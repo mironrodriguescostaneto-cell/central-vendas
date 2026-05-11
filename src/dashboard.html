@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f3f4f8">
+<title>Central Vendas</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f3f4f8;--card:#fff;--card-hover:#f8f9fb;--border:#e8eaef;
+  --accent:#4f6ef7;--accent-dim:#3d5bd9;--text:#1a1d26;--text-muted:#6b7280;
+  --info:#4f6ef7;--logzz:#2ecc87;--gestor:#8b6cf7;
+  --danger:#e74c5e;--warning:#f5a623;--success:#2ecc87;
+  --radius:16px;--radius-sm:12px;
+  --nav-h:64px;--header-h:52px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02);
+  --shadow-md:0 4px 12px rgba(0,0,0,.06);
+}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;overflow:hidden;position:fixed;width:100%;height:100%}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:16px}
+a{color:var(--accent);text-decoration:none}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#loginScreen.hidden{display:none}
+.login-box{width:100%;max-width:360px;text-align:center}
+.login-logo{font-size:26px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--text-muted);margin-bottom:32px}
+.login-input{width:100%;padding:14px 16px;border-radius:var(--radius);background:#fff;border:1.5px solid var(--border);color:var(--text);font-size:16px;margin-bottom:12px;outline:none;transition:border .2s}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{width:100%;padding:15px;border-radius:var(--radius);background:var(--accent);color:#fff;font-weight:700;font-size:15px;transition:background .15s,transform .1s}
+.login-btn:active{transform:scale(0.98);background:var(--accent-dim)}
+.login-error{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px}
+
+/* APP SHELL */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#app.hidden{display:none}
+.app-body{display:flex;flex-direction:column-reverse;flex:1;overflow:hidden}
+
+/* HEADER */
+.app-header{height:var(--header-h);min-height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#fff;border-bottom:1px solid var(--border);z-index:100;box-shadow:var(--shadow)}
+.app-header h1{font-size:15px;font-weight:700;color:var(--accent)}
+.header-right{display:flex;align-items:center;gap:10px}
+.header-status{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+.btn-logout{font-size:12px;color:var(--text-muted);padding:5px 10px;border-radius:6px;background:var(--card-hover);border:1px solid var(--border)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* BOTTOM NAV */
+.bottom-nav{height:calc(var(--nav-h) + var(--safe-bottom));min-height:calc(var(--nav-h) + var(--safe-bottom));background:#fff;border-top:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-around;padding-top:8px;padding-bottom:var(--safe-bottom);z-index:100;box-shadow:0 -1px 3px rgba(0,0,0,.04)}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 12px;border-radius:10px;transition:background .15s;min-width:60px;cursor:pointer;background:none;border:none;color:var(--text-muted);font-family:inherit}
+.nav-item.active{color:var(--accent)}
+.nav-item.active .nav-icon{background:rgba(79,110,247,.1)}
+.nav-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:background .15s}
+.nav-label{font-size:10px;font-weight:600;white-space:nowrap}
+
+/* PAGES */
+.page-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.page-content{padding:12px 12px calc(8px + var(--safe-bottom));min-height:100%}
+.page{display:none;height:100%;flex-direction:column}
+.page.active{display:flex}
+
+/* SECTION TITLES */
+.section-title{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;margin-top:16px;padding:0 4px}
+.section-title:first-child{margin-top:0}
+
+/* CARDS */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:10px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:14px;font-weight:700;color:var(--text)}
+.card-subtitle{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stat-card{background:var(--card);border-radius:var(--radius-sm);padding:14px 12px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.stat-val{font-size:22px;font-weight:800;color:var(--accent)}
+.stat-lbl{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+/* CONNECTION STATUS */
+.conn-card{background:var(--card);border-radius:var(--radius);padding:16px;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:10px}
+.conn-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.conn-agent{display:flex;align-items:center;gap:10px}
+.conn-dot{width:10px;height:10px;border-radius:50%;background:var(--danger);flex-shrink:0}
+.conn-dot.connected{background:var(--success)}
+.conn-dot.connecting{background:var(--warning);animation:pulse 1.5s infinite}
+.conn-name{font-size:14px;font-weight:700}
+.conn-state{font-size:12px;color:var(--text-muted)}
+.btn-reconnect{font-size:12px;font-weight:600;color:#fff;background:var(--accent);padding:7px 14px;border-radius:8px;transition:background .15s}
+.btn-reconnect:active{background:var(--accent-dim)}
+.qr-container{margin-top:12px;text-align:center;display:none}
+.qr-container img{max-width:180px;border-radius:8px;border:1px solid var(--border)}
+.qr-hint{font-size:11px;color:var(--text-muted);margin-top:8px}
+
+/* TABS */
+.tabs{display:flex;background:var(--card);border-radius:var(--radius-sm);padding:4px;margin-bottom:12px;gap:4px;border:1px solid var(--border)}
+.tab-btn{flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;color:var(--text-muted);transition:all .15s;text-align:center}
+.tab-btn.active{background:var(--accent);color:#fff}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* CHAT LIST */
+.chat-list{display:flex;flex-direction:column;gap:8px}
+.chat-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:background .15s;box-shadow:var(--shadow)}
+.chat-item:active{background:var(--card-hover)}
+.chat-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--gestor));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.chat-info{flex:1;min-width:0}
+.chat-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-preview{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.chat-time{font-size:11px;color:var(--text-muted)}
+.chat-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700}
+.chat-badge.paused{background:#fef3c7;color:#92400e}
+.chat-badge.active{background:#dcfce7;color:#166534}
+
+/* CHAT WINDOW */
+#chatWindow{position:fixed;inset:0;z-index:200;background:#fff;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+#chatWindow.open{transform:translateX(0)}
+.chat-win-header{height:var(--header-h);min-height:var(--header-h);display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--border);background:#fff}
+.btn-back{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--card-hover);border:1px solid var(--border);font-size:18px}
+.chat-win-name{flex:1;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-win-actions{display:flex;gap:8px}
+.btn-pause-chat,.btn-resume-chat{font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:none;cursor:pointer;transition:all .15s}
+.btn-pause-chat{background:#fef3c7;color:#92400e}
+.btn-resume-chat{background:#dcfce7;color:#166534}
+.btn-pause-chat:active{background:#fde68a}
+.btn-resume-chat:active{background:#bbf7d0}
+.chat-win-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f0f2f5}
+.msg-bubble{max-width:80%;padding:10px 13px;border-radius:12px;font-size:14px;line-height:1.45;word-break:break-word}
+.msg-bubble.user{background:#fff;color:var(--text);border-bottom-left-radius:4px;align-self:flex-start;box-shadow:var(--shadow)}
+.msg-bubble.assistant{background:var(--accent);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
+.msg-time{font-size:10px;opacity:.6;margin-top:3px;text-align:right}
+.chat-win-input{padding:8px 12px;padding-bottom:calc(8px + var(--safe-bottom));background:#fff;border-top:1px solid var(--border);display:flex;gap:8px}
+.chat-send-input{flex:1;padding:10px 14px;border-radius:20px;border:1.5px solid var(--border);outline:none;font-size:14px;transition:border .15s}
+.chat-send-input:focus{border-color:var(--accent)}
+.btn-send{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:background .15s}
+.btn-send:active{background:var(--accent-dim)}
+
+/* PEDIDOS */
+.pedido-item{background:var(--card);border-radius:var(--radius-sm);padding:14px;border:1px solid var(--border);margin-bottom:8px;box-shadow:var(--shadow)}
+.pedido-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.pedido-id{font-size:11px;font-weight:700;color:var(--accent)}
+.pedido-status{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700}
+.pedido-status.pendente{background:#fef3c7;color:#92400e}
+.pedido-status.agendado{background:#dbeafe;color:#1e40af}
+.pedido-status.entregue{background:#dcfce7;color:#166534}
+.pedido-status.devolvido{background:#fee2e2;color:#991b1b}
+.pedido-nome{font-size:14px;font-weight:600;margin-bottom:4px}
+.pedido-info{font-size:12px;color:var(--text-muted)}
+.pedido-actions{display:flex;gap:6px;margin-top:10px}
+.btn-status{font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;cursor:pointer}
+.btn-status.agendar{background:#dbeafe;color:#1e40af}
+.btn-status.entregar{background:#dcfce7;color:#166534}
+.btn-status.devolver{background:#fee2e2;color:#991b1b}
+
+/* LINKS DE OFERTA */
+.link-item{background:var(--card);border-radius:var(--radius-sm);padding:14px;border:1px solid var(--border);margin-bottom:8px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px}
+.link-info{flex:1;min-width:0}
+.link-titulo{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-url{font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-desc{font-size:12px;color:var(--text-muted)}
+.link-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-copy{background:var(--card-hover);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;color:var(--text-muted);transition:all .15s}
+.btn-copy.copied{background:#dcfce7;color:#166534;border-color:#86efac}
+.btn-copy:active{background:var(--border)}
+.btn-del{background:#fee2e2;border:none;border-radius:8px;padding:7px 10px;font-size:12px;color:#991b1b}
+
+/* GESTOR CHAT */
+.gestor-chat{display:flex;flex-direction:column;height:calc(100vh - var(--header-h) - var(--nav-h) - 130px)}
+.gestor-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.gestor-msg{max-width:85%;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.5;word-break:break-word}
+.gestor-msg.user{background:var(--accent);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
+.gestor-msg.assistant{background:#fff;color:var(--text);border-bottom-left-radius:4px;align-self:flex-start;box-shadow:var(--shadow);border:1px solid var(--border)}
+.gestor-msg.system{background:rgba(139,108,247,.1);color:#5b21b6;border-radius:8px;font-size:12px;align-self:center;padding:8px 14px;border:1px solid rgba(139,108,247,.2)}
+.gestor-msg-time{font-size:10px;opacity:.5;margin-top:4px}
+.gestor-input-row{display:flex;gap:8px;margin-top:10px}
+.gestor-input{flex:1;padding:12px 16px;border-radius:var(--radius);border:1.5px solid var(--border);outline:none;font-size:14px;resize:none;transition:border .15s;min-height:44px;max-height:120px;overflow-y:auto}
+.gestor-input:focus{border-color:var(--gestor)}
+.btn-gestor-send{width:44px;height:44px;border-radius:50%;background:var(--gestor);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:background .15s}
+.btn-gestor-send:active{background:#7c3aed}
+
+/* LOGS */
+.log-list{display:flex;flex-direction:column;gap:6px}
+.log-item{background:var(--card);border-radius:10px;padding:10px 12px;border:1px solid var(--border);font-size:12px;display:flex;gap:10px;align-items:flex-start}
+.log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.log-dot.error{background:var(--danger)}
+.log-dot.warning{background:var(--warning)}
+.log-dot.info,.log-dot.chat,.log-dot.edit{background:var(--accent)}
+.log-dot.deploy{background:var(--success)}
+.log-dot.telegram{background:var(--gestor)}
+.log-body{flex:1}
+.log-time{color:var(--text-muted);margin-bottom:2px;font-size:10px}
+.log-msg{color:var(--text)}
+
+/* PAINEL */
+.agent-status-row{display:flex;gap:8px;margin-bottom:10px}
+.agent-status-mini{flex:1;background:var(--card);border-radius:var(--radius-sm);padding:12px;border:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.agent-status-mini .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.agent-status-mini .dot.connected{background:var(--success)}
+.agent-status-mini .dot.disconnected{background:var(--danger)}
+.agent-status-mini .dot.connecting{background:var(--warning);animation:pulse 1.5s infinite}
+.agent-status-mini .label{font-size:12px;font-weight:700}
+.agent-status-mini .sub{font-size:11px;color:var(--text-muted)}
+
+/* FORM */
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;display:block}
+.form-input{width:100%;padding:11px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);outline:none;font-size:14px;background:#fff;transition:border .15s}
+.form-input:focus{border-color:var(--accent)}
+.btn-primary{width:100%;padding:13px;border-radius:var(--radius-sm);background:var(--accent);color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer;transition:background .15s}
+.btn-primary:active{background:var(--accent-dim)}
+.btn-secondary{width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--card);color:var(--text);font-weight:600;font-size:14px;border:1.5px solid var(--border);cursor:pointer;transition:background .15s}
+.btn-secondary:active{background:var(--card-hover)}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;gap:6px;padding:20px;color:var(--text-muted);font-size:13px}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
+.empty-icon{font-size:40px;margin-bottom:8px}
+.empty-text{font-size:14px}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(80px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:#1a1d26;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* MODAL ADICIONAR LINK */
+.modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-sheet{background:#fff;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px calc(20px + var(--safe-bottom));width:100%;transform:translateY(100%);transition:transform .25s}
+.modal-overlay.open .modal-sheet{transform:translateY(0)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">Central Vendas</div>
+    <div class="login-sub">Sistema de Gestão de Vendas</div>
+    <input class="login-input" type="password" id="loginPassword" placeholder="Senha" autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="app-body">
+
+    <!-- PAGE: PAINEL -->
+    <div class="page active" id="pagePainel">
+      <div class="page-scroll">
+        <div class="page-content">
+          <div class="section-title">Status dos Agentes</div>
+          <div class="agent-status-row" id="agentStatusRow">
+            <div class="agent-status-mini">
+              <div class="dot disconnected" id="dotInfo"></div>
+              <div><div class="label">Info-Produtos</div><div class="sub" id="stateInfo">Desconectado</div></div>
+            </div>
+            <div class="agent-status-mini">
+              <div class="dot disconnected" id="dotLogzz"></div>
+              <div><div class="label">Logzz</div><div class="sub" id="stateLogzz">Desconectado</div></div>
+            </div>
+          </div>
+
+          <div class="section-title">Resumo</div>
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><div class="stat-val" id="statConvInfo">–</div><div class="stat-lbl">Conversas Info</div></div>
+            <div class="stat-card"><div class="stat-val" id="statConvLogzz">–</div><div class="stat-lbl">Conversas Logzz</div></div>
+            <div class="stat-card"><div class="stat-val" id="statPedidos">–</div><div class="stat-lbl">Pedidos</div></div>
+            <div class="stat-card"><div class="stat-val" id="statLinks">–</div><div class="stat-lbl">Links Oferta</div></div>
+          </div>
+
+          <div class="section-title">Jarvis — Últimos Eventos</div>
+          <div id="painelLogs" class="log-list">
+            <div class="loading"><div class="spinner"></div> Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: INFO-PRODUTOS -->
+    <div class="page" id="pageInfo">
+      <div class="page-scroll">
+        <div class="page-content">
+          <div class="tabs" id="tabsInfo">
+            <button class="tab-btn active" onclick="showTab('info','agente')">Agente</button>
+            <button class="tab-btn" onclick="showTab('info','conexao')">Conexão</button>
+            <button class="tab-btn" onclick="showTab('info','conversa')">Conversa</button>
+          </div>
+
+          <!-- Agente Info -->
+          <div class="tab-pane active" id="info-tab-agente">
+            <div class="card">
+              <div class="card-header">
+                <div><div class="card-title">Agente Info-Produtos</div><div class="card-subtitle">Venda de cursos digitais via WhatsApp</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
+                  <div style="font-weight:700;margin-bottom:4px">Produto Principal</div>
+                  <div style="color:var(--text-muted)" id="infoProdPrincipal">–</div>
+                </div>
+                <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
+                  <div style="font-weight:700;margin-bottom:4px">Downsell (se recusar)</div>
+                  <div style="color:var(--text-muted)" id="infoProdDownsell">–</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
+              <textarea class="form-input" id="instrucaoInfo" rows="4" placeholder="Instrução especial para o agente info-produtos..."></textarea>
+              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('info')">Salvar Instrução</button>
+            </div>
+          </div>
+
+          <!-- Conexão Info -->
+          <div class="tab-pane" id="info-tab-conexao">
+            <div class="conn-card">
+              <div class="conn-header">
+                <div class="conn-agent">
+                  <div class="conn-dot" id="connDotInfo"></div>
+                  <div><div class="conn-name">Agente Info-Produtos</div><div class="conn-state" id="connStateInfo">Verificando...</div></div>
+                </div>
+                <button class="btn-reconnect" onclick="reconnectAgent('info')">Reconectar</button>
+              </div>
+              <div class="qr-container" id="qrInfo">
+                <img id="qrImgInfo" src="" alt="QR Code">
+                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conversa Info -->
+          <div class="tab-pane" id="info-tab-conversa">
+            <div id="convListInfo" class="chat-list">
+              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: LOGZZ -->
+    <div class="page" id="pageLogzz">
+      <div class="page-scroll">
+        <div class="page-content">
+          <div class="tabs" id="tabsLogzz">
+            <button class="tab-btn active" onclick="showTab('logzz','agente')">Agente</button>
+            <button class="tab-btn" onclick="showTab('logzz','pedidos')">Pedidos</button>
+            <button class="tab-btn" onclick="showTab('logzz','links')">Links</button>
+            <button class="tab-btn" onclick="showTab('logzz','conexao')">Conexão</button>
+            <button class="tab-btn" onclick="showTab('logzz','conversa')">Conversa</button>
+          </div>
+
+          <!-- Agente Logzz -->
+          <div class="tab-pane active" id="logzz-tab-agente">
+            <div class="card">
+              <div class="card-header">
+                <div><div class="card-title">Agente Logzz</div><div class="card-subtitle">Vendas COD — pago na entrega</div></div>
+              </div>
+              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
+                <div style="font-weight:700;margin-bottom:4px">Produto COD</div>
+                <div style="color:var(--text-muted)" id="logzzProdInfo">–</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
+              <textarea class="form-input" id="instrucaoLogzz" rows="4" placeholder="Instrução especial para o agente Logzz..."></textarea>
+              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('logzz')">Salvar Instrução</button>
+            </div>
+          </div>
+
+          <!-- Pedidos -->
+          <div class="tab-pane" id="logzz-tab-pedidos">
+            <div id="pedidosList">
+              <div class="loading"><div class="spinner"></div> Carregando pedidos...</div>
+            </div>
+          </div>
+
+          <!-- Links de Oferta -->
+          <div class="tab-pane" id="logzz-tab-links">
+            <button class="btn-primary" style="margin-bottom:12px" onclick="openModalLink()">+ Adicionar Link</button>
+            <div id="linksList">
+              <div class="loading"><div class="spinner"></div> Carregando links...</div>
+            </div>
+          </div>
+
+          <!-- Conexão Logzz -->
+          <div class="tab-pane" id="logzz-tab-conexao">
+            <div class="conn-card">
+              <div class="conn-header">
+                <div class="conn-agent">
+                  <div class="conn-dot" id="connDotLogzz"></div>
+                  <div><div class="conn-name">Agente Logzz</div><div class="conn-state" id="connStateLogzz">Verificando...</div></div>
+                </div>
+                <button class="btn-reconnect" onclick="reconnectAgent('logzz')">Reconectar</button>
+              </div>
+              <div class="qr-container" id="qrLogzz">
+                <img id="qrImgLogzz" src="" alt="QR Code">
+                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conversa Logzz -->
+          <div class="tab-pane" id="logzz-tab-conversa">
+            <div id="convListLogzz" class="chat-list">
+              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: GESTOR -->
+    <div class="page" id="pageGestor">
+      <div class="page-scroll">
+        <div class="page-content">
+          <div class="tabs" id="tabsGestor">
+            <button class="tab-btn active" onclick="showTab('gestor','chat')">Chat</button>
+            <button class="tab-btn" onclick="showTab('gestor','logs')">Logs</button>
+          </div>
+
+          <!-- Chat Jarvis -->
+          <div class="tab-pane active" id="gestor-tab-chat">
+            <div class="gestor-chat">
+              <div class="gestor-msgs" id="gestorMsgs">
+                <div class="gestor-msg assistant">Olá, Miron! Sou o Jarvis, seu Gestor de Projetos. Posso ajudar com análises do sistema, corrigir bugs, responder dúvidas sobre marketing e vendas, e fazer deploys com sua autorização. O que precisa?</div>
+              </div>
+              <div class="gestor-input-row">
+                <textarea class="gestor-input" id="gestorInput" placeholder="Pergunte algo ao Jarvis..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendGestor()}"></textarea>
+                <button class="btn-gestor-send" onclick="sendGestor()">➤</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs -->
+          <div class="tab-pane" id="gestor-tab-logs">
+            <div id="gestorLogsList" class="log-list">
+              <div class="loading"><div class="spinner"></div> Carregando logs...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- app-body -->
+
+  <!-- HEADER -->
+  <div class="app-header">
+    <h1 id="pageTitle">Painel</h1>
+    <div class="header-right">
+      <div class="header-status" id="headerStatus"></div>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-painel" onclick="showPage('painel')">
+      <div class="nav-icon">📊</div>
+      <span class="nav-label">Painel</span>
+    </button>
+    <button class="nav-item" id="nav-info" onclick="showPage('info')">
+      <div class="nav-icon">🎓</div>
+      <span class="nav-label">Info</span>
+    </button>
+    <button class="nav-item" id="nav-logzz" onclick="showPage('logzz')">
+      <div class="nav-icon">📦</div>
+      <span class="nav-label">Logzz</span>
+    </button>
+    <button class="nav-item" id="nav-gestor" onclick="showPage('gestor')">
+      <div class="nav-icon">🧠</div>
+      <span class="nav-label">Jarvis</span>
+    </button>
+  </nav>
+</div><!-- app -->
+
+<!-- CHAT WINDOW (overlay) -->
+<div id="chatWindow">
+  <div class="chat-win-header">
+    <button class="btn-back" onclick="closeChatWindow()">←</button>
+    <div class="chat-win-name" id="chatWinName">–</div>
+    <div class="chat-win-actions">
+      <button class="btn-pause-chat" id="btnPauseChat" onclick="pauseChat()">⏸ Pausar</button>
+      <button class="btn-resume-chat" id="btnResumeChat" onclick="resumeChat()" style="display:none">▶ Iniciar</button>
+    </div>
+  </div>
+  <div class="chat-win-body" id="chatWinBody"></div>
+  <div class="chat-win-input">
+    <input class="chat-send-input" id="chatSendInput" placeholder="Enviar mensagem..." onkeydown="if(event.key==='Enter')sendManualMsg()">
+    <button class="btn-send" onclick="sendManualMsg()">➤</button>
+  </div>
+</div>
+
+<!-- MODAL ADICIONAR LINK -->
+<div class="modal-overlay" id="modalLink" onclick="if(event.target===this)closeModalLink()">
+  <div class="modal-sheet">
+    <div class="modal-title">Adicionar Link de Oferta</div>
+    <div class="form-group">
+      <label class="form-label">Título</label>
+      <input class="form-input" id="linkTitulo" placeholder="Ex: Oferta Black Friday">
+    </div>
+    <div class="form-group">
+      <label class="form-label">URL do Link</label>
+      <input class="form-input" id="linkUrl" type="url" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição (opcional)</label>
+      <input class="form-input" id="linkDesc" placeholder="Detalhes da oferta">
+    </div>
+    <button class="btn-primary" onclick="addLink()">Adicionar</button>
+    <button class="btn-secondary" style="margin-top:8px" onclick="closeModalLink()">Cancelar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ----- Estado -----
+let TOKEN = localStorage.getItem('cv_token') || '';
+let currentPage = 'painel';
+let chatWindowAgent = '';
+let chatWindowPhone = '';
+let chatWindowPaused = false;
+let pollInterval = null;
+let agentStatusPoll = null;
+
+// ----- Inicialização -----
+window.onload = () => {
+  if (TOKEN) {
+    showApp();
+  } else {
+    document.getElementById('loginPassword').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  }
+};
+
+// ----- Login -----
+async function doLogin() {
+  const pwd = document.getElementById('loginPassword').value;
+  if (!pwd) return;
+  try {
+    const res = await api('/api/login', 'POST', { password: pwd }, false);
+    TOKEN = res.token;
+    localStorage.setItem('cv_token', TOKEN);
+    document.getElementById('loginError').textContent = '';
+    showApp();
+  } catch {
+    document.getElementById('loginError').textContent = 'Senha incorreta';
+  }
+}
+
+function logout() {
+  TOKEN = '';
+  localStorage.removeItem('cv_token');
+  location.reload();
+}
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  startPolling();
+  loadInitialData();
+}
+
+// ----- API -----
+async function api(url, method = 'GET', body = null, auth = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth) headers['Authorization'] = `Bearer ${TOKEN}`;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (res.status === 401) { logout(); throw new Error('Sessão expirada'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
+  return res.json();
+}
+
+// ----- Navegação -----
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`pagePainel`);
+  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', gestor: 'pageGestor' };
+  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', gestor: 'Gestor Jarvis' };
+  document.getElementById(pageMap[page])?.classList.add('active');
+  document.getElementById(`nav-${page}`)?.classList.add('active');
+  document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
+  currentPage = page;
+
+  if (page === 'info') { loadConversas('info'); loadInstrucao('info'); }
+  if (page === 'logzz') { loadConversas('logzz'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); }
+  if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
+}
+
+// ----- Tabs -----
+function showTab(page, tab) {
+  const container = document.getElementById(`tabs${page.charAt(0).toUpperCase()+page.slice(1)}`);
+  if (!container) return;
+  container.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.remove('active'));
+  document.querySelectorAll(`#page${page.charAt(0).toUpperCase()+page.slice(1)} .tab-pane`).forEach(p => p.classList.remove('active'));
+  const btn = Array.from(container.querySelectorAll('.tab-btn')).find(b => b.onclick?.toString().includes(`'${tab}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById(`${page}-tab-${tab}`);
+  if (pane) pane.classList.add('active');
+
+  if (page === 'info' && tab === 'conversa') loadConversas('info');
+  if (page === 'info' && tab === 'conexao') loadAgentStatus();
+  if (page === 'logzz' && tab === 'conversa') loadConversas('logzz');
+  if (page === 'logzz' && tab === 'conexao') loadAgentStatus();
+  if (page === 'logzz' && tab === 'pedidos') loadPedidos();
+  if (page === 'logzz' && tab === 'links') loadLinks();
+  if (page === 'gestor' && tab === 'logs') loadGestorLogs();
+}
+
+// ----- Polling -----
+function startPolling() {
+  clearInterval(pollInterval);
+  clearInterval(agentStatusPoll);
+  pollInterval = setInterval(() => {
+    if (currentPage === 'painel') loadPainelData();
+    if (currentPage === 'info') loadConversas('info');
+    if (currentPage === 'logzz') loadConversas('logzz');
+  }, 5000);
+  agentStatusPoll = setInterval(loadAgentStatus, 8000);
+  loadAgentStatus();
+}
+
+// ----- Dados iniciais -----
+async function loadInitialData() {
+  await Promise.all([loadPainelData(), loadAgentStatus()]);
+}
+
+async function loadPainelData() {
+  try {
+    const [statusData, logsData, convsInfo, convsLogzz, pedidos, links] = await Promise.all([
+      api('/api/agents/status'),
+      api('/api/gestor/logs?limit=5'),
+      api('/api/conversas/info'),
+      api('/api/conversas/logzz'),
+      api('/api/pedidos'),
+      api('/api/links-oferta'),
+    ]);
+
+    // Stats
+    document.getElementById('statConvInfo').textContent = convsInfo.length || 0;
+    document.getElementById('statConvLogzz').textContent = convsLogzz.length || 0;
+    document.getElementById('statPedidos').textContent = pedidos.length || 0;
+    document.getElementById('statLinks').textContent = links.length || 0;
+
+    // Agent status mini
+    for (const agentId of ['info', 'logzz']) {
+      const s = statusData[agentId] || {};
+      const dot = document.getElementById(`dot${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      const label = document.getElementById(`state${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      if (dot) { dot.className = `dot ${s.state || 'disconnected'}`; }
+      if (label) label.textContent = stateLabel(s.state);
+    }
+
+    // Logs
+    renderPainelLogs(logsData);
+  } catch (e) {
+    console.warn('loadPainelData:', e.message);
+  }
+}
+
+function stateLabel(s) {
+  if (s === 'connected') return 'Conectado';
+  if (s === 'connecting') return 'Conectando...';
+  return 'Desconectado';
+}
+
+function renderPainelLogs(logs) {
+  const el = document.getElementById('painelLogs');
+  if (!logs?.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Nenhum evento ainda</div></div>'; return; }
+  el.innerHTML = logs.slice(0,5).map(l => `
+    <div class="log-item">
+      <div class="log-dot ${l.tipo}"></div>
+      <div class="log-body">
+        <div class="log-time">${formatTs(l.ts)}</div>
+        <div class="log-msg">${esc(l.msg?.slice(0,100))}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ----- Status dos agentes -----
+async function loadAgentStatus() {
+  try {
+    const data = await api('/api/agents/status');
+    for (const agentId of ['info', 'logzz']) {
+      const s = data[agentId] || {};
+      const connDot = document.getElementById(`connDot${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      const connState = document.getElementById(`connState${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      if (connDot) connDot.className = `conn-dot ${s.state || 'disconnected'}`;
+      if (connState) connState.textContent = stateLabel(s.state);
+
+      // QR Code
+      const qrCont = document.getElementById(`qr${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      const qrImg = document.getElementById(`qrImg${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+      if (qrCont && qrImg) {
+        if (s.hasQR && s.qrCode) {
+          qrCont.style.display = 'block';
+          generateQRImage(s.qrCode, qrImg);
+        } else {
+          qrCont.style.display = 'none';
+        }
+      }
+    }
+  } catch {}
+}
+
+async function generateQRImage(qrData, imgEl) {
+  try {
+    // Usar QRCode.js via CDN embutido ou gerar URL via API
+    const res = await api(`/api/agents/status`); // já temos os dados
+    // Usar canvas para gerar QR (simples, via qrserver.com)
+    imgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+  } catch {}
+}
+
+async function reconnectAgent(agentId) {
+  try {
+    await api(`/api/agents/${agentId}/reconnect`, 'POST');
+    toast('Reconexão iniciada. Aguarde o QR Code.');
+    setTimeout(loadAgentStatus, 2000);
+  } catch (e) {
+    toast(`Erro: ${e.message}`);
+  }
+}
+
+// ----- Conversas -----
+async function loadConversas(agentId) {
+  const el = document.getElementById(`convList${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+  if (!el) return;
+  try {
+    const data = await api(`/api/conversas/${agentId}`);
+    if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Nenhuma conversa ainda</div></div>'; return; }
+    el.innerHTML = data.map(c => `
+      <div class="chat-item" onclick="openChatWindow('${agentId}','${esc(c.phone)}','${esc(c.pushName||c.phone)}',${c.pausado})">
+        <div class="chat-avatar">${(c.pushName||c.phone).charAt(0).toUpperCase()}</div>
+        <div class="chat-info">
+          <div class="chat-name">${esc(c.pushName||c.phone)}</div>
+          <div class="chat-preview">${esc(c.ultimoTexto||'—')}</div>
+        </div>
+        <div class="chat-meta">
+          <div class="chat-time">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : '—'}</div>
+          <span class="chat-badge ${c.pausado?'paused':'active'}">${c.pausado?'Pausado':'Ativo'}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${e.message}</div></div>`;
+  }
+}
+
+// ----- Chat Window -----
+function openChatWindow(agentId, phone, name, pausado) {
+  chatWindowAgent = agentId;
+  chatWindowPhone = phone;
+  chatWindowPaused = pausado;
+  document.getElementById('chatWinName').textContent = name || phone;
+  updatePauseButtons();
+  document.getElementById('chatWindow').classList.add('open');
+  loadChatMessages();
+}
+
+function closeChatWindow() {
+  document.getElementById('chatWindow').classList.remove('open');
+  chatWindowAgent = '';
+  chatWindowPhone = '';
+}
+
+async function loadChatMessages() {
+  if (!chatWindowAgent || !chatWindowPhone) return;
+  try {
+    const data = await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}`);
+    chatWindowPaused = data.pausado;
+    updatePauseButtons();
+    const body = document.getElementById('chatWinBody');
+    const msgs = data.msgs || [];
+    if (!msgs.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Sem mensagens</div></div>'; return; }
+    body.innerHTML = msgs.map(m => `
+      <div class="msg-bubble ${m.role}">
+        ${esc(m.text)}
+        <div class="msg-time">${formatTs(m.ts)}</div>
+      </div>
+    `).join('');
+    body.scrollTop = body.scrollHeight;
+  } catch {}
+}
+
+function updatePauseButtons() {
+  document.getElementById('btnPauseChat').style.display = chatWindowPaused ? 'none' : '';
+  document.getElementById('btnResumeChat').style.display = chatWindowPaused ? '' : 'none';
+}
+
+async function pauseChat() {
+  try {
+    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/pause`, 'POST');
+    chatWindowPaused = true;
+    updatePauseButtons();
+    toast('Conversa pausada');
+    loadConversas(chatWindowAgent);
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+async function resumeChat() {
+  try {
+    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/resume`, 'POST');
+    chatWindowPaused = false;
+    updatePauseButtons();
+    toast('Conversa iniciada');
+    loadConversas(chatWindowAgent);
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+async function sendManualMsg() {
+  const input = document.getElementById('chatSendInput');
+  const text = input.value.trim();
+  if (!text || !chatWindowAgent || !chatWindowPhone) return;
+  input.value = '';
+  try {
+    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/send`, 'POST', { text });
+    await loadChatMessages();
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+// ----- Pedidos -----
+async function loadPedidos() {
+  const el = document.getElementById('pedidosList');
+  if (!el) return;
+  try {
+    const data = await api('/api/pedidos');
+    if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Nenhum pedido</div></div>'; return; }
+    el.innerHTML = data.map(p => `
+      <div class="pedido-item">
+        <div class="pedido-header">
+          <span class="pedido-id">${p.id}</span>
+          <span class="pedido-status ${p.status}">${p.status}</span>
+        </div>
+        <div class="pedido-nome">${esc(p.nome)}</div>
+        <div class="pedido-info">${esc(p.produto)} • R$ ${p.preco || '–'}</div>
+        <div class="pedido-info" style="margin-top:4px">${esc(p.endereco||'—')}</div>
+        <div class="pedido-info">📞 ${esc(p.telefone||p.phone||'—')}</div>
+        <div class="pedido-actions">
+          ${p.status==='pendente'?`<button class="btn-status agendar" onclick="updatePedido('${p.id}','agendado')">Agendar</button>`:''}
+          ${p.status==='agendado'?`<button class="btn-status entregar" onclick="updatePedido('${p.id}','entregue')">Entregue</button>`:''}
+          ${p.status!=='devolvido'?`<button class="btn-status devolver" onclick="updatePedido('${p.id}','devolvido')">Devolvido</button>`:''}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${e.message}</div></div>`;
+  }
+}
+
+async function updatePedido(id, status) {
+  try {
+    await api(`/api/pedidos/${id}`, 'PATCH', { status });
+    toast(`Pedido ${status}`);
+    loadPedidos();
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+// ----- Links de Oferta -----
+async function loadLinks() {
+  const el = document.getElementById('linksList');
+  if (!el) return;
+  try {
+    const data = await api('/api/links-oferta');
+    if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔗</div><div class="empty-text">Nenhum link cadastrado</div></div>'; return; }
+    el.innerHTML = data.map(l => `
+      <div class="link-item">
+        <div class="link-info">
+          <div class="link-titulo">${esc(l.titulo)}</div>
+          <div class="link-url">${esc(l.url)}</div>
+          ${l.descricao?`<div class="link-desc">${esc(l.descricao)}</div>`:''}
+        </div>
+        <div class="link-actions">
+          <button class="btn-copy" id="cp-${l.id}" onclick="copyLink('${esc(l.url)}','${l.id}')">📋</button>
+          <button class="btn-del" onclick="deleteLink('${l.id}')">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${e.message}</div></div>`;
+  }
+}
+
+function copyLink(url, id) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById(`cp-${id}`);
+    if (btn) { btn.textContent = '✅'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='📋'; btn.classList.remove('copied'); }, 2000); }
+    toast('Link copiado!');
+  }).catch(() => toast('Erro ao copiar'));
+}
+
+async function deleteLink(id) {
+  try {
+    await api(`/api/links-oferta/${id}`, 'DELETE');
+    toast('Link removido');
+    loadLinks();
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+function openModalLink() { document.getElementById('modalLink').classList.add('open'); }
+function closeModalLink() { document.getElementById('modalLink').classList.remove('open'); document.getElementById('linkTitulo').value=''; document.getElementById('linkUrl').value=''; document.getElementById('linkDesc').value=''; }
+
+async function addLink() {
+  const titulo = document.getElementById('linkTitulo').value.trim();
+  const url = document.getElementById('linkUrl').value.trim();
+  const descricao = document.getElementById('linkDesc').value.trim();
+  if (!titulo || !url) { toast('Título e URL são obrigatórios'); return; }
+  try {
+    await api('/api/links-oferta', 'POST', { titulo, url, descricao });
+    closeModalLink();
+    toast('Link adicionado!');
+    loadLinks();
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+// ----- Gestor Jarvis -----
+let gestorSending = false;
+
+async function sendGestor() {
+  if (gestorSending) return;
+  const input = document.getElementById('gestorInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  gestorSending = true;
+
+  const msgs = document.getElementById('gestorMsgs');
+  msgs.innerHTML += `<div class="gestor-msg user">${esc(text)}<div class="gestor-msg-time">${new Date().toLocaleTimeString('pt-BR')}</div></div>`;
+  msgs.innerHTML += `<div class="gestor-msg assistant" id="gestorTyping"><div class="spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px"></div> Jarvis pensando...</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res = await api('/api/gestor/chat', 'POST', { message: text });
+    document.getElementById('gestorTyping')?.remove();
+    msgs.innerHTML += `<div class="gestor-msg assistant">${esc(res.resposta).replace(/\n/g,'<br>')}<div class="gestor-msg-time">${new Date().toLocaleTimeString('pt-BR')}</div></div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch (e) {
+    document.getElementById('gestorTyping')?.remove();
+    msgs.innerHTML += `<div class="gestor-msg system">Erro: ${e.message}</div>`;
+  } finally {
+    gestorSending = false;
+  }
+}
+
+async function loadGestorLogs() {
+  const el = document.getElementById('gestorLogsList');
+  if (!el) return;
+  try {
+    const data = await api('/api/gestor/logs?limit=50');
+    if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Nenhum log</div></div>'; return; }
+    el.innerHTML = data.map(l => `
+      <div class="log-item">
+        <div class="log-dot ${l.tipo}"></div>
+        <div class="log-body">
+          <div class="log-time">${formatTs(l.ts)}</div>
+          <div class="log-msg">${esc(l.msg)}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch {}
+}
+
+async function loadGestorHistory() {
+  try {
+    const data = await api('/api/gestor/chat/history');
+    if (!data.length) return;
+    const msgs = document.getElementById('gestorMsgs');
+    msgs.innerHTML = data.map(m => `
+      <div class="gestor-msg ${m.role}">${esc(m.content).replace(/\n/g,'<br>')}<div class="gestor-msg-time">${formatTs(m.ts)}</div></div>
+    `).join('');
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch {}
+}
+
+// ----- Instruções -----
+async function loadInstrucao(agentId) {
+  try {
+    const data = await api(`/api/instrucoes/${agentId}`);
+    const el = document.getElementById(`instrucao${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+    if (el) el.value = data.instrucao || '';
+  } catch {}
+}
+
+async function salvarInstrucao(agentId) {
+  const el = document.getElementById(`instrucao${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
+  if (!el) return;
+  try {
+    await api(`/api/instrucoes/${agentId}`, 'POST', { instrucao: el.value });
+    toast('Instrução salva!');
+  } catch (e) { toast(`Erro: ${e.message}`); }
+}
+
+// ----- Utils -----
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'agora';
+  if (diff < 3600000) return `${Math.floor(diff/60000)}min`;
+  if (diff < 86400000) return d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+}
+
+function toast(msg, duration = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+</script>
+</body>
+</html>
