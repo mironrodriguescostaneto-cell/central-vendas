@@ -401,6 +401,52 @@ async function chat(userMessage) {
   return finalText;
 }
 
+// ----- Telegram Listener -----
+function initTelegramListener() {
+  const { botToken, chatId } = CONFIG.telegram;
+  if (!botToken || !chatId) {
+    console.warn('[JARVIS] Telegram listener não iniciado: variáveis ausentes');
+    return;
+  }
+
+  try {
+    const TelegramBot = require('node-telegram-bot-api');
+    const bot = new TelegramBot(botToken, { polling: true });
+
+    bot.on('message', async (msg) => {
+      if (String(msg.chat.id) !== String(chatId)) return;
+      const texto = msg.text;
+      if (!texto) return;
+
+      console.log(`[JARVIS] Telegram recebido: ${texto.slice(0, 80)}`);
+
+      try {
+        const resposta = await chat(texto);
+        // Telegram limita 4096 chars por mensagem
+        const partes = resposta.match(/[\s\S]{1,4000}/g) || [resposta];
+        for (const parte of partes) {
+          try {
+            await bot.sendMessage(msg.chat.id, parte, { parse_mode: 'Markdown' });
+          } catch (_) {
+            await bot.sendMessage(msg.chat.id, parte);
+          }
+        }
+      } catch (e) {
+        console.error('[JARVIS] Erro ao processar mensagem Telegram:', e.message);
+        try { await bot.sendMessage(msg.chat.id, `⚠️ Erro: ${e.message}`); } catch (_) {}
+      }
+    });
+
+    bot.on('polling_error', (err) => {
+      console.error('[JARVIS] Polling error:', err.message);
+    });
+
+    console.log('[JARVIS] @jarvisistema_bot pronto para receber mensagens');
+  } catch (e) {
+    console.error('[JARVIS] Falha ao iniciar listener Telegram:', e.message);
+  }
+}
+
 // ----- Monitor de erros em tempo real -----
 function initErrorMonitor() {
   process.on('uncaughtException', async (error) => {
@@ -416,6 +462,7 @@ function initErrorMonitor() {
     addGestorLog('warning', msg);
   });
 
+  initTelegramListener();
   console.log('[JARVIS] Monitor de erros ativo');
 }
 
