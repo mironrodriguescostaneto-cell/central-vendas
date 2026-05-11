@@ -10,6 +10,7 @@ const { CONFIG } = require('../config');
 const { callGemini } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
+const { sendTelegram } = require('../gestor');
 
 const AGENT_ID = 'info';
 
@@ -161,6 +162,7 @@ async function processMessage(event, payload) {
 
   } catch (error) {
     console.error(`[INFO-AGENTE] Erro ao processar mensagem de ${phone}:`, error.message);
+    sendTelegram(`⚠️ *Info-Agente — Erro*\nCliente: ${phone}\nErro: ${error.message}`).catch(() => {});
   }
 }
 
