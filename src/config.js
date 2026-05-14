@@ -13,6 +13,7 @@ const CONFIG = {
 
   anthropicKey: env('ANTHROPIC_API_KEY'),
   geminiKey: env('GEMINI_API_KEY'),
+  groqKey: env('GROQ_API_KEY'),
   redisUrl: env('REDIS_URL'),
 
   telegram: {

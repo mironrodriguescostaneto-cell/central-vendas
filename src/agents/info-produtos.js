@@ -7,7 +7,7 @@
 // ============================================================
 
 const { CONFIG } = require('../config');
-const { callGemini } = require('../services');
+const { callGemini, transcribeAudio } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
@@ -88,16 +88,28 @@ function removeTags(text) {
 
 // ----- Processa mensagem recebida -----
 async function processMessage(event, payload) {
-  const { phone, body, pushName, _originalJid } = payload;
+  const { phone, body: rawBody, pushName, _originalJid } = payload;
 
   if (!phone) return;
+  if (payload.isFromMe) return;
 
-  // Registrar mensagem do cliente
-  if (!payload.isFromMe) {
-    addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
+  // Transcrever áudio se necessário
+  let body = rawBody;
+  if (!body && payload.audio?.audioUrl) {
+    try {
+      const transcricao = await transcribeAudio(payload.audio.audioUrl);
+      if (transcricao) {
+        body = transcricao;
+        console.log(`[INFO] Áudio transcrito de ${phone}: "${transcricao.slice(0, 80)}"`);
+      }
+    } catch (e) {
+      console.error(`[INFO] Erro transcrição áudio:`, e.message);
+    }
+    if (!body) body = '[áudio não transcrito]';
   }
 
-  if (payload.isFromMe) return;
+  // Registrar mensagem do cliente
+  addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
 
   // Verificar se está pausado
   if (isPaused(AGENT_ID, phone)) return;

@@ -1,7 +1,7 @@
 'use strict';
 
 const { CONFIG } = require('../config');
-const { callClaudeText } = require('../services');
+const { callClaudeText, transcribeAudio } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
@@ -185,9 +185,24 @@ function getConvState(phone) {
 }
 
 async function processMessage(event, payload) {
-  const { phone, body, pushName, _originalJid } = payload;
+  const { phone, body: rawBody, pushName, _originalJid } = payload;
   if (!phone) return;
   if (payload.isFromMe) return;
+
+  // Transcrever áudio se necessário
+  let body = rawBody;
+  if (!body && payload.audio?.audioUrl) {
+    try {
+      const transcricao = await transcribeAudio(payload.audio.audioUrl);
+      if (transcricao) {
+        body = transcricao;
+        console.log(`[LOGZZ] Áudio transcrito de ${phone}: "${transcricao.slice(0, 80)}"`);
+      }
+    } catch (e) {
+      console.error(`[LOGZZ] Erro transcrição áudio:`, e.message);
+    }
+    if (!body) body = '[áudio não transcrito]';
+  }
 
   console.log(`[LOGZZ] Mensagem recebida de ${phone}: "${(body || '').slice(0, 60)}"`);
 
