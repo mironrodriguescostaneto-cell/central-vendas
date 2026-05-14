@@ -499,7 +499,7 @@ a{color:var(--accent);text-decoration:none}
   <div class="chat-win-body" id="chatWinBody"></div>
   <div class="chat-win-input">
     <input class="chat-send-input" id="chatSendInput" placeholder="Enviar mensagem..." onkeydown="if(event.key==='Enter')sendManualMsg()">
-    <button class="btn-send" onclick="sendManualMsg()">➤</button>
+    <button type="button" class="btn-send" onclick="sendManualMsg()">➤</button>
   </div>
 </div>
 
@@ -825,13 +825,22 @@ async function resumeChat() {
 
 async function sendManualMsg() {
   const input = document.getElementById('chatSendInput');
+  const btn = document.querySelector('.btn-send');
   const text = input.value.trim();
   if (!text || !chatWindowAgent || !chatWindowPhone) return;
-  input.value = '';
+  input.disabled = true;
+  if (btn) btn.disabled = true;
   try {
     await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/send`, 'POST', { text });
+    input.value = '';
     await loadChatMessages();
-  } catch (e) { toast(`Erro: ${e.message}`); }
+  } catch (e) {
+    toast(`Erro ao enviar: ${e.message}`, 5000);
+  } finally {
+    input.disabled = false;
+    if (btn) btn.disabled = false;
+    input.focus();
+  }
 }
 
 // ----- Pedidos -----
