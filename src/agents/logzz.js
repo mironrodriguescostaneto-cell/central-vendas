@@ -189,11 +189,11 @@ async function processMessage(event, payload) {
   console.log(`[LOGZZ] Mensagem recebida de ${phone}: "${(body || '').slice(0, 60)}"`);
 
   addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
-  const conv = getConvState(phone);
-  if (conv?.linkEnviadoEm) {
-    delete conv.linkEnviadoEm;
-    delete conv.followUpEnviado;
-    delete conv.remarketingEnviado;
+  const convState = getConvState(phone);
+  if (convState?.linkEnviadoEm) {
+    delete convState.linkEnviadoEm;
+    delete convState.followUpEnviado;
+    delete convState.remarketingEnviado;
   }
 
   if (isPaused(AGENT_ID, phone)) return;
