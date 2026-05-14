@@ -117,23 +117,23 @@ async function processMessage(event, payload) {
   if (_pending.has(phone)) return;
   _pending.add(phone);
 
-  const conv = getConv(AGENT_ID, phone);
-  const instrucao = getInstrucao(AGENT_ID);
-
-  // Histórico para o Gemini (últimas 20 mensagens)
-  const historico = (conv.msgs || []).slice(-20).map(m => ({
-    role: m.role === 'user' ? 'user' : 'model',
-    content: m.text,
-  }));
-
-  // Garantir que a última mensagem seja do usuário (Gemini exige)
-  if (historico.length === 0 || historico.at(-1).role !== 'user') {
-    historico.push({ role: 'user', content: body || 'oi' });
-  }
-
+  // Delay antes de responder — mensagens recebidas neste período acumulam no DB
   await new Promise(r => setTimeout(r, 20000));
 
   try {
+    // Rebuild historico APÓS o delay para incluir todas as mensagens recebidas durante a espera
+    const conv = getConv(AGENT_ID, phone);
+    const instrucao = getInstrucao(AGENT_ID);
+
+    const historico = (conv.msgs || []).slice(-20).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      content: m.text,
+    }));
+
+    if (historico.length === 0 || historico.at(-1).role !== 'user') {
+      historico.push({ role: 'user', content: body || 'oi' });
+    }
+
     const systemPrompt = buildSystemPrompt(instrucao);
     const resposta = await Promise.race([
       callGemini(systemPrompt, historico, { temperature: 0.8, maxTokens: 600 }),
@@ -143,9 +143,6 @@ async function processMessage(event, payload) {
     const tags = extractTags(resposta);
     const textoLimpo = removeTags(resposta);
 
-    // Registrar resposta do agente
-    addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
-
     const sessionId = CONFIG.sessionIds.info;
 
     // Processar tags
@@ -154,9 +151,10 @@ async function processMessage(event, payload) {
       console.log(`[INFO-AGENTE] Agente pausado para ${phone} por solicitação do cliente`);
     }
 
-    // Enviar resposta de texto
+    // Enviar resposta de texto — addMsg só após envio confirmado
     if (textoLimpo) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
+      addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
     }
 
     // Enviar mídia se solicitado

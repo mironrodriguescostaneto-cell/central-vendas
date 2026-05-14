@@ -219,29 +219,29 @@ async function processMessage(event, payload) {
   if (_pending.has(phone)) return;
   _pending.add(phone);
 
-  const conv = getConv(AGENT_ID, phone);
-  const instrucao = getInstrucao(AGENT_ID);
-
-  const historico = (conv.msgs || []).slice(-30).map(m => ({
-    role: m.role === 'user' ? 'user' : 'assistant',
-    content: m.text,
-  }));
-
-  if (historico.length === 0 || historico.at(-1).role !== 'user') {
-    historico.push({ role: 'user', content: body || 'oi' });
-  }
-
+  // Delay antes de responder — mensagens recebidas neste período acumulam no DB
   await new Promise(r => setTimeout(r, 20000));
 
   try {
+    // Rebuild historico APÓS o delay para incluir todas as mensagens recebidas durante a espera
+    const conv = getConv(AGENT_ID, phone);
+    const instrucao = getInstrucao(AGENT_ID);
+
+    const historico = (conv.msgs || []).slice(-30).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.text,
+    }));
+
+    if (historico.length === 0 || historico.at(-1).role !== 'user') {
+      historico.push({ role: 'user', content: body || 'oi' });
+    }
+
     const resposta = await Promise.race([
       callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
     ]);
     const tags = extractTags(resposta);
     const textoLimpo = removeTags(resposta);
-
-    addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
 
     const sessionId = CONFIG.sessionIds.logzz;
 
@@ -258,6 +258,7 @@ async function processMessage(event, payload) {
 
     if (textoLimpo) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
+      addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
     }
 
     if (tags.includes('ENVIAR_FOTO')) {
