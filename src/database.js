@@ -169,6 +169,10 @@ function resumePhone(agentId, phone) {
   state.paused[agentId]?.delete(phone);
 }
 
+function clearPauses(agentId) {
+  if (state.paused[agentId]) state.paused[agentId].clear();
+}
+
 // ----- LID Mapping -----
 function isLidFormat(jid) {
   return jid && jid.endsWith('@lid');
@@ -253,6 +257,7 @@ module.exports = {
   isPaused,
   pausePhone,
   resumePhone,
+  clearPauses,
   isLidFormat,
   mapLidToPhone,
   registerLid,

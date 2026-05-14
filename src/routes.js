@@ -321,6 +321,29 @@ router.post('/admin/upload-session', auth, async (req, res) => {
   }
 });
 
+// ----- Limpar pausas de um agente -----
+router.delete('/api/agents/:agentId/pauses', auth, (req, res) => {
+  const { agentId } = req.params;
+  if (!['info', 'logzz'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  db.clearPauses(agentId);
+  res.json({ ok: true, message: `Pausas do agente ${agentId} limpas` });
+});
+
+// ----- Endpoint de teste para simular mensagem recebida -----
+router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
+  const { agentId } = req.params;
+  const { phone, message } = req.body;
+  if (!phone || !message) return res.status(400).json({ error: 'phone e message obrigatórios' });
+  if (!['info', 'logzz'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  try {
+    const agent = agentId === 'logzz' ? require('./agents/logzz') : require('./agents/info-produtos');
+    await agent.processMessage('received', { phone, body: message, pushName: 'Teste', isFromMe: false });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ----- Dashboard (servir o HTML) -----
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));

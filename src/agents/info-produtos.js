@@ -97,12 +97,7 @@ async function processMessage(event, payload) {
     addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
   }
 
-  // Detectar se o dono assumiu a conversa manualmente
-  if (payload.isFromMe) {
-    pausePhone(AGENT_ID, phone);
-    console.log(`[INFO-AGENTE] Dono assumiu conversa com ${phone} → pausando`);
-    return;
-  }
+  if (payload.isFromMe) return;
 
   // Verificar se está pausado
   if (isPaused(AGENT_ID, phone)) return;

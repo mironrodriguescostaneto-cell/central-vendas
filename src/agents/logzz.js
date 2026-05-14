@@ -184,21 +184,16 @@ function getConvState(phone) {
 async function processMessage(event, payload) {
   const { phone, body, pushName, _originalJid } = payload;
   if (!phone) return;
+  if (payload.isFromMe) return;
 
-  if (!payload.isFromMe) {
-    addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
-    // Cliente respondeu → limpa timer de follow-up
-    const conv = getConvState(phone);
-    if (conv?.linkEnviadoEm) {
-      delete conv.linkEnviadoEm;
-      delete conv.followUpEnviado;
-      delete conv.remarketingEnviado;
-    }
-  }
+  console.log(`[LOGZZ] Mensagem recebida de ${phone}: "${(body || '').slice(0, 60)}"`);
 
-  if (payload.isFromMe) {
-    pausePhone(AGENT_ID, phone);
-    return;
+  addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
+  const conv = getConvState(phone);
+  if (conv?.linkEnviadoEm) {
+    delete conv.linkEnviadoEm;
+    delete conv.followUpEnviado;
+    delete conv.remarketingEnviado;
   }
 
   if (isPaused(AGENT_ID, phone)) return;
