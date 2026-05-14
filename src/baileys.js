@@ -225,6 +225,8 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
 
     // ----- Mensagens recebidas -----
     session.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (!session._seenMsgIds) session._seenMsgIds = new Set();
+
       for (const msg of messages) {
         if (msg.key.fromMe) {
           if (session.messageHandler) {
@@ -236,6 +238,13 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
 
         if (type !== 'notify') continue;
         if (msg.key.remoteJid?.includes('@g.us')) continue;
+
+        // Dedup — Baileys pode disparar o mesmo evento duas vezes
+        if (msg.key.id && session._seenMsgIds.has(msg.key.id)) continue;
+        if (msg.key.id) {
+          session._seenMsgIds.add(msg.key.id);
+          if (session._seenMsgIds.size > 1000) session._seenMsgIds.clear();
+        }
 
         let phone = jidToPhone(msg.key.remoteJid);
         let originalJid = msg.key.remoteJid;
@@ -378,6 +387,23 @@ async function sendText(sessionId, phone, text, originalJid) {
   await session.sock.sendMessage(jid, { text });
 }
 
+async function fetchBuffer(url, hops = 5) {
+  const mod = url.startsWith('https') ? require('https') : require('http');
+  return new Promise((resolve, reject) => {
+    mod.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && hops > 0) {
+        res.resume();
+        fetchBuffer(res.headers.location, hops - 1).then(resolve).catch(reject);
+        return;
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', reject);
+  });
+}
+
 async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
   const session = getSession(sessionId);
   if (!session.sock || session.connectionState !== 'connected') {
@@ -387,7 +413,12 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
   if (type === 'image') {
     await session.sock.sendMessage(jid, { image: { url }, caption: caption || '' });
   } else if (type === 'video') {
-    await session.sock.sendMessage(jid, { video: { url }, caption: caption || '' });
+    try {
+      const buf = await fetchBuffer(url);
+      await session.sock.sendMessage(jid, { video: buf, caption: caption || '', mimetype: 'video/mp4' });
+    } catch {
+      await session.sock.sendMessage(jid, { video: { url }, caption: caption || '' });
+    }
   } else if (type === 'audio') {
     await session.sock.sendMessage(jid, { audio: { url }, mimetype: 'audio/mp4' });
   }
