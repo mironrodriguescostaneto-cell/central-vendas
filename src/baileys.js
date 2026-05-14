@@ -321,6 +321,42 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
           }
         }
 
+        // Imagem — baixa completa; fallback para thumbnail embutido
+        let image;
+        if (msg.message?.imageMessage) {
+          try {
+            const stream = await downloadMediaMessage(msg, 'buffer', {});
+            const buffer = Buffer.isBuffer(stream) ? stream : Buffer.from(stream);
+            image = {
+              base64: buffer.toString('base64'),
+              mimetype: msg.message.imageMessage.mimetype || 'image/jpeg',
+              caption: msg.message.imageMessage.caption || '',
+            };
+            console.log(`[BAILEYS:${sessionId}] Imagem baixada: ${buffer.length} bytes`);
+          } catch (e) {
+            const thumb = msg.message.imageMessage.jpegThumbnail;
+            if (thumb) {
+              image = { base64: Buffer.from(thumb).toString('base64'), mimetype: 'image/jpeg', caption: msg.message.imageMessage.caption || '' };
+              console.log(`[BAILEYS:${sessionId}] Imagem: usando thumbnail (${thumb.length} bytes)`);
+            }
+            console.error(`[BAILEYS:${sessionId}] Erro ao baixar imagem:`, e.message);
+          }
+        }
+
+        // Vídeo — Claude não processa vídeo, mas usa thumbnail JPEG embutido
+        let videoThumb;
+        if (msg.message?.videoMessage) {
+          const thumb = msg.message.videoMessage.jpegThumbnail;
+          if (thumb) {
+            videoThumb = {
+              base64: Buffer.from(thumb).toString('base64'),
+              mimetype: 'image/jpeg',
+              caption: msg.message.videoMessage.caption || '',
+            };
+            console.log(`[BAILEYS:${sessionId}] Thumbnail de vídeo extraído: ${thumb.length} bytes`);
+          }
+        }
+
         const normalized = {
           phone,
           isFromMe: false,
@@ -329,6 +365,8 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
           caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || '',
           location,
           audio,
+          image,
+          videoThumb,
           pushName,
           senderName: pushName,
           _originalJid: originalJid,

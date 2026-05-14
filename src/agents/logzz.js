@@ -8,6 +8,8 @@ const { sendTelegram } = require('../gestor');
 
 const AGENT_ID = 'logzz';
 const _pending = new Set();
+// Mídia acumulada por telefone enquanto aguarda o delay de 20s
+const _pendingMedia = new Map();
 
 const CIDADES_ENTREGA = new Set([
   'belo horizonte','ibirité','sabará','santa luzia','betim','contagem',
@@ -215,8 +217,23 @@ async function processMessage(event, payload) {
     delete convState.remarketingEnviado;
   }
 
-  if (isPaused(AGENT_ID, phone)) return;
-  if (_pending.has(phone)) return;
+  // Acumular mídia antes do check de pausa/pending
+  if (payload.image) {
+    const list = _pendingMedia.get(phone) || [];
+    list.push({ ...payload.image, kind: 'image' });
+    _pendingMedia.set(phone, list);
+  }
+  if (payload.videoThumb) {
+    const list = _pendingMedia.get(phone) || [];
+    list.push({ ...payload.videoThumb, kind: 'video' });
+    _pendingMedia.set(phone, list);
+  }
+
+  if (isPaused(AGENT_ID, phone)) {
+    _pendingMedia.delete(phone);
+    return;
+  }
+  if (_pending.has(phone)) return; // mídia fica acumulada, será consumida pelo processamento em andamento
   _pending.add(phone);
 
   // Delay antes de responder — mensagens recebidas neste período acumulam no DB
@@ -234,6 +251,31 @@ async function processMessage(event, payload) {
 
     if (historico.length === 0 || historico.at(-1).role !== 'user') {
       historico.push({ role: 'user', content: body || 'oi' });
+    }
+
+    // Consumir mídia acumulada e injetar como vision blocks na última mensagem do usuário
+    const mediaList = _pendingMedia.get(phone) || [];
+    _pendingMedia.delete(phone);
+
+    if (mediaList.length > 0) {
+      let lastUserIdx = -1;
+      for (let i = historico.length - 1; i >= 0; i--) {
+        if (historico[i].role === 'user') { lastUserIdx = i; break; }
+      }
+      if (lastUserIdx >= 0) {
+        const blocks = [];
+        for (const m of mediaList) {
+          blocks.push({ type: 'image', source: { type: 'base64', media_type: m.mimetype, data: m.base64 } });
+        }
+        const hasVideo = mediaList.some(m => m.kind === 'video');
+        const textoAtual = historico[lastUserIdx].content;
+        const textoFinal = (textoAtual === '[mídia]' || !textoAtual)
+          ? (hasVideo ? '[O cliente enviou um vídeo — analise o frame/thumbnail acima]' : '[O cliente enviou esta imagem — use para continuar o fluxo de vendas]')
+          : textoAtual;
+        blocks.push({ type: 'text', text: textoFinal });
+        historico[lastUserIdx] = { role: 'user', content: blocks };
+        console.log(`[LOGZZ] Vision: ${mediaList.length} mídia(s) injetada(s) para ${phone}`);
+      }
     }
 
     const resposta = await Promise.race([
@@ -286,6 +328,7 @@ async function processMessage(event, payload) {
     sendTelegram(`⚠️ *Roberto — Erro*\nCliente: ${phone}\nErro: ${error.message}`).catch(() => {});
   } finally {
     _pending.delete(phone);
+    _pendingMedia.delete(phone);
   }
 }
 
