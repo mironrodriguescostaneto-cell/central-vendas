@@ -437,8 +437,17 @@ function initTelegramListener() {
       }
     });
 
+    let _pollingErrors = 0;
     bot.on('polling_error', (err) => {
       console.error('[JARVIS] Polling error:', err.message);
+      _pollingErrors++;
+      if (_pollingErrors >= 3) {
+        _pollingErrors = 0;
+        console.error('[JARVIS] Polling falhou 3x — reiniciando...');
+        bot.stopPolling()
+          .then(() => bot.startPolling())
+          .catch(e => console.error('[JARVIS] Falha ao reiniciar polling:', e.message));
+      }
     });
 
     console.log('[JARVIS] @jarvisistema_bot pronto para receber mensagens');

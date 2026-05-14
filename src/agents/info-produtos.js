@@ -135,7 +135,10 @@ async function processMessage(event, payload) {
 
   try {
     const systemPrompt = buildSystemPrompt(instrucao);
-    const resposta = await callGemini(systemPrompt, historico, { temperature: 0.8, maxTokens: 600 });
+    const resposta = await Promise.race([
+      callGemini(systemPrompt, historico, { temperature: 0.8, maxTokens: 600 }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
+    ]);
 
     const tags = extractTags(resposta);
     const textoLimpo = removeTags(resposta);

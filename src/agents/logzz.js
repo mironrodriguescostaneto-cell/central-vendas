@@ -234,7 +234,10 @@ async function processMessage(event, payload) {
   await new Promise(r => setTimeout(r, 20000));
 
   try {
-    const resposta = await callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 });
+    const resposta = await Promise.race([
+      callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
+    ]);
     const tags = extractTags(resposta);
     const textoLimpo = removeTags(resposta);
 
@@ -300,9 +303,11 @@ async function checkFollowUps() {
 
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
+    if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
 
     const elapsed = agora - conv.linkEnviadoEm;
+    if (isNaN(elapsed)) continue;
 
     // Follow-up 2h
     if (!conv.followUpEnviado && elapsed >= DUAS_HORAS) {

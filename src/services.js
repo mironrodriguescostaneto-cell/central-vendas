@@ -26,7 +26,7 @@ function recordSuccess(key) { getBreaker(key).failures = 0; }
 function httpRequest(url, options = {}, body = null) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
-    const req = mod.request(url, options, (res) => {
+    const req = mod.request(url, { ...options, timeout: 15000 }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -34,6 +34,7 @@ function httpRequest(url, options = {}, body = null) {
         catch { resolve({ status: res.statusCode, data }); }
       });
     });
+    req.on('timeout', () => { req.destroy(); reject(new Error('HTTP timeout 15s')); });
     req.on('error', reject);
     if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
     req.end();
@@ -98,7 +99,9 @@ async function callClaude(systemPrompt, messages, opts = {}) {
 async function callClaudeText(systemPrompt, messages, opts = {}) {
   const response = await callClaude(systemPrompt, messages, opts);
   const textBlock = response.content.find(b => b.type === 'text');
-  return textBlock?.text || '';
+  const text = textBlock?.text || '';
+  if (!text) throw new Error('Claude retornou resposta sem texto');
+  return text;
 }
 
 // ----- Z-API (fallback WhatsApp) -----

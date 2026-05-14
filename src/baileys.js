@@ -140,6 +140,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
   }
 
   session.messageHandler = onMessage;
+  session._seenMsgIds = new Set();
   if (!isInternalReconnect) {
     session.retryCount = 0;
     session._reconnectGen = (session._reconnectGen || 0) + 1;
@@ -243,7 +244,11 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
         if (msg.key.id && session._seenMsgIds.has(msg.key.id)) continue;
         if (msg.key.id) {
           session._seenMsgIds.add(msg.key.id);
-          if (session._seenMsgIds.size > 1000) session._seenMsgIds.clear();
+          if (session._seenMsgIds.size > 1000) {
+            // Sliding window: mantém os 500 mais recentes em vez de limpar tudo
+            const arr = [...session._seenMsgIds];
+            session._seenMsgIds = new Set(arr.slice(-500));
+          }
         }
 
         let phone = jidToPhone(msg.key.remoteJid);

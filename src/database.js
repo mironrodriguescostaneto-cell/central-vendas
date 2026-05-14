@@ -99,10 +99,18 @@ async function initRedis() {
 async function saveDB() {
   const data = JSON.stringify(serialize());
   if (redis) {
-    try { await redis.set('central_vendas:state', data); return; } catch {}
+    try { await redis.set('central_vendas:state', data); return; } catch (e) {
+      console.error('[DB] Redis save falhou, tentando filesystem:', e.message);
+    }
   }
-  try { fs.writeFileSync(DB_PATH, data, 'utf8'); } catch (e) {
-    console.error('[DB] Erro ao salvar JSON:', e.message);
+  try {
+    fs.writeFileSync(DB_PATH, data, 'utf8');
+  } catch (e) {
+    console.error('[DB] Falha total ao salvar dados:', e.message);
+    try {
+      const { sendTelegram } = require('./gestor');
+      sendTelegram(`🚨 *DB Save Falhou*\nRedis e filesystem inacessíveis.\nErro: ${e.message}`).catch(() => {});
+    } catch {}
   }
 }
 

@@ -220,8 +220,10 @@ router.post('/api/conversas/:agentId/:phone/send', auth, async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto ausente' });
 
+  const sessionId = CONFIG.sessionIds[agentId];
+  if (!sessionId) return res.status(400).json({ error: 'Agente inválido' });
+
   try {
-    const sessionId = CONFIG.sessionIds[agentId];
     const originalJid = db.state.phoneLidMap.get(phone) || null;
     await baileys.sendText(sessionId, phone, text, originalJid);
     db.addMsg(agentId, phone, 'assistant', text);
@@ -350,7 +352,9 @@ router.post('/admin/upload-session', auth, async (req, res) => {
     const BASE_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || '/tmp';
     const authDir = path.join(BASE_DIR, `baileys_cv_${sessionId}`);
     if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+    const SAFE_NAME = /^[\w\-\.]+$/;
     for (const [filename, b64] of Object.entries(files)) {
+      if (!SAFE_NAME.test(filename) || filename.includes('..')) continue;
       fs.writeFileSync(path.join(authDir, filename), Buffer.from(b64, 'base64'));
     }
     // Reiniciar conexão sem apagar arquivos (soft restart)
