@@ -310,7 +310,10 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
             const stream = await downloadMediaMessage(msg, 'buffer', {});
             const buffer = Buffer.isBuffer(stream) ? stream : Buffer.from(stream);
             audio = { audioUrl: `data:audio/ogg;base64,${buffer.toString('base64')}` };
-          } catch { /* ignore */ }
+            console.log(`[BAILEYS:${sessionId}] Áudio baixado: ${buffer.length} bytes`);
+          } catch (e) {
+            console.error(`[BAILEYS:${sessionId}] Erro ao baixar áudio:`, e.message);
+          }
         }
 
         const normalized = {
