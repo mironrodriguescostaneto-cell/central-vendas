@@ -297,6 +297,45 @@ router.post('/api/instrucoes/:agentId', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ----- Diagnóstico de áudio -----
+router.get('/api/debug/audio', auth, async (req, res) => {
+  const out = {};
+  try {
+    out.groqKeySet = !!CONFIG.groqKey;
+    out.groqKeyPrefix = CONFIG.groqKey ? CONFIG.groqKey.slice(0, 10) + '...' : 'NAO CONFIGURADA';
+
+    // Teste 1: Groq API acessível
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${CONFIG.groqKey}` },
+      });
+      out.groqApiStatus = r.status;
+      out.groqApiOk = r.ok;
+    } catch (e) { out.groqApiError = e.message; }
+
+    // Teste 2: Buffer + Blob + FormData
+    try {
+      const buf = Buffer.from('SGVsbG8=', 'base64');
+      const blob = new Blob([buf], { type: 'audio/ogg' });
+      const form = new FormData();
+      form.append('file', blob, 'test.ogg');
+      out.blobSize = blob.size;
+      out.formDataOk = true;
+    } catch (e) { out.formDataError = e.message; }
+
+    // Teste 3: Pipeline completo com áudio WAV mínimo (44 bytes de silêncio)
+    try {
+      const { transcribeAudio } = require('./services');
+      const wavB64 = 'UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      const result = await transcribeAudio(`data:audio/wav;base64,${wavB64}`);
+      out.transcribeResult = result;
+      out.transcribeOk = result !== null;
+    } catch (e) { out.transcribeError = e.message; }
+
+  } catch (e) { out.fatalError = e.message; }
+  res.json(out);
+});
+
 // ----- Upload de sessão (para transferir sessão local → Railway) -----
 router.post('/admin/upload-session', auth, async (req, res) => {
   const { agentId, files } = req.body; // files: { filename: base64content }
