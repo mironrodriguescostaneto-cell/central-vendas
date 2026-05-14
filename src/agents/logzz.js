@@ -58,20 +58,17 @@ const MEDIA = {
     'https://drive.google.com/uc?export=download&id=15mjNsXdYGS2LJH5QA_pTBC3sSJX0t7vb',
     'https://drive.google.com/uc?export=download&id=1usa7QSnq3GzW4zZqX2LuQlXlG4BsfSBw',
   ],
+  // 2 provas no fluxo normal
   provas: [
     'https://drive.google.com/uc?export=download&id=1WxjfcyDVijrFZwhIGeT-geNigeqEsSia', // prova social 5 — 2.1MB
     'https://drive.google.com/uc?export=download&id=1nVXoxLjX4VCMB52Yoqe1jgIzpSUvDaTo', // prova social 3 — 6MB
+  ],
+  // 2 provas exclusivas do remarketing
+  provasRemarketing: [
     'https://drive.google.com/uc?export=download&id=1FL1JRXfasR2ZX6wLn8KyoC69uHvWg4qi', // WhatsApp 25/02 — 8.3MB
     'https://drive.google.com/uc?export=download&id=1S57Od4tqpEBjnw5fEA05mwF12YzJKMAa', // WhatsApp 02/03 — 10.7MB
   ],
 };
-
-let _provaIdx = 0;
-function nextProva() {
-  const url = MEDIA.provas[_provaIdx % MEDIA.provas.length];
-  _provaIdx++;
-  return url;
-}
 
 function buildSystemPrompt(instrucaoManual = '') {
   return `Você é Roberto, consultor de vendas da Resina Extreme. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
@@ -251,8 +248,10 @@ async function processMessage(event, payload) {
     }
 
     if (tags.includes('ENVIAR_PROVA')) {
-      await new Promise(r => setTimeout(r, 1500));
-      await baileys.sendMedia(sessionId, phone, 'video', nextProva(), '', _originalJid);
+      for (const url of MEDIA.provas) {
+        await new Promise(r => setTimeout(r, 1500));
+        await baileys.sendMedia(sessionId, phone, 'video', url, '', _originalJid);
+      }
     }
 
     if (tags.includes('TRANSFERIR_HUMANO')) {
@@ -306,6 +305,10 @@ async function checkFollowUps() {
         const msg = `Oi${nome}! 👋 Ainda pensando na Resina Extreme?\n\nConsegui uma condição especial só para você 🎁\n\n✅ 1 frasco + microfibra de brinde por R$89,99\n${LINKS.rmk1}\n\n✅ 2 frascos + microfibra de brinde por R$109,99\n${LINKS.rmk2}\n\nFrete grátis e você paga só na entrega. Qual fica melhor?`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
+        for (const url of MEDIA.provasRemarketing) {
+          await new Promise(r => setTimeout(r, 1500));
+          await baileys.sendMedia(sessionId, phone, 'video', url);
+        }
         conv.remarketingEnviado = true;
         console.log(`[LOGZZ] Remarketing → ${phone}`);
       } catch (e) {
