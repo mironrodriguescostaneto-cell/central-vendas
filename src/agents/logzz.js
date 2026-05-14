@@ -53,6 +53,26 @@ const LINKS = {
   rmk2: 'https://entrega.logzz.com.br/pay/memmonxkn/2-por-108-199-order-bump',
 };
 
+const MEDIA = {
+  fotos: [
+    'https://drive.google.com/uc?export=download&id=15mjNsXdYGS2LJH5QA_pTBC3sSJX0t7vb',
+    'https://drive.google.com/uc?export=download&id=1usa7QSnq3GzW4zZqX2LuQlXlG4BsfSBw',
+  ],
+  provas: [
+    'https://drive.google.com/uc?export=download&id=1WxjfcyDVijrFZwhIGeT-geNigeqEsSia', // prova social 5 — 2.1MB
+    'https://drive.google.com/uc?export=download&id=1nVXoxLjX4VCMB52Yoqe1jgIzpSUvDaTo', // prova social 3 — 6MB
+    'https://drive.google.com/uc?export=download&id=1FL1JRXfasR2ZX6wLn8KyoC69uHvWg4qi', // WhatsApp 25/02 — 8.3MB
+    'https://drive.google.com/uc?export=download&id=1S57Od4tqpEBjnw5fEA05mwF12YzJKMAa', // WhatsApp 02/03 — 10.7MB
+  ],
+};
+
+let _provaIdx = 0;
+function nextProva() {
+  const url = MEDIA.provas[_provaIdx % MEDIA.provas.length];
+  _provaIdx++;
+  return url;
+}
+
 function buildSystemPrompt(instrucaoManual = '') {
   return `Você é Roberto, consultor de vendas da Resina Extreme. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
 
@@ -125,7 +145,8 @@ Carro fica na garagem: "Deixar na garagem já ajuda sim, mas a pintura ainda sof
 
 ## TAGS DE AÇÃO
 [LINK_ENVIADO] — registra envio do link, sistema faz follow-up automático em 2h
-[ENVIAR_FOTO] — enviar foto do produto
+[ENVIAR_FOTO] — enviar foto do produto (use na apresentação)
+[ENVIAR_PROVA] — enviar vídeo de prova social (use após apresentar o produto)
 [PAUSAR_AGENTE] — pausar conversa (usar após confirmação de pedido)
 [TRANSFERIR_HUMANO] — transferir para humano (dúvidas de agendamento pós-link)
 
@@ -141,6 +162,7 @@ ${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoM
 function extractTags(text) {
   const tags = [];
   if (text.includes('[ENVIAR_FOTO]')) tags.push('ENVIAR_FOTO');
+  if (text.includes('[ENVIAR_PROVA]')) tags.push('ENVIAR_PROVA');
   if (text.includes('[LINK_ENVIADO]')) tags.push('LINK_ENVIADO');
   if (text.includes('[TRANSFERIR_HUMANO]')) tags.push('TRANSFERIR_HUMANO');
   if (text.includes('[PAUSAR_AGENTE]')) tags.push('PAUSAR_AGENTE');
@@ -150,6 +172,7 @@ function extractTags(text) {
 function removeTags(text) {
   return text
     .replace(/\[ENVIAR_FOTO\]/gi, '')
+    .replace(/\[ENVIAR_PROVA\]/gi, '')
     .replace(/\[LINK_ENVIADO\]/gi, '')
     .replace(/\[TRANSFERIR_HUMANO\]/gi, '')
     .replace(/\[PAUSAR_AGENTE\]/gi, '')
@@ -219,9 +242,17 @@ async function processMessage(event, payload) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
     }
 
-    if (tags.includes('ENVIAR_FOTO') && CONFIG.agents.logzz.media.foto1) {
+    if (tags.includes('ENVIAR_FOTO')) {
       await new Promise(r => setTimeout(r, 1000));
-      await baileys.sendMedia(sessionId, phone, 'image', CONFIG.agents.logzz.media.foto1, '', _originalJid);
+      for (const url of MEDIA.fotos) {
+        await baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid);
+        await new Promise(r => setTimeout(r, 800));
+      }
+    }
+
+    if (tags.includes('ENVIAR_PROVA')) {
+      await new Promise(r => setTimeout(r, 1500));
+      await baileys.sendMedia(sessionId, phone, 'video', nextProva(), '', _originalJid);
     }
 
     if (tags.includes('TRANSFERIR_HUMANO')) {
