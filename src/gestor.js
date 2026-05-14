@@ -81,7 +81,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        caminho: { type: 'string', description: 'Caminho relativo ao root do projeto (ex: src/agents/info-produtos.js)' },
+        caminho: { type: 'string', description: 'Caminho relativo ao root do projeto (ex: src/agents/logzz.js)' },
       },
       required: ['caminho'],
     },
@@ -117,7 +117,6 @@ const GESTOR_TOOLS = [
       type: 'object',
       properties: {
         mensagem: { type: 'string', description: 'Mensagem a enviar para o Miron' },
-        aguardar_autorizacao: { type: 'boolean', description: 'Se true, aguarda resposta de autorização antes de continuar' },
       },
       required: ['mensagem'],
     },
@@ -128,7 +127,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        mensagem_commit: { type: 'string', description: 'Mensagem do commit descrevendo o que foi corrigido' },
+        mensagem_commit: { type: 'string', description: 'Mensagem do commit' },
         arquivos_modificados: { type: 'array', items: { type: 'string' }, description: 'Lista de arquivos modificados' },
       },
       required: ['mensagem_commit', 'arquivos_modificados'],
@@ -146,10 +145,78 @@ const GESTOR_TOOLS = [
   },
   {
     name: 'status_agentes',
-    description: 'Verifica status de conexão e saúde dos agentes WhatsApp',
+    description: 'Verifica status de conexão dos agentes WhatsApp (info e logzz)',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'listar_conversas',
+    description: 'Lista todas as conversas ativas de um agente com resumo do último texto',
     input_schema: {
       type: 'object',
-      properties: {},
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente' },
+      },
+      required: ['agente'],
+    },
+  },
+  {
+    name: 'ler_conversa',
+    description: 'Lê o histórico completo de mensagens de um cliente específico',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente' },
+        phone: { type: 'string', description: 'Número do cliente (ex: 5562991819645)' },
+      },
+      required: ['agente', 'phone'],
+    },
+  },
+  {
+    name: 'enviar_mensagem_whatsapp',
+    description: 'Envia uma mensagem WhatsApp para um cliente como se fosse o agente. Use para intervenções manuais.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente envia' },
+        phone: { type: 'string', description: 'Número do cliente' },
+        mensagem: { type: 'string', description: 'Texto da mensagem' },
+      },
+      required: ['agente', 'phone', 'mensagem'],
+    },
+  },
+  {
+    name: 'pausar_atendimento',
+    description: 'Pausa ou retoma o atendimento automático de um cliente específico',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente' },
+        phone: { type: 'string', description: 'Número do cliente' },
+        acao: { type: 'string', enum: ['pausar', 'retomar'], description: 'pausar ou retomar' },
+      },
+      required: ['agente', 'phone', 'acao'],
+    },
+  },
+  {
+    name: 'atualizar_instrucao',
+    description: 'Atualiza as instruções manuais do dono para um agente (prioridade máxima no prompt)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente' },
+        instrucao: { type: 'string', description: 'Nova instrução (vazio para limpar)' },
+      },
+      required: ['agente', 'instrucao'],
+    },
+  },
+  {
+    name: 'ver_pedidos_logzz',
+    description: 'Visualiza pedidos COD da Logzz (produto físico, pago na entrega)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        limite: { type: 'number', description: 'Quantidade de pedidos (default 20)' },
+      },
     },
   },
 ];
@@ -218,6 +285,71 @@ async function executeTool(name, input) {
       } catch (e) {
         return `Erro ao verificar status: ${e.message}`;
       }
+    }
+
+    case 'listar_conversas': {
+      const db = require('./database');
+      const convs = db.getAllConvs(input.agente);
+      if (!convs.length) return `Nenhuma conversa em ${input.agente}`;
+      return convs.slice(0, 50).map(c =>
+        `${c.pushName || c.phone} (${c.phone}) | ${c.totalMsgs} msgs | ${c.pausado ? 'PAUSADO' : 'ativo'} | "${c.ultimoTexto}"`
+      ).join('\n');
+    }
+
+    case 'ler_conversa': {
+      const db = require('./database');
+      const conv = db.getConv(input.agente, input.phone);
+      const msgs = conv.msgs || [];
+      if (!msgs.length) return `Nenhuma mensagem encontrada para ${input.phone}`;
+      return msgs.slice(-40).map(m => {
+        const ts = new Date(m.ts).toLocaleString('pt-BR');
+        const quem = m.role === 'user' ? 'CLIENTE' : 'AGENTE';
+        return `[${ts}] ${quem}: ${(m.text || '').slice(0, 300)}`;
+      }).join('\n');
+    }
+
+    case 'enviar_mensagem_whatsapp': {
+      try {
+        const db = require('./database');
+        const baileys = require('./baileys');
+        const sessionId = CONFIG.sessionIds[input.agente];
+        if (!sessionId) return `Agente ${input.agente} inválido`;
+        const originalJid = db.state.phoneLidMap.get(input.phone) || null;
+        await baileys.sendText(sessionId, input.phone, input.mensagem, originalJid);
+        db.addMsg(input.agente, input.phone, 'assistant', input.mensagem);
+        addGestorLog('send', `Jarvis enviou para ${input.phone} via ${input.agente}: ${input.mensagem.slice(0, 80)}`);
+        return `Mensagem enviada para ${input.phone}`;
+      } catch (e) {
+        return `Erro ao enviar: ${e.message}`;
+      }
+    }
+
+    case 'pausar_atendimento': {
+      const db = require('./database');
+      if (input.acao === 'pausar') {
+        db.pausePhone(input.agente, input.phone);
+      } else {
+        db.resumePhone(input.agente, input.phone);
+      }
+      const acao = input.acao === 'pausar' ? 'Pausado' : 'Retomado';
+      addGestorLog('control', `${acao} atendimento: ${input.phone} (${input.agente})`);
+      return `Atendimento ${input.acao === 'pausar' ? 'pausado' : 'retomado'} para ${input.phone}`;
+    }
+
+    case 'atualizar_instrucao': {
+      const db = require('./database');
+      db.setInstrucao(input.agente, input.instrucao || '');
+      addGestorLog('instrucao', `Instrução do agente ${input.agente} atualizada`);
+      return `Instrução do agente ${input.agente} atualizada: "${(input.instrucao || '(limpa)').slice(0, 100)}"`;
+    }
+
+    case 'ver_pedidos_logzz': {
+      const db = require('./database');
+      const pedidos = db.getPedidos();
+      if (!pedidos.length) return 'Nenhum pedido registrado';
+      return pedidos.slice(0, input.limite || 20).map(p =>
+        `${p.id} | ${p.nome || '?'} | ${p.phone} | ${p.status} | ${new Date(p.criadoEm).toLocaleDateString('pt-BR')}`
+      ).join('\n');
     }
 
     default:
@@ -306,26 +438,31 @@ Você é o CEO digital da operação — responsável por tudo que acontece no s
 
 ## SUAS RESPONSABILIDADES
 1. Responder dúvidas do Miron sobre vendas, marketing, estratégia
-2. Detectar e corrigir bugs automaticamente no sistema
-3. Analisar o sistema em tempo real e reportar problemas
-4. Notificar o Miron no Telegram ANTES de fazer qualquer deploy
-5. Aguardar autorização do Miron para fazer push no GitHub
-6. Salvar logs de tudo que acontece
+2. Ter visibilidade total: ver conversas, status dos agentes, pedidos, logs
+3. Controlar agentes: pausar/retomar clientes, enviar mensagens, atualizar instruções
+4. Detectar e corrigir bugs no código do sistema
+5. Notificar o Miron no Telegram ANTES de qualquer deploy
+6. Aguardar autorização para push no GitHub
 
-## FLUXO OBRIGATÓRIO PARA DEPLOY
-1. Identificar o problema/melhoria
-2. Ler os arquivos relevantes com ler_arquivo
-3. Editar os arquivos com editar_arquivo
-4. Notificar o Miron no Telegram com RESUMO do que foi feito + pedir autorização
-5. Aguardar o Miron dizer "pode fazer o deploy" ou "autorizado"
-6. Fazer push_github com os arquivos modificados
+## CONTROLE TOTAL DOS AGENTES
+- Para ver conversas de um agente: use listar_conversas
+- Para ler uma conversa específica: use ler_conversa (informe agente e phone)
+- Para enviar mensagem para um cliente: use enviar_mensagem_whatsapp
+- Para pausar/retomar atendimento automático: use pausar_atendimento
+- Para mudar instrução do dono (ex: "hoje foque em conversão"): use atualizar_instrucao
+- Para ver pedidos Logzz: use ver_pedidos_logzz
+
+## FLUXO PARA CORREÇÕES DE CÓDIGO
+1. Ler arquivos relevantes com ler_arquivo
+2. Editar com editar_arquivo
+3. Notificar Miron no Telegram com resumo + pedir autorização
+4. Após autorização: fazer push_github
 
 ## REGRAS DE OURO
 - NUNCA faz deploy sem autorização explícita do Miron
-- SEMPRE explica o que vai mudar antes de mudar
-- SEMPRE salva logs de erros e correções
-- Responde de forma direta e concisa
-- Em erros críticos (sistema caiu), notifica imediatamente no Telegram
+- Para ações nos agentes (pausar, enviar msg, instruções): executa imediatamente sem pedir autorização
+- SEMPRE usa as ferramentas de verdade — nunca diz "fiz X" sem realmente ter executado
+- Em erros críticos, notifica imediatamente no Telegram
 
 ## BASE DE CONHECIMENTO
 ${KNOWLEDGE_BASE}
@@ -357,20 +494,20 @@ async function chat(userMessage) {
   });
 
   let finalText = '';
-  const toolResults = [];
+  // currentHistory acumula cada turno para que chamadas encadeadas de ferramentas mantenham contexto
+  let currentHistory = [...history];
 
-  // Loop de execução de ferramentas
   while (response.stop_reason === 'tool_use') {
     const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
     const textBlocks = response.content.filter(b => b.type === 'text');
 
     if (textBlocks.length > 0) finalText += textBlocks.map(b => b.text).join('\n');
 
-    // Executar todas as ferramentas
     const results = [];
     for (const tu of toolUseBlocks) {
-      console.log(`[JARVIS] Executando ferramenta: ${tu.name}`);
+      console.log(`[JARVIS] Executando ferramenta: ${tu.name}`, JSON.stringify(tu.input).slice(0, 120));
       const result = await executeTool(tu.name, tu.input);
+      console.log(`[JARVIS] Resultado de ${tu.name}: ${String(result).slice(0, 120)}`);
       results.push({
         type: 'tool_result',
         tool_use_id: tu.id,
@@ -378,14 +515,14 @@ async function chat(userMessage) {
       });
     }
 
-    // Continuar conversa com resultados
-    const nextHistory = [
-      ...history,
+    // Acumula turno no histórico (corrige bug onde iterações anteriores eram descartadas)
+    currentHistory = [
+      ...currentHistory,
       { role: 'assistant', content: response.content },
       { role: 'user', content: results },
     ];
 
-    response = await callClaude(buildGestorSystemPrompt(), nextHistory, {
+    response = await callClaude(buildGestorSystemPrompt(), currentHistory, {
       tools: GESTOR_TOOLS,
       maxTokens: 4096,
     });
