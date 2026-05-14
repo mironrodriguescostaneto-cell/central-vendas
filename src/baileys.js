@@ -436,6 +436,23 @@ async function reconnect(sessionId) {
   if (handler) await connect(sessionId, handler);
 }
 
+// Reinicia a conexão sem apagar os arquivos de sessão (usado após upload de sessão)
+async function restartConnection(sessionId) {
+  const session = getSession(sessionId);
+  const handler = session.messageHandler;
+  if (session.sock) {
+    session.sock.ev.removeAllListeners();
+    try { session.sock.end(new Error('restart')); } catch { /* ignore */ }
+    try { session.sock.ws?.close(); } catch { /* ignore */ }
+    session.sock = null;
+  }
+  session.retryCount = 0;
+  session.qrCode = null;
+  session.connectionState = 'disconnected';
+  notifyStatus(sessionId, 'disconnected', null);
+  if (handler) await connect(sessionId, handler);
+}
+
 module.exports = {
   connect,
   sendText,
@@ -446,6 +463,7 @@ module.exports = {
   getAllStatus,
   forceLogout,
   reconnect,
+  restartConnection,
   jidToPhone,
   phoneToJid,
 };

@@ -26,6 +26,8 @@ if (!fs.existsSync(authDir)) {
 
 const files = {};
 for (const file of fs.readdirSync(authDir)) {
+  // Pular LID mappings — não são necessários para reconexão
+  if (file.startsWith('lid-mapping')) continue;
   files[file] = fs.readFileSync(path.join(authDir, file)).toString('base64');
 }
 

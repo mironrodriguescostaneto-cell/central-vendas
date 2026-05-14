@@ -313,8 +313,8 @@ router.post('/admin/upload-session', auth, async (req, res) => {
     for (const [filename, b64] of Object.entries(files)) {
       fs.writeFileSync(path.join(authDir, filename), Buffer.from(b64, 'base64'));
     }
-    // Reconectar com os novos arquivos
-    await baileys.reconnect(sessionId);
+    // Reiniciar conexão sem apagar arquivos (soft restart)
+    await baileys.restartConnection(sessionId);
     res.json({ ok: true, filesWritten: Object.keys(files).length });
   } catch (e) {
     res.status(500).json({ error: e.message });
