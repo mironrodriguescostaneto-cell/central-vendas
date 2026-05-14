@@ -238,7 +238,10 @@ function addGestorChat(role, content) {
 function getGestorChat(limit = 50) { return state.gestorChat.slice(-limit); }
 
 // ----- Instruções por agente -----
-function setInstrucao(agentId, texto) { state.instrucoes[agentId] = texto; }
+function setInstrucao(agentId, texto) {
+  state.instrucoes[agentId] = texto;
+  saveDB().catch(() => {});
+}
 function getInstrucao(agentId) { return state.instrucoes[agentId] || ''; }
 
 // ----- Status de conexão -----

@@ -1,7 +1,7 @@
 'use strict';
 
 const { CONFIG } = require('../config');
-const { callGemini } = require('../services');
+const { callClaudeText } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
@@ -202,7 +202,7 @@ async function processMessage(event, payload) {
   const instrucao = getInstrucao(AGENT_ID);
 
   const historico = (conv.msgs || []).slice(-30).map(m => ({
-    role: m.role === 'user' ? 'user' : 'model',
+    role: m.role === 'user' ? 'user' : 'assistant',
     content: m.text,
   }));
 
@@ -211,7 +211,7 @@ async function processMessage(event, payload) {
   }
 
   try {
-    const resposta = await callGemini(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 });
+    const resposta = await callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 });
     const tags = extractTags(resposta);
     const textoLimpo = removeTags(resposta);
 
