@@ -13,6 +13,7 @@ const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
 
 const AGENT_ID = 'info';
+const _pending = new Set();
 
 // ----- Prompt do sistema -----
 function buildSystemPrompt(instrucaoManual = '') {
@@ -113,6 +114,8 @@ async function processMessage(event, payload) {
 
   // Verificar se está pausado
   if (isPaused(AGENT_ID, phone)) return;
+  if (_pending.has(phone)) return;
+  _pending.add(phone);
 
   const conv = getConv(AGENT_ID, phone);
   const instrucao = getInstrucao(AGENT_ID);
@@ -172,6 +175,8 @@ async function processMessage(event, payload) {
   } catch (error) {
     console.error(`[INFO-AGENTE] Erro ao processar mensagem de ${phone}:`, error.message);
     sendTelegram(`⚠️ *Info-Agente — Erro*\nCliente: ${phone}\nErro: ${error.message}`).catch(() => {});
+  } finally {
+    _pending.delete(phone);
   }
 }
 

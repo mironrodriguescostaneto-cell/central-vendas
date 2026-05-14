@@ -7,6 +7,7 @@ const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
 
 const AGENT_ID = 'logzz';
+const _pending = new Set();
 
 const CIDADES_ENTREGA = new Set([
   'belo horizonte','ibirité','sabará','santa luzia','betim','contagem',
@@ -215,6 +216,8 @@ async function processMessage(event, payload) {
   }
 
   if (isPaused(AGENT_ID, phone)) return;
+  if (_pending.has(phone)) return;
+  _pending.add(phone);
 
   const conv = getConv(AGENT_ID, phone);
   const instrucao = getInstrucao(AGENT_ID);
@@ -277,6 +280,8 @@ async function processMessage(event, payload) {
   } catch (error) {
     console.error(`[LOGZZ-AGENTE] Erro ao processar ${phone}:`, error.message);
     sendTelegram(`⚠️ *Roberto — Erro*\nCliente: ${phone}\nErro: ${error.message}`).catch(() => {});
+  } finally {
+    _pending.delete(phone);
   }
 }
 
