@@ -128,6 +128,8 @@ async function processMessage(event, payload) {
     historico.push({ role: 'user', content: body || 'oi' });
   }
 
+  await new Promise(r => setTimeout(r, 20000));
+
   try {
     const systemPrompt = buildSystemPrompt(instrucao);
     const resposta = await callGemini(systemPrompt, historico, { temperature: 0.8, maxTokens: 600 });

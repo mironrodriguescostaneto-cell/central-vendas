@@ -228,6 +228,8 @@ async function processMessage(event, payload) {
     historico.push({ role: 'user', content: body || 'oi' });
   }
 
+  await new Promise(r => setTimeout(r, 20000));
+
   try {
     const resposta = await callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 });
     const tags = extractTags(resposta);
