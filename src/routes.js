@@ -222,7 +222,8 @@ router.post('/api/conversas/:agentId/:phone/send', auth, async (req, res) => {
 
   try {
     const sessionId = CONFIG.sessionIds[agentId];
-    await baileys.sendText(sessionId, phone, text);
+    const originalJid = db.state.phoneLidMap.get(phone) || null;
+    await baileys.sendText(sessionId, phone, text, originalJid);
     db.addMsg(agentId, phone, 'assistant', text);
     res.json({ ok: true });
   } catch (e) {
