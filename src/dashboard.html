@@ -713,21 +713,17 @@ async function loadAgentStatus() {
       if (qrCont && qrImg) {
         if (s.hasQR && s.qrCode) {
           qrCont.style.display = 'block';
-          generateQRImage(s.qrCode, qrImg);
+          const newSrc = `/api/agents/${agentId}/qr.png?token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`;
+          if (qrImg.dataset.qrHash !== s.qrCode.slice(0, 20)) {
+            qrImg.dataset.qrHash = s.qrCode.slice(0, 20);
+            qrImg.src = newSrc;
+          }
         } else {
           qrCont.style.display = 'none';
+          if (qrImg) qrImg.dataset.qrHash = '';
         }
       }
     }
-  } catch {}
-}
-
-async function generateQRImage(qrData, imgEl) {
-  try {
-    // Usar QRCode.js via CDN embutido ou gerar URL via API
-    const res = await api(`/api/agents/status`); // já temos os dados
-    // Usar canvas para gerar QR (simples, via qrserver.com)
-    imgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
   } catch {}
 }
 

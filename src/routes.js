@@ -77,6 +77,67 @@ router.get('/api/agents/:agentId/qr', auth, (req, res) => {
   res.json({ qr, state });
 });
 
+// ----- Página de scan local (sem auth, só localhost) -----
+router.get('/scan/:agentId', (req, res) => {
+  const { agentId } = req.params;
+  if (!['info', 'logzz'].includes(agentId)) return res.status(404).end();
+  res.setHeader('Content-Type', 'text/html');
+  res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR - ${agentId}</title>
+<style>body{background:#111;color:#fff;font-family:sans-serif;text-align:center;padding:20px}
+img{border:8px solid #fff;border-radius:12px;max-width:300px;width:90%}
+.status{margin-top:16px;font-size:18px;font-weight:bold}
+.connected{color:#4caf50}.connecting{color:#ff9800}.disconnected{color:#f44336}</style></head>
+<body>
+<h2>WhatsApp QR — ${agentId}</h2>
+<img id="qr" src="/qr-img/${agentId}?t=0" alt="QR">
+<div class="status" id="st">Aguardando...</div>
+<script>
+let t=0;
+async function refresh(){
+  const r=await fetch('/api/health'); const d=await r.json();
+  const s=d.agents['${agentId}-session']||{};
+  document.getElementById('st').textContent=s.state==='connected'?'✅ Conectado!':s.hasQR?'📱 Escaneie o QR':'⏳ Aguardando QR...';
+  document.getElementById('st').className='status '+(s.state||'disconnected');
+  if(s.hasQR){document.getElementById('qr').src='/qr-img/${agentId}?t='+(++t);}
+}
+refresh();setInterval(refresh,5000);
+</script></body></html>`);
+});
+
+router.get('/qr-img/:agentId', async (req, res) => {
+  const { agentId } = req.params;
+  if (!CONFIG.sessionIds[agentId]) return res.status(404).end();
+  const sessionId = CONFIG.sessionIds[agentId];
+  const qr = baileys.getQRCode(sessionId);
+  if (!qr) return res.status(204).end();
+  try {
+    const QRCode = require('qrcode');
+    const buf = await QRCode.toBuffer(qr, { width: 300, margin: 2 });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(buf);
+  } catch (e) { res.status(500).end(); }
+});
+
+// ----- QR Code como imagem PNG (gerado localmente) -----
+router.get('/api/agents/:agentId/qr.png', auth, async (req, res) => {
+  const { agentId } = req.params;
+  if (!CONFIG.sessionIds[agentId]) return res.status(404).end();
+  const sessionId = CONFIG.sessionIds[agentId];
+  const qr = baileys.getQRCode(sessionId);
+  if (!qr) return res.status(204).end();
+  try {
+    const QRCode = require('qrcode');
+    const buf = await QRCode.toBuffer(qr, { width: 256, margin: 2 });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(buf);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ----- Reconectar agente -----
 router.post('/api/agents/:agentId/reconnect', auth, async (req, res) => {
   const { agentId } = req.params;
@@ -234,6 +295,30 @@ router.get('/api/instrucoes/:agentId', auth, (req, res) => {
 router.post('/api/instrucoes/:agentId', auth, (req, res) => {
   db.setInstrucao(req.params.agentId, req.body.instrucao || '');
   res.json({ ok: true });
+});
+
+// ----- Upload de sessão (para transferir sessão local → Railway) -----
+router.post('/admin/upload-session', auth, async (req, res) => {
+  const { agentId, files } = req.body; // files: { filename: base64content }
+  if (!agentId || !files || typeof files !== 'object') {
+    return res.status(400).json({ error: 'agentId e files obrigatórios' });
+  }
+  if (!CONFIG.sessionIds[agentId]) return res.status(404).json({ error: 'Agente não encontrado' });
+  const sessionId = CONFIG.sessionIds[agentId];
+  try {
+    const fs = require('fs');
+    const BASE_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || '/tmp';
+    const authDir = path.join(BASE_DIR, `baileys_cv_${sessionId}`);
+    if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+    for (const [filename, b64] of Object.entries(files)) {
+      fs.writeFileSync(path.join(authDir, filename), Buffer.from(b64, 'base64'));
+    }
+    // Reconectar com os novos arquivos
+    await baileys.reconnect(sessionId);
+    res.json({ ok: true, filesWritten: Object.keys(files).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ----- Dashboard (servir o HTML) -----
