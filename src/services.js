@@ -128,31 +128,26 @@ async function sendZapi(agentId, phone, message) {
 }
 
 // ----- Groq Whisper — transcrição de áudio -----
-async function transcribeAudio(audioBase64Url) {
-  if (!CONFIG.groqKey) {
-    console.warn('[GROQ] GROQ_API_KEY não configurada');
-    return null;
-  }
+async function transcribeAudio(audioUrl) {
+  if (!CONFIG.groqKey) return null;
   try {
-    const base64 = audioBase64Url.replace(/^data:[^;]+;base64,/, '');
-    const audioBuffer = Buffer.from(base64, 'base64');
-
-    const file = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' });
+    const audioResp = await fetch(audioUrl);
+    const arrayBuf = await audioResp.arrayBuffer();
+    const blob = new Blob([arrayBuf], { type: 'audio/ogg' });
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', blob, 'audio.ogg');
     form.append('model', 'whisper-large-v3-turbo');
     form.append('language', 'pt');
-
-    const axios = require('axios');
-    const res = await axios.post(
-      'https://api.groq.com/openai/v1/audio/transcriptions',
-      form,
-      { headers: { Authorization: `Bearer ${CONFIG.groqKey}` } }
-    );
-    console.log(`[GROQ] Transcrição: "${(res.data?.text || '').slice(0, 80)}"`);
-    return res.data?.text || null;
+    const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${CONFIG.groqKey}` },
+      body: form,
+    });
+    const data = await r.json();
+    console.log(`[GROQ] Transcrição: "${(data.text || '').slice(0, 80)}"`);
+    return data.text || null;
   } catch (e) {
-    console.error('[GROQ] Erro transcrição:', e.message, e.response?.data ? JSON.stringify(e.response.data) : '');
+    console.error('[GROQ] Erro transcrição:', e.message);
     return null;
   }
 }
