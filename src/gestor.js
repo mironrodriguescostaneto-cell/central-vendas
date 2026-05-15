@@ -219,6 +219,24 @@ const GESTOR_TOOLS = [
       },
     },
   },
+  {
+    name: 'disparar_remarketing',
+    description: 'Dispara mensagem de remarketing para toda a base de um agente ou para um subconjunto filtrado. Envia as mensagens de verdade via WhatsApp com delay entre cada envio.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['info', 'logzz'], description: 'Qual agente vai disparar' },
+        mensagem: { type: 'string', description: 'Texto da mensagem a enviar. Use {nome} para personalizar com o nome do cliente.' },
+        filtro: {
+          type: 'string',
+          enum: ['todos', 'com_link', 'sem_link', 'sem_resposta_24h'],
+          description: 'todos=toda a base não pausada; com_link=quem recebeu link mas não confirmou; sem_link=quem ainda não recebeu link; sem_resposta_24h=sem resposta há mais de 24h',
+        },
+        delay_segundos: { type: 'number', description: 'Delay entre mensagens em segundos (default 3, min 1, max 10)' },
+      },
+      required: ['agente', 'mensagem'],
+    },
+  },
 ];
 
 // ----- Execução de ferramentas -----
@@ -352,6 +370,60 @@ async function executeTool(name, input) {
       ).join('\n');
     }
 
+    case 'disparar_remarketing': {
+      const db = require('./database');
+      const baileys = require('./baileys');
+      const { CONFIG } = require('./config');
+
+      const agente = input.agente;
+      const sessionId = CONFIG.sessionIds[agente];
+      const convMap = db.state.conversations[agente];
+      if (!convMap || convMap.size === 0) return `Nenhuma conversa encontrada para o agente ${agente}`;
+
+      if (baileys.getState(sessionId) !== 'connected') return `Agente ${agente} não está conectado no WhatsApp`;
+
+      const filtro = input.filtro || 'todos';
+      const delayMs = Math.min(10, Math.max(1, input.delay_segundos || 3)) * 1000;
+      const agora = Date.now();
+      const VINTE_QUATRO_H = 24 * 60 * 60 * 1000;
+
+      const alvos = [];
+      for (const [phone, conv] of convMap.entries()) {
+        if (db.isPaused(agente, phone)) continue;
+        if (filtro === 'com_link' && !conv.linkEnviadoEm) continue;
+        if (filtro === 'sem_link' && conv.linkEnviadoEm) continue;
+        if (filtro === 'sem_resposta_24h') {
+          const ultimaMsg = (conv.msgs || []).filter(m => m.role === 'user').at(-1);
+          if (!ultimaMsg || (agora - new Date(ultimaMsg.ts || 0).getTime()) < VINTE_QUATRO_H) continue;
+        }
+        alvos.push({ phone, nome: conv.pushName || '' });
+      }
+
+      if (alvos.length === 0) return `Nenhum cliente encontrado com filtro "${filtro}"`;
+
+      let enviados = 0;
+      const erros = [];
+      addGestorLog('remarketing', `Disparando remarketing para ${alvos.length} clientes do agente ${agente}`);
+
+      for (const { phone, nome } of alvos) {
+        try {
+          const texto = input.mensagem.replace(/\{nome\}/gi, nome || 'amigo');
+          const originalJid = db.state.phoneLidMap?.get(phone) || null;
+          await baileys.sendText(sessionId, phone, texto, originalJid);
+          db.addMsg(agente, phone, 'assistant', texto);
+          enviados++;
+          await new Promise(r => setTimeout(r, delayMs));
+        } catch (e) {
+          erros.push(`${phone}: ${e.message}`);
+        }
+      }
+
+      const resumo = `Remarketing disparado: ${enviados}/${alvos.length} mensagens enviadas.${erros.length ? ` Erros (${erros.length}): ${erros.slice(0, 3).join('; ')}` : ''}`;
+      addGestorLog('remarketing', resumo);
+      sendTelegram(`📣 *Remarketing ${agente}*\n${resumo}`).catch(() => {});
+      return resumo;
+    }
+
     default:
       return `Ferramenta desconhecida: ${name}`;
   }
@@ -451,6 +523,7 @@ Você é o CEO digital da operação — responsável por tudo que acontece no s
 - Para pausar/retomar atendimento automático: use pausar_atendimento
 - Para mudar instrução do dono (ex: "hoje foque em conversão"): use atualizar_instrucao
 - Para ver pedidos Logzz: use ver_pedidos_logzz
+- Para disparar remarketing para a base (enviar mensagens de verdade): use disparar_remarketing — esta ferramenta envia as mensagens via WhatsApp de verdade. NUNCA use atualizar_instrucao como substituto de remarketing. Se o Miron pedir remarketing, use disparar_remarketing.
 
 ## FLUXO PARA CORREÇÕES DE CÓDIGO
 1. Ler arquivos relevantes com ler_arquivo
