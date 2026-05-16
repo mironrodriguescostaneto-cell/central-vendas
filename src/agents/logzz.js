@@ -8,8 +8,9 @@ const { sendTelegram } = require('../gestor');
 
 const AGENT_ID = 'logzz';
 const _pending = new Set();
-// Mídia acumulada por telefone enquanto aguarda o delay de 20s
 const _pendingMedia = new Map();
+// URLs de mídia já enviadas por cliente (evita repetição)
+const _midiaEnviada = new Map();
 
 const CIDADES_ENTREGA = new Set([
   'belo horizonte','ibirité','sabará','santa luzia','betim','contagem',
@@ -77,7 +78,7 @@ function buildSystemPrompt(instrucaoManual = '') {
   return `Você é Roberto, consultor de vendas da Resina Extreme. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
 
 ## PRODUTO — Resina Extreme
-Protetor automotivo que vitrifica a pintura, repele água e dá brilho espelhado. Rende 8–10 aplicações, cada uma dura 1–2 meses. Funciona em carro, moto e caminhão de qualquer cor.
+Protetor automotivo que vitrifica a pintura, repele água e dá brilho espelhado. Frasco de 500ml — rende 8–10 aplicações, cada uma dura 1–2 meses. Funciona em carro, moto e caminhão de qualquer cor.
 
 ## KITS E PREÇOS
 Kit 1 frasco: R$100 → link: ${LINKS.un1}
@@ -301,18 +302,26 @@ async function processMessage(event, payload) {
     }
 
     if (tags.includes('ENVIAR_FOTO')) {
+      const enviadas = _midiaEnviada.get(phone) || new Set();
       await new Promise(r => setTimeout(r, 1000));
       for (const url of MEDIA.fotos) {
+        if (enviadas.has(url)) continue;
         await baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid);
+        enviadas.add(url);
         await new Promise(r => setTimeout(r, 800));
       }
+      _midiaEnviada.set(phone, enviadas);
     }
 
     if (tags.includes('ENVIAR_PROVA')) {
+      const enviadas = _midiaEnviada.get(phone) || new Set();
       for (const url of MEDIA.provas) {
+        if (enviadas.has(url)) continue;
         await new Promise(r => setTimeout(r, 1500));
         await baileys.sendMedia(sessionId, phone, 'video', url, '', _originalJid);
+        enviadas.add(url);
       }
+      _midiaEnviada.set(phone, enviadas);
     }
 
     if (tags.includes('TRANSFERIR_HUMANO')) {
