@@ -430,7 +430,12 @@ async function sendText(sessionId, phone, text, originalJid) {
     throw new Error(`WhatsApp ${sessionId} não conectado`);
   }
   const jid = originalJid || phoneToJid(phone);
-  await session.sock.sendMessage(jid, { text });
+  console.log(`[BAILEYS:${sessionId}] sendText → jid=${jid}`);
+  const result = await session.sock.sendMessage(jid, { text });
+  if (!result?.key?.id) {
+    throw new Error(`Falha ao enviar mensagem para ${jid} — WhatsApp não confirmou o envio`);
+  }
+  console.log(`[BAILEYS:${sessionId}] sendText OK — msgId=${result.key.id}`);
 }
 
 async function fetchBuffer(url, hops = 5) {

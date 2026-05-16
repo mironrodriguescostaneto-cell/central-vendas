@@ -782,7 +782,7 @@ function closeChatWindow() {
 async function loadChatMessages() {
   if (!chatWindowAgent || !chatWindowPhone) return;
   try {
-    const data = await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}`);
+    const data = await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`);
     chatWindowPaused = data.pausado;
     updatePauseButtons();
     const body = document.getElementById('chatWinBody');
@@ -805,7 +805,7 @@ function updatePauseButtons() {
 
 async function pauseChat() {
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/pause`, 'POST');
+    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/pause`, 'POST');
     chatWindowPaused = true;
     updatePauseButtons();
     toast('Conversa pausada');
@@ -815,7 +815,7 @@ async function pauseChat() {
 
 async function resumeChat() {
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/resume`, 'POST');
+    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/resume`, 'POST');
     chatWindowPaused = false;
     updatePauseButtons();
     toast('Conversa iniciada');
@@ -831,7 +831,7 @@ async function sendManualMsg() {
   input.disabled = true;
   if (btn) btn.disabled = true;
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${chatWindowPhone}/send`, 'POST', { text });
+    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/send`, 'POST', { text });
     input.value = '';
     await loadChatMessages();
   } catch (e) {

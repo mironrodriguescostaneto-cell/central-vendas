@@ -224,11 +224,13 @@ router.post('/api/conversas/:agentId/:phone/send', auth, async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'Agente inválido' });
 
   try {
-    const originalJid = db.state.phoneLidMap.get(phone) || null;
+    const originalJid = db.state.phoneLidMap?.get(phone) || null;
+    console.log(`[ROUTES] Envio manual → agente=${agentId} phone=${phone} jid=${originalJid || '(padrão)'}`);
     await baileys.sendText(sessionId, phone, text, originalJid);
     db.addMsg(agentId, phone, 'assistant', text);
     res.json({ ok: true });
   } catch (e) {
+    console.error(`[ROUTES] Erro envio manual → ${phone}: ${e.message}`);
     res.status(500).json({ error: e.message });
   }
 });
