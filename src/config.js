@@ -81,12 +81,20 @@ const CONFIG = {
         piso: parseFloat(env('LOGZZ_PRODUTO_PISO', '0')),
       },
     },
+
+    rafael: {
+      id: 'rafael',
+      name: env('RAFAEL_AGENT_NAME', 'Rafael'),
+      numero: env('RAFAEL_NUMERO'),
+      provider: env('RAFAEL_PROVIDER', 'baileys'),
+    },
   },
 
   // IDs usados para controle de sessão Baileys
   sessionIds: {
     info: 'info-session',
     logzz: 'logzz-session',
+    rafael: 'rafael-session',
   },
 };
 
