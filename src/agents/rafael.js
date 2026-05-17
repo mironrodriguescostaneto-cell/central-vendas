@@ -1,7 +1,7 @@
 'use strict';
 
 const { CONFIG } = require('../config');
-const { transcribeAudio } = require('../services');
+const { callClaudeText, transcribeAudio } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
 const { sendTelegram } = require('../gestor');
@@ -10,7 +10,6 @@ const AGENT_ID = 'rafael';
 const _pending = new Set();
 const _pendingMedia = new Map();
 
-// IDs de imagens Google Drive
 const MEDIA = {
   exemplos: [
     'https://drive.google.com/uc?export=download&id=1RzgcptEIgsjqYM5xOggkPqVXG8x0MiSQ',
@@ -18,71 +17,58 @@ const MEDIA = {
   ],
 };
 
-// Estágios do fluxo:
-// 0 = novo cliente (introução + imagens + pergunta promo)
-// 1 = aguardando resposta da promo → envia preços
-// 2 = aguardando escolha do pacote → pede fotos
-// 3 = aguardando fotos do cliente → pausa ao receber mídia
-// 4 = pausado / encerrado
+function buildSystemPrompt(instrucaoManual = '') {
+  return `Você é Rafael, da TVO FOTOGRAFIAS. Você usa IA para transformar fotos de clientes no estilo que eles quiserem.
 
-function getConvState(phone) {
-  const db = require('../database');
-  return db.state.conversations.rafael?.get(phone) || null;
+## SERVIÇO
+Você recebe 1 foto do rosto + 1 foto de corpo inteiro do cliente e cria ensaios fotográficos com IA no estilo desejado.
+Prazo de entrega: 20 minutos.
+
+## TABELA DE PREÇOS
+1 foto — R$ 9,90
+3 fotos — R$ 14,90
+5 fotos — R$ 19,90
+
+## FLUXO DE ATENDIMENTO
+
+### Etapa 1 — ABERTURA (1ª mensagem do cliente)
+Cumprimente, apresente-se como Rafael da TVO FOTOGRAFIAS, explique brevemente o serviço e use [ENVIAR_FOTOS_EXEMPLO] para mostrar exemplos do seu trabalho.
+Em seguida pergunte: "Posso te passar os valores da nossa promoção?"
+
+### Etapa 2 — PREÇOS (após cliente confirmar interesse)
+Mostre a tabela de preços e pergunte qual pacote ele prefere.
+
+### Etapa 3 — PEDIR FOTOS (após cliente escolher pacote)
+Peça as fotos: "Me manda uma foto do seu rosto e uma de corpo inteiro, e me diz qual estilo você quer que eu faça. Entrego em 20 minutos 😊"
+
+### Etapa 4 — FOTOS RECEBIDAS
+Quando o cliente enviar imagens (você vai ver as fotos na conversa), confirme que recebeu e use [PAUSAR_AGENTE].
+Exemplo: "Recebi suas fotos! Já vou começar a trabalhar. Em até 20 minutos você recebe o resultado 😊 [PAUSAR_AGENTE]"
+
+## REGRAS
+- Máximo 3–4 linhas por mensagem
+- Se o cliente enviar uma foto ou imagem (você consegue ver), reconheça visualmente e responda com contexto
+- Nunca prometa resultado antes de ver as fotos
+- Se o cliente quiser saber mais sobre o serviço, explique com exemplos do trabalho mostrado nas fotos
+
+## TAGS DE AÇÃO
+[ENVIAR_FOTOS_EXEMPLO] — envia as fotos de exemplo do trabalho (use na abertura)
+[PAUSAR_AGENTE] — pausa a conversa (use quando receber as fotos do cliente para fazer o serviço)
+${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoManual}` : ''}`;
+}
+
+function extractTags(text) {
+  const tags = [];
+  if (text.includes('[ENVIAR_FOTOS_EXEMPLO]')) tags.push('ENVIAR_FOTOS_EXEMPLO');
+  if (text.includes('[PAUSAR_AGENTE]')) tags.push('PAUSAR_AGENTE');
+  return tags;
 }
 
 function removeTags(text) {
-  return text.trim();
-}
-
-async function executeStage0(sessionId, phone, pushName, _originalJid) {
-  const nome = pushName ? `, ${pushName}` : '';
-  const intro = `Olá${nome}, meu nome é Rafael, sou da empresa TVO FOTOGRAFIAS, aqui eu uso uma foto sua para deixar ela como você quiser através de inteligência artificial 😊\n\nVou te passar algumas fotos para você ver como é o meu trabalho e logo após te passo o valor.`;
-
-  await baileys.sendText(sessionId, phone, intro, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', intro);
-
-  // Envia as 2 imagens de exemplo (timeout 10s para não travar o fluxo)
-  await new Promise(r => setTimeout(r, 1500));
-  for (const url of MEDIA.exemplos) {
-    try {
-      await Promise.race([
-        baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout imagem 10s')), 10000)),
-      ]);
-    } catch (imgErr) {
-      console.error(`[RAFAEL] Imagem não enviada (continuando):`, imgErr.message);
-    }
-    await new Promise(r => setTimeout(r, 1200));
-  }
-
-  await new Promise(r => setTimeout(r, 1000));
-  const promo = `Essa semana estamos fazendo uma promoção no ensaio fotográfico, posso te passar os valores?`;
-  await baileys.sendText(sessionId, phone, promo, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', promo);
-}
-
-async function executeStage1(sessionId, phone, _originalJid) {
-  const precos = `Esses são os valores para essa semana:\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nPrazo de entrega 20 minutos ⏱\n\nComo funciona👇🏻\nVocê envia\n1 foto do seu rosto + 1 de corpo inteiro\n\nApós isso faço a criação com base nelas`;
-  await baileys.sendText(sessionId, phone, precos, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', precos);
-
-  await new Promise(r => setTimeout(r, 5000));
-
-  const pergunta = `Qual pacote fica melhor para você?`;
-  await baileys.sendText(sessionId, phone, pergunta, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', pergunta);
-}
-
-async function executeStage2(sessionId, phone, _originalJid) {
-  const msg = `Perfeito, me manda suas fotos, e qual estilo você quer que eu faça, para que eu te mande as prévias.`;
-  await baileys.sendText(sessionId, phone, msg, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', msg);
-}
-
-async function executeStage3Text(sessionId, phone, _originalJid) {
-  const msg = `Pode me mandar a foto do seu rosto e uma de corpo inteiro que eu já começo a trabalhar 😊`;
-  await baileys.sendText(sessionId, phone, msg, _originalJid);
-  addMsg(AGENT_ID, phone, 'assistant', msg);
+  return text
+    .replace(/\[ENVIAR_FOTOS_EXEMPLO\]/gi, '')
+    .replace(/\[PAUSAR_AGENTE\]/gi, '')
+    .trim();
 }
 
 async function processMessage(event, payload) {
@@ -90,7 +76,7 @@ async function processMessage(event, payload) {
   if (!phone) return;
   if (payload.isFromMe) return;
 
-  // Transcrever áudio se necessário
+  // Transcrever áudio
   let body = rawBody;
   if (!body && payload.audio?.audioUrl) {
     try {
@@ -105,29 +91,11 @@ async function processMessage(event, payload) {
     if (!body) body = '[áudio não transcrito]';
   }
 
-  console.log(`[RAFAEL] Mensagem recebida de ${phone}: "${(body || '').slice(0, 60)}"`);
-
-  // Verificação antecipada: estágio 3 + mídia → pausar imediatamente
-  const convAtual = getConvState(phone);
-  if (convAtual?.stage === 3 && (payload.image || payload.videoThumb)) {
-    addMsg(AGENT_ID, phone, 'user', body || '[fotos do cliente]', pushName);
-    pausePhone(AGENT_ID, phone);
-    console.log(`[RAFAEL] Fotos recebidas de ${phone} — pausando para atendimento humano`);
-    sendTelegram(`📸 *Rafael — Cliente enviou fotos!*\nCliente: ${pushName || phone}\nAssuma o atendimento agora! ✅`).catch(() => {});
-    return;
-  }
+  console.log(`[RAFAEL] Mensagem de ${phone}: "${(body || '').slice(0, 60)}"`);
 
   addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
 
-  // Quando o cliente responde, limpar flags de follow-up (retomou a conversa)
-  const convState = getConvState(phone);
-  if (convState) {
-    convState.followUpEnviado = false;
-    convState.remarketingEnviado = false;
-    convState.ultimaPerguntaEm = null;
-  }
-
-  // Acumular mídia
+  // Acumular mídia ANTES do check de pausa/pending
   if (payload.image) {
     const list = _pendingMedia.get(phone) || [];
     list.push({ ...payload.image, kind: 'image' });
@@ -146,33 +114,80 @@ async function processMessage(event, payload) {
   if (_pending.has(phone)) return;
   _pending.add(phone);
 
-  // Delay de 20s para acumular mensagens simultâneas
   await new Promise(r => setTimeout(r, 20000));
 
   try {
-    _pendingMedia.delete(phone);
-    const sessionId = CONFIG.sessionIds.rafael;
-    const conv = getConvState(phone);
-    const stage = conv?.stage ?? 0;
+    // Rebuild historico APÓS delay
+    const conv = getConv(AGENT_ID, phone);
+    const instrucao = getInstrucao(AGENT_ID);
 
-    console.log(`[RAFAEL] Processando ${phone} — stage=${stage}`);
+    const historico = (conv.msgs || []).slice(-30).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.text,
+    }));
 
-    // Atualiza stage ANTES de executar para evitar loop em caso de erro parcial
-    if (conv) {
-      if (stage === 0) { conv.stage = 1; conv.ultimaPerguntaEm = Date.now(); }
-      else if (stage === 1) { conv.stage = 2; conv.ultimaPerguntaEm = Date.now(); }
-      else if (stage === 2) { conv.stage = 3; conv.ultimaPerguntaEm = Date.now(); }
-      else if (stage === 3) { conv.ultimaPerguntaEm = Date.now(); }
+    if (historico.length === 0 || historico.at(-1).role !== 'user') {
+      historico.push({ role: 'user', content: body || 'oi' });
     }
 
-    if (stage === 0) {
-      await executeStage0(sessionId, phone, pushName, _originalJid);
-    } else if (stage === 1) {
-      await executeStage1(sessionId, phone, _originalJid);
-    } else if (stage === 2) {
-      await executeStage2(sessionId, phone, _originalJid);
-    } else if (stage === 3) {
-      await executeStage3Text(sessionId, phone, _originalJid);
+    // Injetar visão na última mensagem do usuário
+    const mediaList = _pendingMedia.get(phone) || [];
+    _pendingMedia.delete(phone);
+
+    if (mediaList.length > 0) {
+      let lastUserIdx = -1;
+      for (let i = historico.length - 1; i >= 0; i--) {
+        if (historico[i].role === 'user') { lastUserIdx = i; break; }
+      }
+      if (lastUserIdx >= 0) {
+        const blocks = mediaList.map(m => ({
+          type: 'image',
+          source: { type: 'base64', media_type: m.mimetype, data: m.base64 },
+        }));
+        const hasVideo = mediaList.some(m => m.kind === 'video');
+        const textoAtual = historico[lastUserIdx].content;
+        const textoFinal = (textoAtual === '[mídia]' || !textoAtual)
+          ? (hasVideo ? '[O cliente enviou um vídeo]' : '[O cliente enviou esta imagem — responda com contexto visual]')
+          : textoAtual;
+        blocks.push({ type: 'text', text: textoFinal });
+        historico[lastUserIdx] = { role: 'user', content: blocks };
+        console.log(`[RAFAEL] Vision: ${mediaList.length} mídia(s) injetada(s) para ${phone}`);
+      }
+    }
+
+    const resposta = await Promise.race([
+      callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
+    ]);
+
+    const tags = extractTags(resposta);
+    const textoLimpo = removeTags(resposta);
+    const sessionId = CONFIG.sessionIds.rafael;
+
+    if (textoLimpo) {
+      await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
+      addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
+    }
+
+    if (tags.includes('ENVIAR_FOTOS_EXEMPLO')) {
+      await new Promise(r => setTimeout(r, 1000));
+      for (const url of MEDIA.exemplos) {
+        try {
+          await Promise.race([
+            baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 10s')), 10000)),
+          ]);
+        } catch (imgErr) {
+          console.error(`[RAFAEL] Imagem de exemplo não enviada:`, imgErr.message);
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      }
+    }
+
+    if (tags.includes('PAUSAR_AGENTE')) {
+      pausePhone(AGENT_ID, phone);
+      sendTelegram(`📸 *Rafael — Cliente enviou fotos!*\nCliente: ${pushName || phone}\nAssuma o atendimento agora! ✅`).catch(() => {});
+      console.log(`[RAFAEL] Agente pausado para ${phone} — aguardando atendimento humano`);
     }
 
   } catch (error) {
@@ -184,7 +199,6 @@ async function processMessage(event, payload) {
   }
 }
 
-// Follow-up 2h + remarketing 24h automático
 async function checkFollowUps() {
   const db = require('../database');
   const convMap = db.state.conversations.rafael;
@@ -200,19 +214,15 @@ async function checkFollowUps() {
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
     if (_pending.has(phone)) continue;
+    if (!conv.linkEnviadoEm && !conv.ultimaMensagem) continue;
 
-    // Só faz follow-up se o agente fez uma pergunta e está aguardando resposta (stages 1, 2, 3)
-    const stage = conv.stage ?? 0;
-    if (stage === 0 || stage === 4) continue;
-    if (!conv.ultimaPerguntaEm) continue;
-
-    const elapsed = agora - conv.ultimaPerguntaEm;
+    const ref = conv.linkEnviadoEm || conv.ultimaMensagem;
+    const elapsed = agora - ref;
     if (isNaN(elapsed)) continue;
 
-    // Follow-up 2h
     if (!conv.followUpEnviado && elapsed >= DUAS_HORAS) {
       try {
-        const msg = `Opa, você não me deu um retorno, vamos prosseguir com seu ensaio, e aproveitar a promoção 😊`;
+        const msg = `Opa, você ainda quer fazer seu ensaio fotográfico com IA? A promoção ainda está ativa! 😊`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
         conv.followUpEnviado = true;
@@ -222,11 +232,10 @@ async function checkFollowUps() {
       }
     }
 
-    // Remarketing 24h (só após follow-up já enviado)
     if (conv.followUpEnviado && !conv.remarketingEnviado && elapsed >= VINTE_QUATRO_HORAS) {
       try {
         const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 👋 Ainda quero te ajudar a criar fotos incríveis com IA!\n\nNossa promoção ainda está ativa:\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nEntrega em 20 minutos ⏱\nÉ só me mandar uma foto do rosto + uma de corpo inteiro e me dizer o estilo que você quer 🎨`;
+        const msg = `Oi${nome}! 👋 Ainda dá pra fazer seu ensaio com IA hoje!\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nEntrega em 20 minutos ⏱\nÉ só mandar 1 foto do rosto + 1 de corpo inteiro e me dizer o estilo 🎨`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
         conv.remarketingEnviado = true;
