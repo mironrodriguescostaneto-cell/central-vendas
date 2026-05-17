@@ -239,6 +239,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         if (type !== 'notify') continue;
         if (msg.key.remoteJid?.includes('@g.us')) continue;
+        if (msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid?.endsWith('@broadcast')) continue;
 
         // Dedup — Baileys pode disparar o mesmo evento duas vezes
         if (msg.key.id && session._seenMsgIds.has(msg.key.id)) continue;
