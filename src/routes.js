@@ -263,9 +263,9 @@ router.post('/logzz/webhook', async (req, res) => {
 // URL para colocar na plataforma: https://central-vendas-production.up.railway.app/webhook/logzz-pedido
 const MSGS_STATUS_PEDIDO = {
   confirmado:  (nome) => `Olá${nome}! 🎉 Seu pedido da *Resina Extreme* foi *confirmado*! Em breve nossa equipe entrará em contato para agendar a entrega. Qualquer dúvida é só falar!`,
-  agendado:    (nome) => `Oi${nome}! 📅 Sua entrega da *Resina Extreme* foi *agendada*! Aguarde nosso entregador no dia combinado. Fique de olho! 😊`,
-  em_rota:     (nome) => `Boa notícia${nome}! 🚚 Seu pedido da *Resina Extreme* está *a caminho*! O entregador está indo até você agora. Tenha o valor em mãos para pagar na entrega.`,
-  completo:    (nome) => `Pedido entregue${nome}! ✅ Esperamos que esteja amando a *Resina Extreme*. Se precisar de qualquer coisa, estamos aqui. 😊`,
+  agendado:    (nome) => `Oi${nome}! Vi aqui que seu pedido foi agendado, no dia escolhido o entregador vai entrar em contato com você para confirmar a entrega. 😊`,
+  em_rota:     (nome) => `Oiee${nome}, passando para avisar que seu pedido já saiu em rota, chega hoje. 🚚`,
+  completo:    (nome) => `Oi${nome}! Vi que seu pedido foi entregue, chegou tudo certinho aí? 😊`,
 };
 
 function normalizarStatus(raw = '') {
