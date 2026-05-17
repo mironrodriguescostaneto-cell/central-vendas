@@ -155,41 +155,24 @@ async function processMessage(event, payload) {
     const conv = getConvState(phone);
     const stage = conv?.stage ?? 0;
 
+    console.log(`[RAFAEL] Processando ${phone} — stage=${stage}`);
+
+    // Atualiza stage ANTES de executar para evitar loop em caso de erro parcial
+    if (conv) {
+      if (stage === 0) { conv.stage = 1; conv.ultimaPerguntaEm = Date.now(); }
+      else if (stage === 1) { conv.stage = 2; conv.ultimaPerguntaEm = Date.now(); }
+      else if (stage === 2) { conv.stage = 3; conv.ultimaPerguntaEm = Date.now(); }
+      else if (stage === 3) { conv.ultimaPerguntaEm = Date.now(); }
+    }
+
     if (stage === 0) {
-      // Introdução + imagens + pergunta promoção
       await executeStage0(sessionId, phone, pushName, _originalJid);
-      if (conv) {
-        conv.stage = 1;
-        conv.ultimaPerguntaEm = Date.now();
-      } else {
-        const db = require('../database');
-        const c = db.state.conversations.rafael?.get(phone);
-        if (c) {
-          c.stage = 1;
-          c.ultimaPerguntaEm = Date.now();
-        }
-      }
     } else if (stage === 1) {
-      // Cliente respondeu sobre promoção → envia preços + pergunta pacote
       await executeStage1(sessionId, phone, _originalJid);
-      const c = getConvState(phone);
-      if (c) {
-        c.stage = 2;
-        c.ultimaPerguntaEm = Date.now();
-      }
     } else if (stage === 2) {
-      // Cliente escolheu pacote → pede fotos
       await executeStage2(sessionId, phone, _originalJid);
-      const c = getConvState(phone);
-      if (c) {
-        c.stage = 3;
-        c.ultimaPerguntaEm = Date.now();
-      }
     } else if (stage === 3) {
-      // Cliente enviou texto mas não fotos → lembrar de enviar as fotos
       await executeStage3Text(sessionId, phone, _originalJid);
-      const c = getConvState(phone);
-      if (c) c.ultimaPerguntaEm = Date.now();
     }
 
   } catch (error) {
