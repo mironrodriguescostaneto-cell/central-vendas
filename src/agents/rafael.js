@@ -168,12 +168,23 @@ async function processMessage(event, payload) {
       }
     }
 
+    // Detecta primeiro contato ANTES da chamada à IA (msgs tem apenas mensagens do cliente ainda)
+    const userMsgCount = (conv.msgs || []).filter(m => m.role === 'user').length;
+    const isPrimeiroContato = userMsgCount <= 1;
+
     const resposta = await Promise.race([
       callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
     ]);
 
     const tags = extractTags(resposta);
+
+    // Garante fotos de exemplo no primeiro contato mesmo que a IA não inclua a tag
+    if (isPrimeiroContato && !tags.includes('ENVIAR_FOTOS_EXEMPLO')) {
+      tags.push('ENVIAR_FOTOS_EXEMPLO');
+      console.log(`[RAFAEL] Primeiro contato de ${phone} — ENVIAR_FOTOS_EXEMPLO forçado`);
+    }
+
     const textoLimpo = removeTags(resposta);
     const sessionId = CONFIG.sessionIds.rafael;
 
