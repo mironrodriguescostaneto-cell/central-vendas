@@ -41,13 +41,16 @@ async function executeStage0(sessionId, phone, pushName, _originalJid) {
   await baileys.sendText(sessionId, phone, intro, _originalJid);
   addMsg(AGENT_ID, phone, 'assistant', intro);
 
-  // Envia as 2 imagens de exemplo (erro não aborta o fluxo)
+  // Envia as 2 imagens de exemplo (timeout 10s para não travar o fluxo)
   await new Promise(r => setTimeout(r, 1500));
   for (const url of MEDIA.exemplos) {
     try {
-      await baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid);
+      await Promise.race([
+        baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout imagem 10s')), 10000)),
+      ]);
     } catch (imgErr) {
-      console.error(`[RAFAEL] Erro ao enviar imagem (continuando):`, imgErr.message);
+      console.error(`[RAFAEL] Imagem não enviada (continuando):`, imgErr.message);
     }
     await new Promise(r => setTimeout(r, 1200));
   }
