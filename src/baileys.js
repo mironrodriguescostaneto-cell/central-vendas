@@ -129,7 +129,7 @@ function notifyStatus(sessionId, status, qr = undefined) {
   } catch { /* ignore */ }
 }
 
-async function connect(sessionId, onMessage, isInternalReconnect = false) {
+async function connect(sessionId, onMessage, isInternalReconnect = false, opts = {}) {
   const session = getSession(sessionId);
 
   if (session.sock) {
@@ -401,6 +401,26 @@ async function connect(sessionId, onMessage, isInternalReconnect = false) {
       console.log(`[BAILEYS:${sessionId}] messaging-history.set: ${histContacts.length} contatos processados`);
     });
 
+    // Pairing code: chamado após todos os listeners estarem prontos
+    if (opts.pairingPhone && !state.creds.registered) {
+      const phone = opts.pairingPhone.replace(/\D/g, '');
+      setTimeout(async () => {
+        try {
+          const code = await session.sock.requestPairingCode(phone);
+          session.pairingCode = code;
+          console.log(`[BAILEYS:${sessionId}] Pairing code gerado: ${code}`);
+          const waiters = session._pairingCodeWaiters || [];
+          session._pairingCodeWaiters = [];
+          for (const fn of waiters) fn(null, code);
+        } catch (e) {
+          console.error(`[BAILEYS:${sessionId}] Erro ao gerar pairing code:`, e.message);
+          const waiters = session._pairingCodeWaiters || [];
+          session._pairingCodeWaiters = [];
+          for (const fn of waiters) fn(e, null);
+        }
+      }, 3000);
+    }
+
     return session.sock;
   } catch (error) {
     console.error(`[BAILEYS:${sessionId}] Erro ao conectar:`, error.message);
@@ -475,6 +495,26 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
   }
 }
 
+async function requestPairingCodeFor(sessionId, phone) {
+  const session = getSession(sessionId);
+  await forceLogout(sessionId);
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      session._pairingCodeWaiters = [];
+      reject(new Error('Timeout 30s — WhatsApp não respondeu'));
+    }, 30000);
+
+    session._pairingCodeWaiters = [(err, code) => {
+      clearTimeout(timeout);
+      if (err) reject(err);
+      else resolve(code);
+    }];
+
+    connect(sessionId, session.messageHandler || (() => {}), false, { pairingPhone: phone });
+  });
+}
+
 function getQRCode(sessionId) { return getSession(sessionId).qrCode; }
 function getState(sessionId) { return getSession(sessionId).connectionState; }
 function getSocket(sessionId) { return getSession(sessionId).sock; }
@@ -546,6 +586,7 @@ module.exports = {
   forceLogout,
   reconnect,
   restartConnection,
+  requestPairingCodeFor,
   jidToPhone,
   phoneToJid,
 };

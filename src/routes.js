@@ -83,23 +83,80 @@ router.get('/scan/:agentId', (req, res) => {
   if (!['info', 'logzz', 'rafael'].includes(agentId)) return res.status(404).end();
   res.setHeader('Content-Type', 'text/html');
   res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QR - ${agentId}</title>
-<style>body{background:#111;color:#fff;font-family:sans-serif;text-align:center;padding:20px}
+<title>Conectar - ${agentId}</title>
+<style>
+body{background:#111;color:#fff;font-family:sans-serif;text-align:center;padding:20px}
 img{border:8px solid #fff;border-radius:12px;max-width:300px;width:90%}
 .status{margin-top:16px;font-size:18px;font-weight:bold}
-.connected{color:#4caf50}.connecting{color:#ff9800}.disconnected{color:#f44336}</style></head>
+.connected{color:#4caf50}.connecting{color:#ff9800}.disconnected{color:#f44336}
+.section{background:#1e1e1e;border-radius:12px;padding:20px;margin:20px auto;max-width:400px}
+input{width:80%;padding:12px;font-size:16px;border-radius:8px;border:none;margin:8px 0}
+button{padding:12px 24px;font-size:16px;border-radius:8px;border:none;background:#25d366;color:#fff;cursor:pointer;margin:8px}
+button:hover{background:#1da34e}
+.code{font-size:36px;font-weight:bold;letter-spacing:8px;color:#25d366;margin:16px 0}
+.hint{font-size:13px;color:#aaa;margin-top:8px}
+</style></head>
 <body>
-<h2>WhatsApp QR — ${agentId}</h2>
-<img id="qr" src="/qr-img/${agentId}?t=0" alt="QR">
+<h2>Conectar WhatsApp — ${agentId}</h2>
 <div class="status" id="st">Aguardando...</div>
+
+<div class="section">
+  <h3>Opção 1 — QR Code</h3>
+  <img id="qr" src="/qr-img/${agentId}?t=0" alt="QR" style="display:none">
+  <div id="qr-msg">Aguardando QR...</div>
+</div>
+
+<div class="section">
+  <h3>Opção 2 — Código de Pareamento</h3>
+  <p class="hint">Mais confiável que QR. Abra WhatsApp → Dispositivos conectados → Conectar dispositivo → Conectar com número de telefone</p>
+  <input id="phone" type="tel" placeholder="Ex: 5562991819645" />
+  <br>
+  <button onclick="solicitarCodigo()">Gerar código</button>
+  <div id="code-area" style="display:none">
+    <div class="code" id="code-val"></div>
+    <div class="hint">Digite esse código no WhatsApp do celular</div>
+  </div>
+  <div id="code-err" style="color:#f44;margin-top:8px"></div>
+</div>
+
 <script>
 let t=0;
 async function refresh(){
   const r=await fetch('/api/health'); const d=await r.json();
   const s=d.agents['${agentId}-session']||{};
-  document.getElementById('st').textContent=s.state==='connected'?'✅ Conectado!':s.hasQR?'📱 Escaneie o QR':'⏳ Aguardando QR...';
-  document.getElementById('st').className='status '+(s.state||'disconnected');
-  if(s.hasQR){document.getElementById('qr').src='/qr-img/${agentId}?t='+(++t);}
+  const st=document.getElementById('st');
+  st.textContent=s.state==='connected'?'✅ Conectado!':s.hasQR?'📱 QR disponível':'⏳ Aguardando...';
+  st.className='status '+(s.state||'disconnected');
+  const qrImg=document.getElementById('qr');
+  const qrMsg=document.getElementById('qr-msg');
+  if(s.hasQR){
+    qrImg.style.display='block';
+    qrMsg.style.display='none';
+    qrImg.src='/qr-img/${agentId}?t='+(++t);
+  } else {
+    qrImg.style.display='none';
+    qrMsg.style.display='block';
+    qrMsg.textContent=s.state==='connected'?'Conectado!':'Aguardando QR...';
+  }
+}
+async function solicitarCodigo(){
+  const phone=document.getElementById('phone').value.replace(/\\D/g,'');
+  if(!phone||phone.length<10){alert('Digite o número completo com DDD e código do país (ex: 5562991819645)');return;}
+  document.getElementById('code-area').style.display='none';
+  document.getElementById('code-err').textContent='Solicitando código...';
+  try{
+    const r=await fetch('/api/agents/${agentId}/pairing-code',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${signToken({ user: 'local' })}'},body:JSON.stringify({phone})});
+    const d=await r.json();
+    if(d.code){
+      document.getElementById('code-val').textContent=d.code;
+      document.getElementById('code-area').style.display='block';
+      document.getElementById('code-err').textContent='';
+    } else {
+      document.getElementById('code-err').textContent='Erro: '+(d.error||'desconhecido');
+    }
+  }catch(e){
+    document.getElementById('code-err').textContent='Erro: '+e.message;
+  }
 }
 refresh();setInterval(refresh,5000);
 </script></body></html>`);
@@ -134,6 +191,21 @@ router.get('/api/agents/:agentId/qr.png', auth, async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.end(buf);
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ----- Pairing code (conectar por número de telefone) -----
+router.post('/api/agents/:agentId/pairing-code', auth, async (req, res) => {
+  const { agentId } = req.params;
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone obrigatório (ex: 5562991819645)' });
+  if (!CONFIG.sessionIds[agentId]) return res.status(404).json({ error: 'Agente não encontrado' });
+  try {
+    const code = await baileys.requestPairingCodeFor(CONFIG.sessionIds[agentId], phone);
+    res.json({ code });
+  } catch (e) {
+    console.error(`[ROUTES] Erro pairing code ${agentId}:`, e.message);
     res.status(500).json({ error: e.message });
   }
 });
