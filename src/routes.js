@@ -259,6 +259,91 @@ router.post('/logzz/webhook', async (req, res) => {
   }
 });
 
+// ----- Webhook Logzz — Status de Pedido -----
+// URL para colocar na plataforma: https://central-vendas-production.up.railway.app/webhook/logzz-pedido
+const MSGS_STATUS_PEDIDO = {
+  confirmado:  (nome) => `Olá${nome}! 🎉 Seu pedido da *Resina Extreme* foi *confirmado*! Em breve nossa equipe entrará em contato para agendar a entrega. Qualquer dúvida é só falar!`,
+  agendado:    (nome) => `Oi${nome}! 📅 Sua entrega da *Resina Extreme* foi *agendada*! Aguarde nosso entregador no dia combinado. Fique de olho! 😊`,
+  em_rota:     (nome) => `Boa notícia${nome}! 🚚 Seu pedido da *Resina Extreme* está *a caminho*! O entregador está indo até você agora. Tenha o valor em mãos para pagar na entrega.`,
+  completo:    (nome) => `Pedido entregue${nome}! ✅ Esperamos que esteja amando a *Resina Extreme*. Se precisar de qualquer coisa, estamos aqui. 😊`,
+};
+
+function normalizarStatus(raw = '') {
+  const s = raw.toLowerCase().replace(/[_\s-]/g, '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (s.includes('confirmad')) return 'confirmado';
+  if (s.includes('agendad'))   return 'agendado';
+  if (s.includes('rota') || s.includes('caminho') || s.includes('saiu')) return 'em_rota';
+  if (s.includes('complet') || s.includes('entregue') || s.includes('finaliz')) return 'completo';
+  return null;
+}
+
+router.post('/webhook/logzz-pedido', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const payload = req.body;
+    console.log('[WEBHOOK-LOGZZ-PEDIDO] Payload recebido:', JSON.stringify(payload).slice(0, 500));
+
+    // Extrair phone — a plataforma Logzz pode enviar em vários campos
+    const rawPhone =
+      payload.phone ||
+      payload.telefone ||
+      payload.customer?.phone ||
+      payload.customer?.telefone ||
+      payload.buyer?.phone ||
+      payload.order?.phone ||
+      payload.whatsapp ||
+      '';
+
+    // Normalizar: só dígitos, garantir código do país 55
+    let phone = String(rawPhone).replace(/\D/g, '');
+    if (!phone) {
+      console.warn('[WEBHOOK-LOGZZ-PEDIDO] Nenhum telefone encontrado no payload');
+      return;
+    }
+    if (!phone.startsWith('55')) phone = '55' + phone;
+
+    // Extrair status
+    const rawStatus =
+      payload.status ||
+      payload.order_status ||
+      payload.order?.status ||
+      payload.pedido?.status ||
+      '';
+
+    const status = normalizarStatus(rawStatus);
+    if (!status) {
+      console.log(`[WEBHOOK-LOGZZ-PEDIDO] Status ignorado: "${rawStatus}"`);
+      return;
+    }
+
+    // Nome do cliente
+    const nomeRaw =
+      payload.name ||
+      payload.nome ||
+      payload.customer?.name ||
+      payload.customer?.nome ||
+      payload.buyer?.name ||
+      '';
+    const nome = nomeRaw ? ` ${nomeRaw.split(' ')[0]}` : '';
+
+    const msg = MSGS_STATUS_PEDIDO[status](nome);
+
+    const sessionId = CONFIG.sessionIds.logzz;
+    if (baileys.getState(sessionId) !== 'connected') {
+      console.warn('[WEBHOOK-LOGZZ-PEDIDO] Roberto desconectado — mensagem não enviada');
+      return;
+    }
+
+    await baileys.sendText(sessionId, phone, msg);
+    const { addMsg } = require('./database');
+    addMsg('logzz', phone, 'assistant', msg);
+
+    console.log(`[WEBHOOK-LOGZZ-PEDIDO] Mensagem "${status}" enviada para ${phone}`);
+  } catch (e) {
+    console.error('[WEBHOOK-LOGZZ-PEDIDO] Erro:', e.message);
+  }
+});
+
 // ----- Conversas por agente -----
 router.get('/api/conversas/:agentId', auth, (req, res) => {
   const { agentId } = req.params;
