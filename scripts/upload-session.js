@@ -16,7 +16,8 @@ if (!agentId || !baseUrl || !password) {
 }
 
 const LOCAL_BASE = process.env.RAILWAY_VOLUME_MOUNT_PATH || '/tmp';
-const sessionId = agentId === 'logzz' ? 'logzz-session' : 'info-session';
+const sessionMap = { logzz: 'logzz-session', info: 'info-session', rafael: 'rafael-session' };
+const sessionId = sessionMap[agentId] || `${agentId}-session`;
 const authDir = path.join(LOCAL_BASE, `baileys_cv_${sessionId}`);
 
 if (!fs.existsSync(authDir)) {
