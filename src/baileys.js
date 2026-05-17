@@ -451,11 +451,7 @@ async function sendText(sessionId, phone, text, originalJid) {
   }
   const jid = originalJid || phoneToJid(phone);
   console.log(`[BAILEYS:${sessionId}] sendText → jid=${jid}`);
-  const result = await session.sock.sendMessage(jid, { text });
-  if (!result?.key?.id) {
-    throw new Error(`Falha ao enviar mensagem para ${jid} — WhatsApp não confirmou o envio`);
-  }
-  console.log(`[BAILEYS:${sessionId}] sendText OK — msgId=${result.key.id}`);
+  await session.sock.sendMessage(jid, { text });
 }
 
 async function fetchBuffer(url, hops = 5) {
