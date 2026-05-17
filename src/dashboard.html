@@ -265,15 +265,11 @@ a{color:var(--accent);text-decoration:none}
           <div class="agent-status-row" id="agentStatusRow">
             <div class="agent-status-mini">
               <div class="dot disconnected" id="dotInfo"></div>
-              <div><div class="label">Info-Produtos</div><div class="sub" id="stateInfo">Desconectado</div></div>
+              <div><div class="label">Rafael</div><div class="sub" id="stateInfo">Desconectado</div></div>
             </div>
             <div class="agent-status-mini">
               <div class="dot disconnected" id="dotLogzz"></div>
               <div><div class="label">Logzz</div><div class="sub" id="stateLogzz">Desconectado</div></div>
-            </div>
-            <div class="agent-status-mini">
-              <div class="dot disconnected" id="dotRafael"></div>
-              <div><div class="label">Rafael</div><div class="sub" id="stateRafael">Desconectado</div></div>
             </div>
           </div>
 
@@ -307,7 +303,7 @@ a{color:var(--accent);text-decoration:none}
           <div class="tab-pane active" id="info-tab-agente">
             <div class="card">
               <div class="card-header">
-                <div><div class="card-title">Agente Info-Produtos</div><div class="card-subtitle">Venda de cursos digitais via WhatsApp</div></div>
+                <div><div class="card-title">Agente Rafael</div><div class="card-subtitle">TVO Fotografias — fotos personalizadas com IA</div></div>
               </div>
               <div style="display:flex;flex-direction:column;gap:10px">
                 <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
@@ -322,8 +318,8 @@ a{color:var(--accent);text-decoration:none}
             </div>
             <div class="card">
               <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
-              <textarea class="form-input" id="instrucaoInfo" rows="4" placeholder="Instrução especial para o agente info-produtos..."></textarea>
-              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('info')">Salvar Instrução</button>
+              <textarea class="form-input" id="instrucaoRafael" rows="4" placeholder="Instrução especial para o agente Rafael..."></textarea>
+              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('rafael')">Salvar Instrução</button>
             </div>
           </div>
 
@@ -333,9 +329,9 @@ a{color:var(--accent);text-decoration:none}
               <div class="conn-header">
                 <div class="conn-agent">
                   <div class="conn-dot" id="connDotInfo"></div>
-                  <div><div class="conn-name">Agente Info-Produtos</div><div class="conn-state" id="connStateInfo">Verificando...</div></div>
+                  <div><div class="conn-name">Agente Rafael</div><div class="conn-state" id="connStateInfo">Verificando...</div></div>
                 </div>
-                <button class="btn-reconnect" onclick="reconnectAgent('info')">Reconectar</button>
+                <button class="btn-reconnect" onclick="reconnectAgent('rafael')">Reconectar</button>
               </div>
               <div class="qr-container" id="qrInfo">
                 <img id="qrImgInfo" src="" alt="QR Code">
@@ -344,9 +340,9 @@ a{color:var(--accent);text-decoration:none}
             </div>
           </div>
 
-          <!-- Conversa Info -->
+          <!-- Conversa Rafael -->
           <div class="tab-pane" id="info-tab-conversa">
-            <div id="convListInfo" class="chat-list">
+            <div id="convListRafael" class="chat-list">
               <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
             </div>
           </div>
@@ -426,61 +422,6 @@ a{color:var(--accent);text-decoration:none}
       </div>
     </div>
 
-    <!-- PAGE: RAFAEL -->
-    <div class="page" id="pageRafael">
-      <div class="page-scroll">
-        <div class="page-content">
-          <div class="tabs" id="tabsRafael">
-            <button class="tab-btn active" onclick="showTab('rafael','agente')">Agente</button>
-            <button class="tab-btn" onclick="showTab('rafael','conexao')">Conexão</button>
-            <button class="tab-btn" onclick="showTab('rafael','conversa')">Conversa</button>
-          </div>
-
-          <!-- Agente Rafael -->
-          <div class="tab-pane active" id="rafael-tab-agente">
-            <div class="card">
-              <div class="card-header">
-                <div><div class="card-title">Agente Rafael</div><div class="card-subtitle">TVO Fotografias — fotos com IA</div></div>
-              </div>
-              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
-                <div style="font-weight:700;margin-bottom:4px">Fluxo de atendimento</div>
-                <div style="color:var(--text-muted)">Etapa 0: apresentação + imagens de exemplo → Etapa 1: tabela de preços → Etapa 2: pede fotos → Etapa 3: pausa e notifica Telegram</div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
-              <textarea class="form-input" id="instrucaoRafael" rows="4" placeholder="Instrução especial para o agente Rafael..."></textarea>
-              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('rafael')">Salvar Instrução</button>
-            </div>
-          </div>
-
-          <!-- Conexão Rafael -->
-          <div class="tab-pane" id="rafael-tab-conexao">
-            <div class="conn-card">
-              <div class="conn-header">
-                <div class="conn-agent">
-                  <div class="conn-dot" id="connDotRafael"></div>
-                  <div><div class="conn-name">Agente Rafael</div><div class="conn-state" id="connStateRafael">Verificando...</div></div>
-                </div>
-                <button class="btn-reconnect" onclick="reconnectAgent('rafael')">Reconectar</button>
-              </div>
-              <div class="qr-container" id="qrRafael">
-                <img id="qrImgRafael" src="" alt="QR Code">
-                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Conversa Rafael -->
-          <div class="tab-pane" id="rafael-tab-conversa">
-            <div id="convListRafael" class="chat-list">
-              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- PAGE: GESTOR -->
     <div class="page" id="pageGestor">
       <div class="page-scroll">
@@ -537,10 +478,6 @@ a{color:var(--accent);text-decoration:none}
     <button class="nav-item" id="nav-logzz" onclick="showPage('logzz')">
       <div class="nav-icon">📦</div>
       <span class="nav-label">Logzz</span>
-    </button>
-    <button class="nav-item" id="nav-rafael" onclick="showPage('rafael')">
-      <div class="nav-icon">📸</div>
-      <span class="nav-label">Rafael</span>
     </button>
     <button class="nav-item" id="nav-gestor" onclick="showPage('gestor')">
       <div class="nav-icon">🧠</div>
@@ -663,9 +600,8 @@ function showPage(page) {
   document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
   currentPage = page;
 
-  if (page === 'info') { loadConversas('info'); loadInstrucao('info'); }
+  if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); }
   if (page === 'logzz') { loadConversas('logzz'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); }
-  if (page === 'rafael') { loadConversas('rafael'); loadInstrucao('rafael'); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
@@ -680,7 +616,7 @@ function showTab(page, tab) {
   const pane = document.getElementById(`${page}-tab-${tab}`);
   if (pane) pane.classList.add('active');
 
-  if (page === 'info' && tab === 'conversa') loadConversas('info');
+  if (page === 'info' && tab === 'conversa') loadConversas('rafael');
   if (page === 'info' && tab === 'conexao') loadAgentStatus();
   if (page === 'logzz' && tab === 'conversa') loadConversas('logzz');
   if (page === 'logzz' && tab === 'conexao') loadAgentStatus();
@@ -697,7 +633,7 @@ function startPolling() {
   clearInterval(agentStatusPoll);
   pollInterval = setInterval(() => {
     if (currentPage === 'painel') loadPainelData();
-    if (currentPage === 'info') loadConversas('info');
+    if (currentPage === 'info') loadConversas('rafael');
     if (currentPage === 'logzz') loadConversas('logzz');
     if (currentPage === 'rafael') loadConversas('rafael');
   }, 5000);
@@ -712,27 +648,29 @@ async function loadInitialData() {
 
 async function loadPainelData() {
   try {
-    const [statusData, logsData, convsInfo, convsLogzz, pedidos, links] = await Promise.all([
+    const [statusData, logsData, convsRafael, convsLogzz, pedidos, links] = await Promise.all([
       api('/api/agents/status'),
       api('/api/gestor/logs?limit=5'),
-      api('/api/conversas/info'),
+      api('/api/conversas/rafael'),
       api('/api/conversas/logzz'),
       api('/api/pedidos'),
       api('/api/links-oferta'),
     ]);
 
     // Stats
-    document.getElementById('statConvInfo').textContent = convsInfo.length || 0;
+    document.getElementById('statConvInfo').textContent = convsRafael.length || 0;
     document.getElementById('statConvLogzz').textContent = convsLogzz.length || 0;
     document.getElementById('statPedidos').textContent = pedidos.length || 0;
     document.getElementById('statLinks').textContent = links.length || 0;
 
-    // Agent status mini
-    for (const agentId of ['info', 'logzz', 'rafael']) {
-      const s = statusData[agentId] || {};
-      const dot = document.getElementById(`dot${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
-      const label = document.getElementById(`state${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
-      if (dot) { dot.className = `dot ${s.state || 'disconnected'}`; }
+    // Agent status mini — 'info' slot mostra o agente Rafael
+    const agentSlots = [{ slot: 'info', agent: 'rafael' }, { slot: 'logzz', agent: 'logzz' }];
+    for (const { slot, agent } of agentSlots) {
+      const s = statusData[agent] || {};
+      const cap = slot.charAt(0).toUpperCase() + slot.slice(1);
+      const dot = document.getElementById(`dot${cap}`);
+      const label = document.getElementById(`state${cap}`);
+      if (dot) dot.className = `dot ${s.state || 'disconnected'}`;
       if (label) label.textContent = stateLabel(s.state);
     }
 
@@ -767,8 +705,10 @@ function renderPainelLogs(logs) {
 async function loadAgentStatus() {
   try {
     const data = await api('/api/agents/status');
-    for (const agentId of ['info', 'logzz', 'rafael']) {
-      const s = data[agentId] || {};
+    // 'info' slot mostra agente Rafael; 'logzz' slot mostra Roberto
+    const statusSlots = [{ slot: 'info', agent: 'rafael' }, { slot: 'logzz', agent: 'logzz' }];
+    for (const { slot: agentId, agent } of statusSlots) {
+      const s = data[agent] || {};
       const connDot = document.getElementById(`connDot${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
       const connState = document.getElementById(`connState${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
       if (connDot) connDot.className = `conn-dot ${s.state || 'disconnected'}`;
@@ -780,7 +720,7 @@ async function loadAgentStatus() {
       if (qrCont && qrImg) {
         if (s.hasQR && s.qrCode) {
           qrCont.style.display = 'block';
-          const newSrc = `/api/agents/${agentId}/qr.png?token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`;
+          const newSrc = `/api/agents/${agent}/qr.png?token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`;
           if (qrImg.dataset.qrHash !== s.qrCode.slice(0, 20)) {
             qrImg.dataset.qrHash = s.qrCode.slice(0, 20);
             qrImg.src = newSrc;
