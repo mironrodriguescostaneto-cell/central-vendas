@@ -41,10 +41,14 @@ async function executeStage0(sessionId, phone, pushName, _originalJid) {
   await baileys.sendText(sessionId, phone, intro, _originalJid);
   addMsg(AGENT_ID, phone, 'assistant', intro);
 
-  // Envia as 2 imagens de exemplo
+  // Envia as 2 imagens de exemplo (erro não aborta o fluxo)
   await new Promise(r => setTimeout(r, 1500));
   for (const url of MEDIA.exemplos) {
-    await baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid);
+    try {
+      await baileys.sendMedia(sessionId, phone, 'image', url, '', _originalJid);
+    } catch (imgErr) {
+      console.error(`[RAFAEL] Erro ao enviar imagem (continuando):`, imgErr.message);
+    }
     await new Promise(r => setTimeout(r, 1200));
   }
 
