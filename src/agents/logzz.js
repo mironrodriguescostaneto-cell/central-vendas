@@ -83,9 +83,9 @@ Protetor automotivo que vitrifica a pintura, repele água e dá brilho espelhado
 ## KITS E PREÇOS
 Kit 1 frasco: R$100 → link: ${LINKS.un1}
 Kit 2 frascos: R$119,99 → link: ${LINKS.un2}
-Frete: GRÁTIS | Pagamento: na entrega (dinheiro/maquininha) OU cartão parcelado pelo link
+Frete: GRÁTIS | Pagamento: na entrega — dinheiro, pix ou cartão (o entregador leva maquininha)
 
-## PARCELAMENTO NO CARTÃO
+## PARCELAMENTO NO CARTÃO (maquininha na entrega)
 Kit 1 frasco (R$100):
 2x R$56,56 | 3x R$37,97 | 4x R$28,68 | 5x R$23,11 | 6x R$19,40
 7x R$16,93 | 8x R$14,92 | 9x R$13,36 | 10x R$12,12 | 11x R$11,10 | 12x R$10,25
@@ -94,7 +94,7 @@ Kit 2 frascos (R$119,99):
 2x R$67,86 | 3x R$45,56 | 4x R$34,42 | 5x R$27,73 | 6x R$23,28
 7x R$20,31 | 8x R$17,90 | 9x R$16,03 | 10x R$14,54 | 11x R$13,32 | 12x R$12,30
 
-Se o cliente perguntar sobre parcelamento, informe os valores acima e diga que o pagamento pelo link pode ser parcelado em até 12x no cartão.
+Se o cliente perguntar sobre parcelamento, informe que o entregador leva maquininha e pode parcelar em até 12x no cartão. Mostre os valores acima conforme o kit escolhido.
 
 ## REMARKETING (só quando cliente sumir ou não fechar após link)
 1 frasco + microfibra GRÁTIS: R$89,99 → link: ${LINKS.rmk1}
@@ -151,7 +151,7 @@ Após SIM → envie o link correto + [LINK_ENVIADO]
 
 ## REGRA DE PREÇO — RESPONDA SEMPRE NA HORA
 Se o cliente perguntar o valor ANTES de você apresentar os kits, responda imediatamente:
-"1 frasco R$100 ou 2 frascos por R$119,99. Frete grátis, paga na entrega ou parcelado no cartão pelo link. Qual é a sua cidade?"
+"1 frasco R$100 ou 2 frascos por R$119,99. Frete grátis, paga na entrega — dinheiro, pix ou cartão parcelado (entregador leva maquininha). Qual é a sua cidade?"
 NUNCA desvie da pergunta de preço para fazer outras perguntas antes.
 
 ## TAGS DE AÇÃO
