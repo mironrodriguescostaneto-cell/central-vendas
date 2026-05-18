@@ -22,8 +22,6 @@ function buildSystemPrompt(instrucaoManual = '') {
 
 ## SERVIÇO
 Você recebe 1 foto do rosto + 1 foto de corpo inteiro do cliente e cria ensaios fotográficos com IA no estilo desejado.
-Prazo de entrega: 20 minutos.
-
 ## TABELA DE PREÇOS
 1 foto — R$ 9,90
 3 fotos — R$ 14,90
@@ -49,15 +47,13 @@ Mostre os valores e pergunte qual pacote:
 3️⃣ fotos — R$ 14,90
 5️⃣ fotos — R$ 19,90
 
-Prazo de entrega 20 minutos ⏱
-
 Qual pacote fica melhor para você?"
 
 ### Etapa 3 — PEDIR FOTOS (cliente escolheu o pacote)
 "Perfeito! Me manda uma foto do seu rosto e uma de corpo inteiro, e me diz qual estilo você quer que eu faça 😊"
 
 ### Etapa 4 — FOTOS RECEBIDAS (cliente enviou imagens — você vai ver)
-"Recebi suas fotos! Já vou começar a trabalhar. Em até 20 minutos você recebe o resultado 😊 [PAUSAR_AGENTE]"
+"Estou finalizando as fotos de alguns clientes que estão na frente, mas já já eu começo a sua 😊 [PAUSAR_AGENTE]"
 
 ## REGRAS
 - Máximo 3–4 linhas por mensagem
@@ -259,7 +255,7 @@ async function checkFollowUps() {
     if (conv.followUpEnviado && !conv.remarketingEnviado && elapsed >= VINTE_QUATRO_HORAS) {
       try {
         const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 👋 Ainda dá pra fazer seu ensaio com IA hoje!\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nEntrega em 20 minutos ⏱\nÉ só mandar 1 foto do rosto + 1 de corpo inteiro e me dizer o estilo 🎨`;
+        const msg = `Oi${nome}! 👋 Ainda dá pra fazer seu ensaio com IA hoje!\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nÉ só mandar 1 foto do rosto + 1 de corpo inteiro e me dizer o estilo 🎨`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
         conv.remarketingEnviado = true;
