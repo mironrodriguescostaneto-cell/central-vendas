@@ -296,20 +296,23 @@ async function processMessage(event, payload) {
 
     const sessionId = CONFIG.sessionIds.logzz;
 
-    if (tags.includes('LINK_ENVIADO')) {
-      const convState = getConvState(phone);
-      if (convState) {
-        convState.linkEnviadoEm = Date.now();
-        convState.followUpEnviado = false;
-        convState.remarketingEnviado = false;
-      }
-    }
-
     if (tags.includes('PAUSAR_AGENTE')) pausePhone(AGENT_ID, phone);
 
     if (textoLimpo) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
       addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
+
+      // Detecta link enviado — por tag OU por presença do link logzz na mensagem
+      const temLink = textoLimpo.includes('entrega.logzz.com.br') || tags.includes('LINK_ENVIADO');
+      if (temLink) {
+        const convState = getConvState(phone);
+        if (convState) {
+          convState.linkEnviadoEm = Date.now();
+          convState.followUpEnviado = false;
+          convState.remarketingEnviado = false;
+          console.log(`[LOGZZ] linkEnviadoEm registrado para ${phone}`);
+        }
+      }
     }
 
     if (tags.includes('ENVIAR_FOTO')) {
@@ -362,10 +365,12 @@ async function checkFollowUps() {
   const DUAS_HORAS = 2 * 60 * 60 * 1000;
   const VINTE_QUATRO_HORAS = 24 * 60 * 60 * 1000;
 
+  console.log(`[LOGZZ] checkFollowUps — ${convMap.size} conv(s) ativas`);
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
     if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
+    console.log(`[LOGZZ] follow-up candidato: ${phone}, elapsed: ${Math.round((agora - conv.linkEnviadoEm) / 60000)}min`);
 
     const elapsed = agora - conv.linkEnviadoEm;
     if (isNaN(elapsed)) continue;
