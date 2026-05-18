@@ -220,10 +220,13 @@ async function processMessage(event, payload) {
 
   addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
   const convState = getConvState(phone);
-  if (convState?.linkEnviadoEm) {
-    delete convState.linkEnviadoEm;
-    delete convState.followUpEnviado;
-    delete convState.remarketingEnviado;
+  if (convState) {
+    convState.ultimaMensagemUsuario = Date.now();
+    if (convState.linkEnviadoEm) {
+      delete convState.linkEnviadoEm;
+      delete convState.followUpEnviado;
+      delete convState.remarketingEnviado;
+    }
   }
 
   // Acumular mídia antes do check de pausa/pending
@@ -366,10 +369,13 @@ async function checkFollowUps() {
   const VINTE_QUATRO_HORAS = 24 * 60 * 60 * 1000;
 
   console.log(`[LOGZZ] checkFollowUps — ${convMap.size} conv(s) ativas`);
+  const TRINTA_MINUTOS = 30 * 60 * 1000;
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
     if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
+    // Não disparar se o cliente enviou mensagem nos últimos 30 min
+    if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < TRINTA_MINUTOS) continue;
     console.log(`[LOGZZ] follow-up candidato: ${phone}, elapsed: ${Math.round((agora - conv.linkEnviadoEm) / 60000)}min`);
 
     const elapsed = agora - conv.linkEnviadoEm;
