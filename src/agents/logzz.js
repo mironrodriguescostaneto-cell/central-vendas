@@ -74,7 +74,7 @@ const MEDIA = {
   ],
 };
 
-function buildSystemPrompt(instrucaoManual = '') {
+function buildSystemPrompt(instrucaoManual = '', remarketingCtx = '') {
   return `Você é Roberto, consultor de vendas da Resina Extreme. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
 
 ## PRODUTO — Resina Extreme
@@ -168,7 +168,7 @@ NUNCA desvie da pergunta de preço para fazer outras perguntas antes.
 - Linguagem informal e direta
 - Nunca repita perguntas que o cliente já respondeu
 - COD elimina objeção financeira: reforce "paga só na entrega" sempre que sentir hesitação
-${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoManual}` : ''}`;
+${remarketingCtx ? `\n## CONTEXTO DE REMARKETING — CRÍTICO\nVocê enviou esta mensagem de remarketing para este cliente:\n"${remarketingCtx}"\nHonre EXATAMENTE qualquer desconto ou condição mencionada. Se você ofereceu R$89,99, NÃO pode cobrar R$100. Continue a venda a partir dessa oferta.` : ''}${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoManual}` : ''}`;
 }
 
 function extractTags(text) {
@@ -255,6 +255,7 @@ async function processMessage(event, payload) {
     // Rebuild historico APÓS o delay para incluir todas as mensagens recebidas durante a espera
     const conv = getConv(AGENT_ID, phone);
     const instrucao = getInstrucao(AGENT_ID);
+    const remarketingCtx = getConvState(phone)?.remarketingContexto || '';
 
     const historico = (conv.msgs || []).slice(-30).map(m => ({
       role: m.role === 'user' ? 'user' : 'assistant',
@@ -291,7 +292,7 @@ async function processMessage(event, payload) {
     }
 
     const resposta = await Promise.race([
-      callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
+      callClaudeText(buildSystemPrompt(instrucao, remarketingCtx), historico, { temperature: 0.75, maxTokens: 500 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout IA 60s')), 60000)),
     ]);
     const tags = extractTags(resposta);
@@ -299,7 +300,11 @@ async function processMessage(event, payload) {
 
     const sessionId = CONFIG.sessionIds.logzz;
 
-    if (tags.includes('PAUSAR_AGENTE')) pausePhone(AGENT_ID, phone);
+    if (tags.includes('PAUSAR_AGENTE')) {
+      pausePhone(AGENT_ID, phone);
+      const cs = getConvState(phone);
+      if (cs) delete cs.remarketingContexto;
+    }
 
     if (textoLimpo) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);

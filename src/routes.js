@@ -608,6 +608,10 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         else await baileys.sendText(sessionId, numero, texto, lidJid);
         if (pausarAposEnvio) db.pausePhone(agente, numero);
         db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
+        if (texto) {
+          const convState = db.state.conversations[agente]?.get(numero);
+          if (convState) convState.remarketingContexto = texto;
+        }
         state.enviados++;
       } catch (e) {
         state.erros++;
