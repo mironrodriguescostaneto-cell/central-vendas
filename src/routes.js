@@ -603,8 +603,9 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     for (const numero of numeros) {
       if (state.cancelar) break;
       try {
-        if (imagemUrl) await baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '');
-        else await baileys.sendText(sessionId, numero, texto);
+        const lidJid = db.state.phoneLidMap?.get(numero) || null;
+        if (imagemUrl) await baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', lidJid);
+        else await baileys.sendText(sessionId, numero, texto, lidJid);
         if (pausarAposEnvio) db.pausePhone(agente, numero);
         db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
         state.enviados++;

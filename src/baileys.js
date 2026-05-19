@@ -296,6 +296,10 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
             console.log(`[BAILEYS:${sessionId}] LID resolvido: ${lid} → ${phone}`);
           } else {
             phone = lid.replace(/@lid$/, '');
+            try {
+              const db = require('./database');
+              db.registerLid(lid, phone);
+            } catch { /* ignore */ }
             console.log(`[BAILEYS:${sessionId}] LID não resolvido, usando como-está: ${phone}`);
           }
         }
