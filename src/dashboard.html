@@ -1129,7 +1129,7 @@ async function rmkLoadContatos() {
   const el = document.getElementById('rmkContatos');
   el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Carregando...</div>';
   try {
-    const r = await fetch('/api/remarketing/contatos?agente=logzz', { headers: { 'Authorization': 'Bearer ' + token } });
+    const r = await fetch('/api/remarketing/contatos?agente=logzz', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
     rmkTodosContatos = await r.json();
     rmkRenderContatos();
   } catch (e) {
@@ -1186,7 +1186,7 @@ function rmkHandleImg(e) {
     document.getElementById('rmkImgPreview').style.display = 'block';
     try {
       const r = await fetch('/api/remarketing/temp-img', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
         body: JSON.stringify({ base64, mimetype: file.type })
       });
       const d = await r.json();
@@ -1213,7 +1213,7 @@ async function rmkEnviar() {
   const pausarAposEnvio = document.getElementById('rmkPausarApos').checked;
   try {
     const r = await fetch('/api/remarketing/enviar', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
       body: JSON.stringify({ agente: 'logzz', numeros, texto, imagemUrl: rmkImgUrl, pausarAposEnvio })
     });
     const d = await r.json();
@@ -1232,7 +1232,7 @@ function rmkPollStatus() {
 
 async function rmkCheckStatus() {
   try {
-    const r = await fetch('/api/remarketing/status?agente=logzz', { headers: { 'Authorization': 'Bearer ' + token } });
+    const r = await fetch('/api/remarketing/status?agente=logzz', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
     const d = await r.json();
     const bar = document.getElementById('rmkProgressBar');
     const txt = document.getElementById('rmkProgressText');
@@ -1264,7 +1264,7 @@ async function rmkPausar() {
   const numeros = rmkGetSelecionados();
   if (!numeros.length) return alert('Selecione contatos para pausar');
   await fetch('/api/remarketing/pausar', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
     body: JSON.stringify({ agente: 'logzz', numeros })
   });
   rmkLoadContatos();
@@ -1274,7 +1274,7 @@ async function rmkRetomar() {
   const numeros = rmkGetSelecionados();
   if (!numeros.length) return alert('Selecione contatos para retomar');
   await fetch('/api/remarketing/retomar', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
     body: JSON.stringify({ agente: 'logzz', numeros })
   });
   rmkLoadContatos();
@@ -1282,7 +1282,7 @@ async function rmkRetomar() {
 
 async function rmkParar() {
   await fetch('/api/remarketing/parar', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
     body: JSON.stringify({ agente: 'logzz' })
   });
   document.getElementById('rmkBtnParar').style.display = 'none';
