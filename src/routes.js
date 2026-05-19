@@ -599,19 +599,34 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   res.json({ ok: true, total: numeros.length });
 
   const sessionId = CONFIG.sessionIds[agente];
-  const TIMEOUT_ENVIO = 20000;
+  const TIMEOUT_ENVIO = 18000;
+
+  // Resolve JID correto: prioriza LID mapeado; para números ≥15 dígitos sem prefixo 55, usa @lid diretamente
+  function resolveJid(numero) {
+    const lidJid = db.state.phoneLidMap?.get(numero);
+    if (lidJid) return lidJid;
+    if (numero.length >= 15 && !numero.startsWith('55')) return `${numero}@lid`;
+    return null;
+  }
+
   (async () => {
+    let consecutiveTimeouts = 0;
     for (const numero of numeros) {
       if (state.cancelar) break;
+      if (baileys.getState(sessionId) !== 'connected') {
+        console.log(`[Remarketing] ${sessionId} desconectado — abortando`);
+        break;
+      }
       try {
-        const lidJid = db.state.phoneLidMap?.get(numero) || null;
+        const originalJid = resolveJid(numero);
         const sendFn = imagemUrl
-          ? () => baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', lidJid)
-          : () => baileys.sendText(sessionId, numero, texto, lidJid);
+          ? () => baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', originalJid)
+          : () => baileys.sendText(sessionId, numero, texto, originalJid);
         await Promise.race([
           sendFn(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 20s')), TIMEOUT_ENVIO)),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('__timeout__')), TIMEOUT_ENVIO)),
         ]);
+        consecutiveTimeouts = 0;
         if (pausarAposEnvio) db.pausePhone(agente, numero);
         db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
         if (texto) {
@@ -621,12 +636,22 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         state.enviados++;
       } catch (e) {
         state.erros++;
+        if (e.message === '__timeout__') {
+          consecutiveTimeouts++;
+          console.error(`[Remarketing] Timeout ${numero} (${consecutiveTimeouts} consecutivos)`);
+          if (consecutiveTimeouts >= 3) {
+            console.log(`[Remarketing] 3 timeouts consecutivos — WhatsApp throttling, abortando`);
+            break;
+          }
+          await new Promise(r => setTimeout(r, 8000));
+          continue;
+        }
         console.error(`[Remarketing] Erro ${numero}:`, e.message);
       }
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 3000));
     }
     state.ativo = false;
-    console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} enviados, ${state.erros} erros`);
+    console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} OK, ${state.erros} erros`);
   })();
 });
 

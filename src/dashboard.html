@@ -1242,7 +1242,8 @@ async function rmkCheckStatus() {
     if (d.ativo) {
       const pct = d.total > 0 ? Math.round((d.enviados / d.total) * 100) : 0;
       bar.style.width = pct + '%';
-      txt.textContent = `${d.enviados} / ${d.total}`;
+      const erroTxt = d.erros > 0 ? ` · ${d.erros} erro${d.erros > 1 ? 's' : ''}` : '';
+      txt.textContent = `${d.enviados} / ${d.total}${erroTxt}`;
       prog.style.display = 'block';
       btnParar.style.display = 'block';
       btnEnviar.disabled = true;
@@ -1250,8 +1251,9 @@ async function rmkCheckStatus() {
       clearInterval(rmkStatusTimer);
       if (d.total > 0) {
         bar.style.width = '100%';
-        txt.textContent = `✓ ${d.enviados}/${d.total} enviados`;
-        setTimeout(() => { prog.style.display = 'none'; bar.style.width = '0%'; }, 3000);
+        const erroFinal = d.erros > 0 ? ` (${d.erros} erro${d.erros > 1 ? 's' : ''})` : '';
+        txt.textContent = `✓ ${d.enviados}/${d.total} enviados${erroFinal}`;
+        setTimeout(() => { prog.style.display = 'none'; bar.style.width = '0%'; }, 5000);
       }
       btnParar.style.display = 'none';
       btnEnviar.disabled = false;
