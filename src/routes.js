@@ -599,13 +599,19 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   res.json({ ok: true, total: numeros.length });
 
   const sessionId = CONFIG.sessionIds[agente];
+  const TIMEOUT_ENVIO = 20000;
   (async () => {
     for (const numero of numeros) {
       if (state.cancelar) break;
       try {
         const lidJid = db.state.phoneLidMap?.get(numero) || null;
-        if (imagemUrl) await baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', lidJid);
-        else await baileys.sendText(sessionId, numero, texto, lidJid);
+        const sendFn = imagemUrl
+          ? () => baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', lidJid)
+          : () => baileys.sendText(sessionId, numero, texto, lidJid);
+        await Promise.race([
+          sendFn(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 20s')), TIMEOUT_ENVIO)),
+        ]);
         if (pausarAposEnvio) db.pausePhone(agente, numero);
         db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
         if (texto) {
@@ -617,7 +623,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         state.erros++;
         console.error(`[Remarketing] Erro ${numero}:`, e.message);
       }
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 2000));
     }
     state.ativo = false;
     console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} enviados, ${state.erros} erros`);
@@ -634,6 +640,8 @@ router.post('/api/remarketing/parar', auth, (req, res) => {
   const { agente } = req.body;
   if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].cancelar = true;
+  // Force-reset ativo após 25s para desbloquear caso o loop esteja travado
+  setTimeout(() => { _remarkState[agente].ativo = false; }, 25000);
   res.json({ ok: true });
 });
 
