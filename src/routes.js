@@ -548,6 +548,104 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   }
 });
 
+// ----- Remarketing Logzz -----
+const _remarkTempImgs = new Map();
+const _remarkState = {
+  logzz: { ativo: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+};
+
+router.post('/api/remarketing/temp-img', auth, (req, res) => {
+  const { base64, mimetype } = req.body;
+  if (!base64 || !mimetype) return res.status(400).json({ error: 'base64 e mimetype obrigatorios' });
+  const buffer = Buffer.from(base64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  const id = crypto.randomBytes(10).toString('hex');
+  _remarkTempImgs.set(id, { buffer, mimetype, expiresAt: Date.now() + 7200000 });
+  const url = `${req.protocol}://${req.get('host')}/api/remarketing/temp-img/${id}`;
+  res.json({ ok: true, id, url });
+});
+
+router.get('/api/remarketing/temp-img/:id', (req, res) => {
+  const img = _remarkTempImgs.get(req.params.id);
+  if (!img || img.expiresAt < Date.now()) return res.status(404).send('Not found');
+  res.setHeader('Content-Type', img.mimetype);
+  res.send(img.buffer);
+});
+
+router.get('/api/remarketing/contatos', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!['logzz'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  const contatos = [];
+  db.state.conversations[agentId].forEach((conv, numero) => {
+    contatos.push({
+      numero,
+      nome: conv.pushName || '',
+      ultimaMensagem: conv.ultimaMensagem || 0,
+      pausado: db.state.paused[agentId]?.has(numero) || false,
+    });
+  });
+  contatos.sort((a, b) => b.ultimaMensagem - a.ultimaMensagem);
+  res.json(contatos);
+});
+
+router.post('/api/remarketing/enviar', auth, async (req, res) => {
+  const { agente, numeros, texto, imagemUrl, pausarAposEnvio } = req.body;
+  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
+  if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
+  if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
+
+  const state = _remarkState[agente];
+  state.ativo = true; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numeros.length;
+  res.json({ ok: true, total: numeros.length });
+
+  const sessionId = CONFIG.sessionIds[agente];
+  (async () => {
+    for (const numero of numeros) {
+      if (state.cancelar) break;
+      try {
+        if (imagemUrl) await baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '');
+        else await baileys.sendText(sessionId, numero, texto);
+        if (pausarAposEnvio) db.pausePhone(agente, numero);
+        db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
+        state.enviados++;
+      } catch (e) {
+        state.erros++;
+        console.error(`[Remarketing] Erro ${numero}:`, e.message);
+      }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+    state.ativo = false;
+    console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} enviados, ${state.erros} erros`);
+  })();
+});
+
+router.get('/api/remarketing/status', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!['logzz'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  res.json(_remarkState[agentId]);
+});
+
+router.post('/api/remarketing/parar', auth, (req, res) => {
+  const { agente } = req.body;
+  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  _remarkState[agente].cancelar = true;
+  res.json({ ok: true });
+});
+
+router.post('/api/remarketing/pausar', auth, (req, res) => {
+  const { agente, numeros } = req.body;
+  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
+  for (const numero of numeros) db.pausePhone(agente || 'logzz', numero);
+  res.json({ ok: true, pausados: numeros.length });
+});
+
+router.post('/api/remarketing/retomar', auth, (req, res) => {
+  const { agente, numeros } = req.body;
+  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
+  for (const numero of numeros) db.resumePhone(agente || 'logzz', numero);
+  res.json({ ok: true, retomados: numeros.length });
+});
+
 // ----- Dashboard (servir o HTML) -----
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
