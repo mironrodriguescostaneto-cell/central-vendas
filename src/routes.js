@@ -551,7 +551,7 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
 // ----- Remarketing Logzz -----
 const _remarkTempImgs = new Map();
 const _remarkState = {
-  logzz: { ativo: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  logzz: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
 };
 
 router.post('/api/remarketing/temp-img', auth, (req, res) => {
@@ -595,7 +595,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
 
   const state = _remarkState[agente];
-  state.ativo = true; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numeros.length;
+  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numeros.length;
   res.json({ ok: true, total: numeros.length });
 
   const sessionId = CONFIG.sessionIds[agente];
@@ -612,6 +612,10 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   (async () => {
     let consecutiveTimeouts = 0;
     for (const numero of numeros) {
+      // Aguarda enquanto pausado
+      while (state.pausado && !state.cancelar) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
       if (state.cancelar) break;
       if (baileys.getState(sessionId) !== 'connected') {
         console.log(`[Remarketing] ${sessionId} desconectado — abortando`);
@@ -671,17 +675,17 @@ router.post('/api/remarketing/parar', auth, (req, res) => {
 });
 
 router.post('/api/remarketing/pausar', auth, (req, res) => {
-  const { agente, numeros } = req.body;
-  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
-  for (const numero of numeros) db.pausePhone(agente || 'logzz', numero);
-  res.json({ ok: true, pausados: numeros.length });
+  const { agente } = req.body;
+  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  _remarkState[agente].pausado = true;
+  res.json({ ok: true });
 });
 
 router.post('/api/remarketing/retomar', auth, (req, res) => {
-  const { agente, numeros } = req.body;
-  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
-  for (const numero of numeros) db.resumePhone(agente || 'logzz', numero);
-  res.json({ ok: true, retomados: numeros.length });
+  const { agente } = req.body;
+  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  _remarkState[agente].pausado = false;
+  res.json({ ok: true });
 });
 
 // ----- Dashboard (servir o HTML) -----
