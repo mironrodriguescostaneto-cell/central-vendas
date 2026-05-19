@@ -59,6 +59,7 @@ Qual pacote fica melhor para você?"
 - Máximo 3–4 linhas por mensagem
 - Se o cliente enviar foto ou imagem, você consegue ver — reconheça e responda com contexto
 - Nunca pule a etapa de mostrar os exemplos ([ENVIAR_FOTOS_EXEMPLO])
+- CRÍTICO: Se já existe histórico de conversa, NUNCA reinicie do Etapa 1. Continue de onde parou. [ENVIAR_FOTOS_EXEMPLO] só na primeira mensagem — jamais repita.
 
 ## TAGS DE AÇÃO
 [ENVIAR_FOTOS_EXEMPLO] — envia as fotos de exemplo do trabalho (use na abertura)
@@ -164,9 +165,10 @@ async function processMessage(event, payload) {
       }
     }
 
-    // Detecta primeiro contato ANTES da chamada à IA (msgs tem apenas mensagens do cliente ainda)
+    // Detecta primeiro contato ANTES da chamada à IA
     const userMsgCount = (conv.msgs || []).filter(m => m.role === 'user').length;
     const isPrimeiroContato = userMsgCount <= 1;
+    const jaRespondeu = (conv.msgs || []).some(m => m.role === 'assistant');
 
     const resposta = await Promise.race([
       callClaudeText(buildSystemPrompt(instrucao), historico, { temperature: 0.75, maxTokens: 500 }),
@@ -175,10 +177,15 @@ async function processMessage(event, payload) {
 
     const tags = extractTags(resposta);
 
-    // Garante fotos de exemplo no primeiro contato mesmo que a IA não inclua a tag
+    // Garante fotos de exemplo no primeiro contato
     if (isPrimeiroContato && !tags.includes('ENVIAR_FOTOS_EXEMPLO')) {
       tags.push('ENVIAR_FOTOS_EXEMPLO');
       console.log(`[RAFAEL] Primeiro contato de ${phone} — ENVIAR_FOTOS_EXEMPLO forçado`);
+    }
+    // Bloqueia reenvio das fotos de exemplo se já respondeu antes (evita loop)
+    if (jaRespondeu && tags.includes('ENVIAR_FOTOS_EXEMPLO')) {
+      tags.splice(tags.indexOf('ENVIAR_FOTOS_EXEMPLO'), 1);
+      console.log(`[RAFAEL] ENVIAR_FOTOS_EXEMPLO bloqueado — conversa já iniciada para ${phone}`);
     }
 
     const textoLimpo = removeTags(resposta);
