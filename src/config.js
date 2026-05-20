@@ -19,6 +19,7 @@ const CONFIG = {
   telegram: {
     botToken: env('TELEGRAM_BOT_TOKEN'),
     chatId: env('TELEGRAM_CHAT_ID'),
+    grupoFinancasId: env('TELEGRAM_GRUPO_FINANCAS_ID'),
   },
 
   github: {

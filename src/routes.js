@@ -688,6 +688,54 @@ router.post('/api/remarketing/retomar', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ----- Finanças Familiares -----
+const financas = require('./financas');
+
+router.get('/api/financas/resumo', auth, (req, res) => {
+  const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+  const resumo = financas.getResumoMensal(db, mes);
+  res.json(resumo);
+});
+
+router.get('/api/financas/transacoes', auth, (req, res) => {
+  const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+  const tipo = req.query.tipo || 'todas';
+  const limite = parseInt(req.query.limite) || 50;
+  let transacoes = financas.getTransacoesMes(db, mes);
+  if (tipo !== 'todas') transacoes = transacoes.filter(t => t.tipo === tipo);
+  res.json({ transacoes: transacoes.slice(0, limite) });
+});
+
+router.post('/api/financas/transacoes', auth, (req, res) => {
+  const { tipo, valor, categoria, descricao, quem } = req.body;
+  if (!tipo || !valor || !categoria || !descricao || !quem) {
+    return res.status(400).json({ error: 'Campos obrigatórios: tipo, valor, categoria, descricao, quem' });
+  }
+  const entrada = financas.addTransacao(db, { tipo, valor, categoria, descricao, quem });
+  res.json({ ok: true, transacao: entrada });
+});
+
+router.post('/api/financas/meta', auth, (req, res) => {
+  const { valor } = req.body;
+  if (!valor || parseFloat(valor) <= 0) return res.status(400).json({ error: 'Valor inválido' });
+  db.state.financas.metas.economiasMensal = parseFloat(valor);
+  db.saveDB().catch(() => {});
+  res.json({ ok: true });
+});
+
+router.get('/api/financas/analise', auth, async (req, res) => {
+  try {
+    const analise = await financas.analisarGastosDesnecessarios(db);
+    res.json({ analise });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/financas', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard_financas.html'));
+});
+
 // ----- Dashboard (servir o HTML) -----
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));

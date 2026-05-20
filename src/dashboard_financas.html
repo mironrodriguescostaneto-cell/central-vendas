@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Jarvis — Finanças</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--card:#13131a;--card2:#1a1a24;--border:#2a2a3a;
+  --green:#00e676;--red:#ff5252;--blue:#448aff;--yellow:#ffd740;--purple:#e040fb;
+  --text:#e8e8f0;--muted:#6b6b8a;--accent:#7c4dff;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* Login */
+#login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+#login h1{font-size:28px;margin-bottom:8px;background:linear-gradient(135deg,var(--green),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#login p{color:var(--muted);margin-bottom:32px;font-size:14px}
+#login input{width:100%;max-width:320px;padding:14px 18px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;margin-bottom:12px;outline:none}
+#login input:focus{border-color:var(--accent)}
+#login button{width:100%;max-width:320px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),var(--blue));color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+#login .err{color:var(--red);font-size:13px;margin-top:8px}
+
+/* App */
+#app{display:none;padding:0 0 80px}
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--green),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-actions{display:flex;gap:8px}
+.btn-sm{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;cursor:pointer}
+.btn-sm:hover{border-color:var(--accent)}
+
+.section{padding:16px 16px 0}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+
+/* Cards principais */
+.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.card.full{grid-column:1/-1}
+.card-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+.card-value{font-size:24px;font-weight:700;line-height:1}
+.card-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.green{color:var(--green)}
+.red{color:var(--red)}
+.blue{color:var(--blue)}
+.yellow{color:var(--yellow)}
+
+/* Progresso */
+.progress-bar{height:8px;background:var(--border);border-radius:4px;margin-top:10px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:width .5s}
+
+/* Categorias */
+.cat-list{display:flex;flex-direction:column;gap:8px}
+.cat-item{display:flex;align-items:center;gap:10px}
+.cat-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.cat-fill{height:100%;border-radius:3px}
+.cat-name{font-size:13px;min-width:100px}
+.cat-val{font-size:13px;font-weight:600;min-width:70px;text-align:right}
+
+/* Transações */
+.tx-list{display:flex;flex-direction:column;gap:6px}
+.tx-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.tx-emoji{font-size:20px;flex-shrink:0}
+.tx-info{flex:1;min-width:0}
+.tx-desc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.tx-valor{font-size:15px;font-weight:700;flex-shrink:0}
+
+/* Formulário rápido */
+.form-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.form-field{display:flex;flex-direction:column;gap:4px}
+.form-field label{font-size:12px;color:var(--muted)}
+.form-field input,.form-field select{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px;outline:none;width:100%}
+.form-field input:focus,.form-field select:focus{border-color:var(--accent)}
+.form-field select option{background:var(--card2)}
+.btn-add{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),var(--blue));color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px}
+
+/* Análise */
+.analise-btn{width:calc(100% - 32px);margin:0 16px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1a1a2e,var(--card2));border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.analise-btn:hover{border-color:var(--accent)}
+.analise-resultado{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;margin:0 16px;font-size:14px;line-height:1.6;white-space:pre-wrap;display:none}
+
+/* Mês selector */
+.mes-nav{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px}
+.mes-nav button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:18px}
+.mes-nav span{font-size:16px;font-weight:600;min-width:120px;text-align:center}
+
+/* Nav tabs */
+.tabs{display:flex;gap:2px;padding:12px 16px 0;overflow-x:auto}
+.tab{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:13px;cursor:pointer;white-space:nowrap}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Skeleton */
+.loading{color:var(--muted);text-align:center;padding:32px;font-size:14px}
+
+/* Responsive */
+@media(max-width:360px){.cards-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>💰 Jarvis Finanças</h1>
+  <p>Controle financeiro familiar</p>
+  <input type="password" id="pwd" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()">
+  <button onclick="doLogin()">Entrar</button>
+  <div class="err" id="lerr"></div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <h1>💰 Jarvis Finanças</h1>
+    <div class="header-actions">
+      <button class="btn-sm" onclick="loadData()">↻</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('resumo')">Resumo</div>
+    <div class="tab" onclick="showTab('transacoes')">Transações</div>
+    <div class="tab" onclick="showTab('adicionar')">+ Registrar</div>
+    <div class="tab" onclick="showTab('analise')">🤖 Análise</div>
+  </div>
+
+  <!-- RESUMO -->
+  <div id="tab-resumo">
+    <div class="mes-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <span id="mes-label">Mai/2026</span>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-label">Receitas</div>
+        <div class="card-value green" id="val-receitas">R$0</div>
+        <div class="card-sub" id="sub-receitas">nenhuma registrada</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Despesas</div>
+        <div class="card-value red" id="val-despesas">R$0</div>
+        <div class="card-sub" id="sub-despesas">nenhuma registrada</div>
+      </div>
+      <div class="card full">
+        <div class="card-label">Saldo do Mês</div>
+        <div class="card-value" id="val-saldo">R$0</div>
+        <div class="card-sub" id="sub-economia">Taxa de economia: 0%</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="prog-economia" style="width:0%;background:var(--green)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Gastos por Categoria</div>
+      <div class="cat-list" id="cat-list">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Meta -->
+    <div style="padding:16px">
+      <div class="card">
+        <div class="card-label">🎯 Meta de Economia Mensal</div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <input type="number" id="meta-input" placeholder="R$ meta mensal" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px;outline:none">
+          <button class="btn-sm" onclick="salvarMeta()" style="padding:10px 14px">Salvar</button>
+        </div>
+        <div class="progress-bar" style="margin-top:10px">
+          <div class="progress-fill" id="prog-meta" style="width:0%;background:var(--yellow)"></div>
+        </div>
+        <div class="card-sub" id="sub-meta" style="margin-top:6px">Defina uma meta</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSAÇÕES -->
+  <div id="tab-transacoes" style="display:none">
+    <div class="mes-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <span id="mes-label2">Mai/2026</span>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+    <div style="display:flex;gap:6px;padding:0 16px 12px;overflow-x:auto">
+      <button class="btn-sm" id="filtro-todas" onclick="setFiltro('todas')" style="border-color:var(--accent)">Todas</button>
+      <button class="btn-sm" id="filtro-despesa" onclick="setFiltro('despesa')">Despesas</button>
+      <button class="btn-sm" id="filtro-receita" onclick="setFiltro('receita')">Receitas</button>
+    </div>
+    <div class="section">
+      <div class="tx-list" id="tx-list">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADICIONAR -->
+  <div id="tab-adicionar" style="display:none">
+    <div style="padding:16px 16px 12px">
+      <div class="section-title">Registrar Transação</div>
+    </div>
+    <div class="form-card">
+      <div class="form-row">
+        <div class="form-field">
+          <label>Tipo</label>
+          <select id="f-tipo">
+            <option value="despesa">💸 Despesa</option>
+            <option value="receita">💵 Receita</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Quem</label>
+          <select id="f-quem">
+            <option value="Miron">Miron</option>
+            <option value="Esposa">Esposa</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Valor (R$)</label>
+          <input type="number" id="f-valor" placeholder="0,00" step="0.01" min="0">
+        </div>
+        <div class="form-field">
+          <label>Categoria</label>
+          <select id="f-categoria">
+            <option value="alimentação">🍽 Alimentação</option>
+            <option value="transporte">🚗 Transporte</option>
+            <option value="moradia">🏠 Moradia</option>
+            <option value="saúde">💊 Saúde</option>
+            <option value="educação">📚 Educação</option>
+            <option value="lazer">🎮 Lazer</option>
+            <option value="roupas">👕 Roupas</option>
+            <option value="contas">📄 Contas</option>
+            <option value="trabalho">💼 Trabalho</option>
+            <option value="outros">📦 Outros</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:12px">
+        <label>Descrição</label>
+        <input type="text" id="f-desc" placeholder="Ex: mercado, uber, salário...">
+      </div>
+      <button class="btn-add" onclick="adicionarTransacao()">Registrar</button>
+      <div id="form-msg" style="text-align:center;font-size:13px;margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- ANÁLISE IA -->
+  <div id="tab-analise" style="display:none">
+    <div style="padding:16px 16px 12px">
+      <div class="section-title">🤖 Análise do Jarvis</div>
+    </div>
+    <div style="padding:0 16px 12px;color:var(--muted);font-size:13px">
+      Jarvis analisa seus gastos com base nos princípios de Warren Buffett, Ray Dalio, Charlie Munger e outros grandes investidores.
+    </div>
+    <button class="analise-btn" onclick="fazerAnalise()">
+      🤖 Analisar Gastos do Mês
+    </button>
+    <div id="analise-loading" style="display:none;padding:24px;text-align:center;color:var(--muted);font-size:14px">
+      🔍 Jarvis analisando seus gastos...
+    </div>
+    <div class="analise-resultado" id="analise-txt"></div>
+  </div>
+</div>
+
+<script>
+let TOKEN = localStorage.getItem('jarvis_fin_token') || '';
+let mesAtual = new Date().toISOString().slice(0,7);
+let filtroTx = 'todas';
+let resumoCache = null;
+
+const CORES_CAT = {
+  'alimentação':'#ff7043','transporte':'#42a5f5','moradia':'#ab47bc',
+  'saúde':'#26a69a','educação':'#ec407a','lazer':'#ffca28',
+  'roupas':'#66bb6a','contas':'#ef5350','trabalho':'#29b6f6','outros':'#78909c'
+};
+
+const EMOJIS_CAT = {
+  'alimentação':'🍽','transporte':'🚗','moradia':'🏠','saúde':'💊',
+  'educação':'📚','lazer':'🎮','roupas':'👕','contas':'📄','trabalho':'💼','outros':'📦'
+};
+
+async function api(path, opts={}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN, ...(opts.headers||{}) }
+  });
+  if (r.status === 401) { TOKEN=''; localStorage.removeItem('jarvis_fin_token'); showLogin(); return null; }
+  return r.json();
+}
+
+async function doLogin() {
+  const pwd = document.getElementById('pwd').value;
+  const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pwd}) });
+  const d = await r.json();
+  if (d.token) {
+    TOKEN = d.token;
+    localStorage.setItem('jarvis_fin_token', TOKEN);
+    showApp();
+  } else {
+    document.getElementById('lerr').textContent = 'Senha incorreta';
+  }
+}
+
+function showLogin() {
+  document.getElementById('login').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+function showApp() {
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadData();
+}
+
+function fmtMoney(v) { return 'R$'+parseFloat(v||0).toFixed(2).replace('.',','); }
+function fmtMes(m) {
+  const nomes=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [a,mm]=m.split('-');
+  return nomes[parseInt(mm)]+'/'+a;
+}
+
+function changeMonth(d) {
+  const [a,m]=mesAtual.split('-').map(Number);
+  let nm=m+d, na=a;
+  if(nm>12){nm=1;na++;}
+  if(nm<1){nm=12;na--;}
+  mesAtual=`${na}-${String(nm).padStart(2,'0')}`;
+  document.getElementById('mes-label').textContent=fmtMes(mesAtual);
+  document.getElementById('mes-label2').textContent=fmtMes(mesAtual);
+  loadData();
+}
+
+async function loadData() {
+  await Promise.all([loadResumo(), loadTransacoes()]);
+}
+
+async function loadResumo() {
+  const d = await api('/api/financas/resumo?mes='+mesAtual);
+  if(!d) return;
+  resumoCache = d;
+
+  document.getElementById('val-receitas').textContent = fmtMoney(d.totalReceitas);
+  document.getElementById('val-despesas').textContent = fmtMoney(d.totalDespesas);
+
+  const saldoEl = document.getElementById('val-saldo');
+  saldoEl.textContent = fmtMoney(d.saldo);
+  saldoEl.className = 'card-value ' + (d.saldo >= 0 ? 'green' : 'red');
+
+  document.getElementById('sub-economia').textContent = `Taxa de economia: ${d.taxaEconomia}%`;
+  document.getElementById('prog-economia').style.width = Math.min(100, d.taxaEconomia) + '%';
+  document.getElementById('prog-economia').style.background = d.taxaEconomia >= 20 ? 'var(--green)' : d.taxaEconomia >= 10 ? 'var(--yellow)' : 'var(--red)';
+
+  // Sub receitas/despesas por quem
+  if(d.porQuem) {
+    const r = Object.entries(d.porQuem.receitas||{}).map(([k,v])=>`${k}: ${fmtMoney(v)}`).join(' | ') || '—';
+    const ds = Object.entries(d.porQuem.despesas||{}).map(([k,v])=>`${k}: ${fmtMoney(v)}`).join(' | ') || '—';
+    document.getElementById('sub-receitas').textContent = r;
+    document.getElementById('sub-despesas').textContent = ds;
+  }
+
+  // Meta
+  if(d.meta > 0) {
+    document.getElementById('meta-input').placeholder = 'Meta atual: '+fmtMoney(d.meta);
+    document.getElementById('prog-meta').style.width = (d.progressoMeta||0)+'%';
+    document.getElementById('sub-meta').textContent = `R$${parseFloat(d.saldo).toFixed(2)} de R$${parseFloat(d.meta).toFixed(2)} (${d.progressoMeta||0}%)`;
+  }
+
+  // Categorias
+  const catEl = document.getElementById('cat-list');
+  const cats = Object.entries(d.porCategoria||{}).sort((a,b)=>b[1]-a[1]);
+  if(!cats.length) { catEl.innerHTML='<div class="loading">Nenhum gasto registrado</div>'; return; }
+  const max = cats[0][1];
+  catEl.innerHTML = cats.map(([cat,val])=>`
+    <div class="cat-item">
+      <span class="cat-name">${EMOJIS_CAT[cat]||'•'} ${cat.charAt(0).toUpperCase()+cat.slice(1)}</span>
+      <div class="cat-bar"><div class="cat-fill" style="width:${(val/max*100).toFixed(0)}%;background:${CORES_CAT[cat]||'var(--accent)'}"></div></div>
+      <span class="cat-val" style="color:${CORES_CAT[cat]||'var(--accent)'}">${fmtMoney(val)}</span>
+    </div>
+  `).join('');
+}
+
+function setFiltro(f) {
+  filtroTx = f;
+  ['todas','despesa','receita'].forEach(x=>{
+    document.getElementById('filtro-'+x).style.borderColor = x===f?'var(--accent)':'var(--border)';
+  });
+  loadTransacoes();
+}
+
+async function loadTransacoes() {
+  const d = await api(`/api/financas/transacoes?mes=${mesAtual}&tipo=${filtroTx}&limite=50`);
+  const el = document.getElementById('tx-list');
+  if(!d || !d.transacoes) { el.innerHTML='<div class="loading">Erro ao carregar</div>'; return; }
+  if(!d.transacoes.length) { el.innerHTML='<div class="loading">Nenhuma transação neste período</div>'; return; }
+  el.innerHTML = d.transacoes.map(t => `
+    <div class="tx-item">
+      <div class="tx-emoji">${t.tipo==='receita'?'💵':'💸'}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${t.descricao||t.categoria}</div>
+        <div class="tx-meta">${EMOJIS_CAT[t.categoria]||''} ${t.categoria} • ${t.quem} • ${t.data}</div>
+      </div>
+      <div class="tx-valor" style="color:${t.tipo==='receita'?'var(--green)':'var(--red)'}">${t.tipo==='receita'?'+':'−'}${fmtMoney(t.valor)}</div>
+    </div>
+  `).join('');
+}
+
+async function adicionarTransacao() {
+  const tipo = document.getElementById('f-tipo').value;
+  const quem = document.getElementById('f-quem').value;
+  const valor = parseFloat(document.getElementById('f-valor').value);
+  const categoria = document.getElementById('f-categoria').value;
+  const descricao = document.getElementById('f-desc').value.trim();
+  const msg = document.getElementById('form-msg');
+
+  if(!valor || valor <= 0) { msg.style.color='var(--red)'; msg.textContent='Informe um valor válido'; return; }
+  if(!descricao) { msg.style.color='var(--red)'; msg.textContent='Informe a descrição'; return; }
+
+  msg.style.color='var(--muted)'; msg.textContent='Registrando...';
+  const d = await api('/api/financas/transacoes', {
+    method:'POST',
+    body: JSON.stringify({tipo, valor, categoria, descricao, quem})
+  });
+  if(d && d.ok) {
+    msg.style.color='var(--green)'; msg.textContent='✅ Registrado com sucesso!';
+    document.getElementById('f-valor').value='';
+    document.getElementById('f-desc').value='';
+    loadData();
+    setTimeout(()=>{ msg.textContent=''; }, 3000);
+  } else {
+    msg.style.color='var(--red)'; msg.textContent='Erro ao registrar';
+  }
+}
+
+async function salvarMeta() {
+  const v = parseFloat(document.getElementById('meta-input').value);
+  if(!v || v<=0) return;
+  await api('/api/financas/meta', { method:'POST', body:JSON.stringify({valor:v}) });
+  loadResumo();
+}
+
+async function fazerAnalise() {
+  document.getElementById('analise-txt').style.display='none';
+  document.getElementById('analise-loading').style.display='block';
+  const d = await api('/api/financas/analise');
+  document.getElementById('analise-loading').style.display='none';
+  if(d && d.analise) {
+    document.getElementById('analise-txt').textContent = d.analise;
+    document.getElementById('analise-txt').style.display='block';
+  }
+}
+
+function showTab(t) {
+  ['resumo','transacoes','adicionar','analise'].forEach(x=>{
+    document.getElementById('tab-'+x).style.display = x===t?'block':'none';
+  });
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.className = 'tab' + (['resumo','transacoes','adicionar','analise'][i]===t?' active':'');
+  });
+  if(t==='transacoes') loadTransacoes();
+}
+
+// Init
+if(TOKEN) {
+  showApp();
+} else {
+  showLogin();
+}
+
+document.getElementById('mes-label').textContent = fmtMes(mesAtual);
+document.getElementById('mes-label2').textContent = fmtMes(mesAtual);
+</script>
+</body>
+</html>

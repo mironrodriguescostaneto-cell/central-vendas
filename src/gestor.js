@@ -17,6 +17,7 @@ const path = require('path');
 const { CONFIG } = require('./config');
 const { callClaude, httpRequest } = require('./services');
 const { addGestorLog, addGestorChat, getGestorChat, getGestorLogs } = require('./database');
+const financas = require('./financas');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -220,6 +221,59 @@ const GESTOR_TOOLS = [
     },
   },
   {
+    name: 'ver_resumo_financeiro',
+    description: 'Mostra o resumo financeiro mensal: receitas, despesas, saldo, taxa de economia e gastos por categoria',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mes: { type: 'string', description: 'Mês no formato YYYY-MM (ex: 2026-05). Se omitido, usa o mês atual.' },
+      },
+    },
+  },
+  {
+    name: 'registrar_transacao',
+    description: 'Registra manualmente uma receita ou despesa no controle financeiro familiar',
+    input_schema: {
+      type: 'object',
+      properties: {
+        tipo: { type: 'string', enum: ['receita', 'despesa'], description: 'Tipo da transação' },
+        valor: { type: 'number', description: 'Valor em reais' },
+        categoria: { type: 'string', description: 'Categoria: alimentação, transporte, moradia, saúde, educação, lazer, roupas, contas, trabalho, outros' },
+        descricao: { type: 'string', description: 'Descrição do gasto ou receita' },
+        quem: { type: 'string', description: 'Quem fez: Miron ou Esposa' },
+      },
+      required: ['tipo', 'valor', 'categoria', 'descricao', 'quem'],
+    },
+  },
+  {
+    name: 'analisar_gastos_desnecessarios',
+    description: 'Analisa os gastos do mês atual e identifica o que pode ser cortado para economizar mais, com base nos princípios dos maiores investidores do mundo',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'listar_transacoes',
+    description: 'Lista as transações financeiras registradas no mês',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mes: { type: 'string', description: 'Mês YYYY-MM. Se omitido, usa o mês atual.' },
+        tipo: { type: 'string', enum: ['todas', 'receita', 'despesa'], description: 'Filtrar por tipo' },
+        limite: { type: 'number', description: 'Máximo de registros (default 30)' },
+      },
+    },
+  },
+  {
+    name: 'definir_meta_economia',
+    description: 'Define a meta de economia mensal para o casal',
+    input_schema: {
+      type: 'object',
+      properties: {
+        valor: { type: 'number', description: 'Valor mensal a economizar em reais' },
+      },
+      required: ['valor'],
+    },
+  },
+  {
     name: 'disparar_remarketing',
     description: 'Dispara mensagem de remarketing para toda a base de um agente ou para um subconjunto filtrado. Envia as mensagens de verdade via WhatsApp com delay entre cada envio.',
     input_schema: {
@@ -368,6 +422,46 @@ async function executeTool(name, input) {
       return pedidos.slice(0, input.limite || 20).map(p =>
         `${p.id} | ${p.nome || '?'} | ${p.phone} | ${p.status} | ${new Date(p.criadoEm).toLocaleDateString('pt-BR')}`
       ).join('\n');
+    }
+
+    case 'ver_resumo_financeiro': {
+      const db = require('./database');
+      const resumo = financas.getResumoMensal(db, input.mes);
+      return financas.formatarResumo(resumo);
+    }
+
+    case 'registrar_transacao': {
+      const db = require('./database');
+      const entrada = financas.addTransacao(db, input);
+      addGestorLog('financas', `Transação registrada: ${input.tipo} R$${input.valor} - ${input.descricao} (${input.quem})`);
+      return `✅ ${input.tipo === 'receita' ? 'Receita' : 'Despesa'} registrada: R$${parseFloat(input.valor).toFixed(2)} — ${input.categoria} — ${input.descricao} (${input.quem}) — ID: ${entrada.id}`;
+    }
+
+    case 'analisar_gastos_desnecessarios': {
+      const db = require('./database');
+      const analise = await financas.analisarGastosDesnecessarios(db);
+      return analise;
+    }
+
+    case 'listar_transacoes': {
+      const db = require('./database');
+      const tipo = input.tipo || 'todas';
+      const limite = input.limite || 30;
+      let transacoes = financas.getTransacoesMes(db, input.mes);
+      if (tipo !== 'todas') transacoes = transacoes.filter(t => t.tipo === tipo);
+      transacoes = transacoes.slice(0, limite);
+      if (!transacoes.length) return 'Nenhuma transação registrada neste período';
+      return transacoes.map(t =>
+        `[${t.data}] ${t.tipo === 'receita' ? '💵' : '💸'} R$${t.valor.toFixed(2)} — ${t.categoria} — ${t.descricao} (${t.quem})`
+      ).join('\n');
+    }
+
+    case 'definir_meta_economia': {
+      const db = require('./database');
+      db.state.financas.metas.economiasMensal = parseFloat(input.valor);
+      db.saveDB().catch(() => {});
+      addGestorLog('financas', `Meta de economia definida: R$${input.valor}/mês`);
+      return `🎯 Meta de economia definida: R$${parseFloat(input.valor).toFixed(2)}/mês`;
     }
 
     case 'disparar_remarketing': {
@@ -537,8 +631,17 @@ Você é o CEO digital da operação — responsável por tudo que acontece no s
 - SEMPRE usa as ferramentas de verdade — nunca diz "fiz X" sem realmente ter executado
 - Em erros críticos, notifica imediatamente no Telegram
 
-## BASE DE CONHECIMENTO
+## BASE DE CONHECIMENTO — VENDAS E MARKETING
 ${KNOWLEDGE_BASE}
+
+## BASE DE CONHECIMENTO — FINANÇAS PESSOAIS (Warren Buffett, Ray Dalio, Charlie Munger, Dave Ramsey)
+- "Pague a si mesmo primeiro" — separe poupança ANTES de gastar
+- Juros compostos são a oitava maravilha — nunca interrompa
+- Zero dívidas de consumo. Fundo de emergência é sagrado.
+- Orçamento mensal escrito: todo real tem destino
+- Ativo coloca dinheiro no bolso. Passivo tira.
+- Gastos sem necessidade: delivery frequente, assinaturas esquecidas, compras por impulso, roupas sem necessidade
+- Benchmarks saudáveis: Moradia ≤30%, Alimentação ≤15%, Poupança ≥20%
 
 ## CONTEXTO DO SISTEMA
 - Sistema: Central Vendas (Node.js 20 + Express + Baileys + Claude)
@@ -624,10 +727,31 @@ function initTelegramListener() {
     const bot = new TelegramBot(botToken, { polling: true });
 
     bot.on('message', async (msg) => {
-      if (String(msg.chat.id) !== String(chatId)) return;
+      const msgChatId = String(msg.chat.id);
       const texto = msg.text;
       if (!texto) return;
 
+      // Grupo de finanças familiares
+      if (CONFIG.telegram.grupoFinancasId && msgChatId === String(CONFIG.telegram.grupoFinancasId)) {
+        const senderName = msg.from?.first_name || 'Desconhecido';
+        console.log(`[JARVIS-FINANCAS] Grupo: ${senderName}: ${texto.slice(0, 80)}`);
+        try {
+          const db = require('./database');
+          await financas.processarMensagemGrupo(texto, senderName, db, async (mensagem) => {
+            try {
+              await bot.sendMessage(msgChatId, mensagem, { parse_mode: 'Markdown' });
+            } catch (_) {
+              await bot.sendMessage(msgChatId, mensagem);
+            }
+          });
+        } catch (e) {
+          console.error('[JARVIS-FINANCAS] Erro:', e.message);
+        }
+        return;
+      }
+
+      // Chat privado do Miron — comandos do gestor
+      if (msgChatId !== String(chatId)) return;
       console.log(`[JARVIS] Telegram recebido: ${texto.slice(0, 80)}`);
 
       try {

@@ -39,6 +39,12 @@ const state = {
   // Status de conexão dos agentes
   connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected' },
   qrCodes: { info: null, logzz: null, rafael: null },
+
+  // Finanças familiares
+  financas: {
+    transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
+    metas: { economiasMensal: 0 },
+  },
 };
 
 // ----- Serialização -----
@@ -50,6 +56,7 @@ function serialize() {
     phoneLidMap: Array.from(state.phoneLidMap.entries()),
     gestorLogs: state.gestorLogs.slice(-200),
     instrucoes: state.instrucoes,
+    financas: state.financas,
     conversations: {
       info: Array.from(state.conversations.info.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
       logzz: Array.from(state.conversations.logzz.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
@@ -71,6 +78,10 @@ function deserialize(data) {
   if (data.phoneLidMap) state.phoneLidMap = new Map(data.phoneLidMap);
   if (data.gestorLogs) state.gestorLogs = data.gestorLogs;
   if (data.instrucoes) state.instrucoes = data.instrucoes;
+  if (data.financas) {
+    if (data.financas.transacoes) state.financas.transacoes = data.financas.transacoes;
+    if (data.financas.metas) state.financas.metas = data.financas.metas;
+  }
   if (data.conversations) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);
     if (data.conversations.logzz) state.conversations.logzz = new Map(data.conversations.logzz);
