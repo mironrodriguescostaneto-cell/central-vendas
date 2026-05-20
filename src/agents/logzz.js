@@ -222,11 +222,6 @@ async function processMessage(event, payload) {
   const convState = getConvState(phone);
   if (convState) {
     convState.ultimaMensagemUsuario = Date.now();
-    if (convState.linkEnviadoEm) {
-      delete convState.linkEnviadoEm;
-      delete convState.followUpEnviado;
-      delete convState.remarketingEnviado;
-    }
   }
 
   // Acumular mídia antes do check de pausa/pending
