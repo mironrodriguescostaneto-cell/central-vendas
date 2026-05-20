@@ -6,7 +6,7 @@
 // Parser de mensagens + storage + análise com IA
 // ============================================================
 
-const { callClaude } = require('./services');
+const { callClaudeText } = require('./services');
 
 const CATEGORIAS = [
   'alimentação', 'transporte', 'moradia', 'saúde', 'educação',
@@ -82,12 +82,9 @@ Se a mensagem NÃO é sobre dinheiro (é uma pergunta, conversa, comando), respo
 Responda APENAS o JSON ou null, sem explicações.`;
 
   try {
-    const resposta = await callClaude(prompt, [{ role: 'user', content: texto }], {
+    const texto_resposta = (await callClaudeText(prompt, [{ role: 'user', content: texto }], {
       maxTokens: 150,
-      temperature: 0,
-    });
-
-    const texto_resposta = resposta.trim();
+    })).trim();
     if (texto_resposta === 'null' || texto_resposta === '') return null;
 
     const parsed = JSON.parse(texto_resposta);
@@ -210,7 +207,7 @@ Analise esses gastos com a sabedoria dos maiores investidores do mundo e identif
 Seja direto, objetivo e específico. Use valores reais. Máximo 400 palavras.`;
 
   try {
-    const analise = await callClaude(prompt, [{ role: 'user', content: 'Analise meus gastos' }], {
+    const analise = await callClaudeText(prompt, [{ role: 'user', content: 'Analise meus gastos' }], {
       maxTokens: 600,
     });
     return analise;
