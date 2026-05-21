@@ -180,6 +180,7 @@ function getAllConvs(agentId) {
     totalMsgs: data.msgs?.length || 0,
     pausado: state.paused[agentId]?.has(phone) || false,
     ultimoTexto: data.msgs?.at(-1)?.text?.slice(0, 80) || '',
+    ultimoRole: data.msgs?.at(-1)?.role || 'assistant',
   })).sort((a, b) => (b.ultimaMensagem || 0) - (a.ultimaMensagem || 0));
 }
 

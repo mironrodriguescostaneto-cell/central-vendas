@@ -694,6 +694,43 @@ let chatWindowPhone = '';
 let chatWindowPaused = false;
 let pollInterval = null;
 let agentStatusPoll = null;
+let chatPollInterval = null;
+let lastSeenTs = {};
+let titleFlashInterval = null;
+const _origTitle = document.title;
+
+function startTitleFlash() {
+  if (titleFlashInterval || chatWindowPhone) return;
+  let on = true;
+  titleFlashInterval = setInterval(() => { document.title = on ? '● Mensagem nova' : _origTitle; on = !on; }, 1200);
+}
+function stopTitleFlash() {
+  clearInterval(titleFlashInterval);
+  titleFlashInterval = null;
+  document.title = _origTitle;
+}
+
+async function refreshChatMessages() {
+  if (!chatWindowAgent || !chatWindowPhone) return;
+  try {
+    const data = await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`);
+    const msgs = data.msgs || [];
+    const body = document.getElementById('chatWinBody');
+    const prevCount = body.querySelectorAll('.msg-bubble').length;
+    if (msgs.length === prevCount) return;
+    chatWindowPaused = data.pausado;
+    updatePauseButtons();
+    const wasAtBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
+    body.innerHTML = msgs.map(m => `
+      <div class="msg-bubble ${m.role}">
+        ${esc(m.text)}
+        <div class="msg-time">${formatTs(m.ts)}</div>
+      </div>
+    `).join('');
+    if (wasAtBottom) body.scrollTop = body.scrollHeight;
+    lastSeenTs[chatWindowAgent + chatWindowPhone] = Date.now();
+  } catch {}
+}
 
 // ----- Inicialização -----
 window.onload = () => {
@@ -910,19 +947,29 @@ async function loadConversas(agentId) {
   try {
     const data = await api(`/api/conversas/${agentId}`);
     if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Nenhuma conversa ainda</div></div>'; return; }
-    el.innerHTML = data.map(c => `
+    let hasNew = false;
+    el.innerHTML = data.map(c => {
+      const key = agentId + c.phone;
+      const isUnread = c.ultimaMensagem && c.ultimoRole !== 'assistant' &&
+        c.ultimaMensagem > (lastSeenTs[key] || 0) && c.phone !== chatWindowPhone;
+      if (isUnread) hasNew = true;
+      return `
       <div class="chat-item" onclick="openChatWindow('${agentId}','${esc(c.phone)}','${esc(c.pushName||c.phone)}',${c.pausado})">
-        <div class="chat-avatar">${(c.pushName||c.phone).charAt(0).toUpperCase()}</div>
+        <div class="chat-avatar" style="position:relative">
+          ${(c.pushName||c.phone).charAt(0).toUpperCase()}
+          ${isUnread ? '<span style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--danger);border:2px solid #fff"></span>' : ''}
+        </div>
         <div class="chat-info">
-          <div class="chat-name">${esc(c.pushName||c.phone)}</div>
-          <div class="chat-preview">${esc(c.ultimoTexto||'—')}</div>
+          <div class="chat-name" style="${isUnread ? 'font-weight:800' : ''}">${esc(c.pushName||c.phone)}</div>
+          <div class="chat-preview" style="${isUnread ? 'font-weight:600;color:var(--text)' : ''}">${esc(c.ultimoTexto||'—')}</div>
         </div>
         <div class="chat-meta">
-          <div class="chat-time">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : '—'}</div>
+          <div class="chat-time" style="${isUnread ? 'color:var(--danger);font-weight:700' : ''}">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : '—'}</div>
           <span class="chat-badge ${c.pausado?'paused':'active'}">${c.pausado?'Pausado':'Ativo'}</span>
         </div>
       </div>
-    `).join('');
+    `}).join('');
+    if (hasNew) startTitleFlash();
   } catch (e) {
     el.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${e.message}</div></div>`;
   }
@@ -933,13 +980,18 @@ function openChatWindow(agentId, phone, name, pausado) {
   chatWindowAgent = agentId;
   chatWindowPhone = phone;
   chatWindowPaused = pausado;
+  lastSeenTs[agentId + phone] = Date.now();
+  stopTitleFlash();
   document.getElementById('chatWinName').textContent = name || phone;
   updatePauseButtons();
   document.getElementById('chatWindow').classList.add('open');
   loadChatMessages();
+  clearInterval(chatPollInterval);
+  chatPollInterval = setInterval(refreshChatMessages, 3000);
 }
 
 function closeChatWindow() {
+  clearInterval(chatPollInterval);
   document.getElementById('chatWindow').classList.remove('open');
   chatWindowAgent = '';
   chatWindowPhone = '';
