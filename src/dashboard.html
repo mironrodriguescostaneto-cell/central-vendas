@@ -355,7 +355,8 @@ a{color:var(--accent);text-decoration:none}
       <div class="page-scroll">
         <div class="page-content">
           <div class="tabs" id="tabsLogzz">
-            <button class="tab-btn active" onclick="showTab('logzz','agente')">Agente</button>
+            <button class="tab-btn active" onclick="showTab('logzz','roberto')">Roberto</button>
+            <button class="tab-btn" onclick="showTab('logzz','sara')">Sara</button>
             <button class="tab-btn" onclick="showTab('logzz','pedidos')">Pedidos</button>
             <button class="tab-btn" onclick="showTab('logzz','links')">Links</button>
             <button class="tab-btn" onclick="showTab('logzz','remarketing')">Mkt</button>
@@ -363,8 +364,8 @@ a{color:var(--accent);text-decoration:none}
             <button class="tab-btn" onclick="showTab('logzz','conversa')">Conversa</button>
           </div>
 
-          <!-- Agente Logzz -->
-          <div class="tab-pane active" id="logzz-tab-agente">
+          <!-- Agente Roberto (Logzz) -->
+          <div class="tab-pane active" id="logzz-tab-roberto">
             <div class="card">
               <div class="card-header">
                 <div><div class="card-title">Agente Logzz</div><div class="card-subtitle">Vendas COD — pago na entrega</div></div>
@@ -378,6 +379,20 @@ a{color:var(--accent);text-decoration:none}
               <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
               <textarea class="form-input" id="instrucaoLogzz" rows="4" placeholder="Instrução especial para o agente Logzz..."></textarea>
               <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('logzz')">Salvar Instrução</button>
+            </div>
+          </div>
+
+          <!-- Agente Sara -->
+          <div class="tab-pane" id="logzz-tab-sara">
+            <div class="card">
+              <div class="card-header">
+                <div><div class="card-title">Agente Sara</div><div class="card-subtitle">Progressiva Vegetal Havana — COD</div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
+              <textarea class="form-input" id="instrucaoSarah" rows="4" placeholder="Instrução especial para a Sarah..."></textarea>
+              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('sarah')">Salvar Instrução</button>
             </div>
           </div>
 
@@ -396,10 +411,15 @@ a{color:var(--accent);text-decoration:none}
             </div>
           </div>
 
-          <!-- Remarketing Logzz -->
+          <!-- Remarketing -->
           <div class="tab-pane" id="logzz-tab-remarketing">
-            <div style="max-width:560px;margin:0 auto;width:100%">
-              <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:14px">📣 Remarketing</div>
+            <!-- Seletor de agente -->
+            <div style="display:flex;gap:6px;margin-bottom:14px">
+              <button class="mkt-agent-btn active" data-agent="roberto" onclick="mktSwitchAgent('roberto',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--logzz);color:#fff;border:none">Roberto</button>
+              <button class="mkt-agent-btn" data-agent="sara" onclick="mktSwitchAgent('sara',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Sara</button>
+            </div>
+            <!-- Roberto Mkt -->
+            <div id="mktSectionRoberto" style="max-width:560px;margin:0 auto;width:100%">
               <!-- Filtro -->
               <div style="display:flex;gap:6px;margin-bottom:12px">
                 <button class="rmk-filter active" data-filter="todos" onclick="rmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
@@ -455,6 +475,55 @@ a{color:var(--accent);text-decoration:none}
                 </div>
               </div>
             </div>
+            <!-- Sara Mkt -->
+            <div id="mktSectionSara" style="display:none;max-width:560px;margin:0 auto;width:100%">
+              <div style="display:flex;gap:8px;margin-bottom:10px">
+                <button class="sarah-rmk-filter active" data-filter="todos" onclick="sarahRmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
+                <button class="sarah-rmk-filter" data-filter="ativos" onclick="sarahRmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
+                <button class="sarah-rmk-filter" data-filter="pausados" onclick="sarahRmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
+                  <input type="checkbox" id="sarahRmkSelectAll" onchange="sarahRmkToggleAll(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+                  Selecionar todos
+                </label>
+                <span id="sarahRmkCounter" style="font-size:12px;color:var(--text-muted);font-weight:600">0 selecionados</span>
+              </div>
+              <div id="sarahRmkContatos" style="background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;max-height:240px;overflow-y:auto">
+                <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Carregando...</div>
+              </div>
+              <textarea id="sarahRmkTexto" placeholder="Mensagem do remarketing..." style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;min-height:90px;resize:vertical;outline:none;margin-bottom:10px;line-height:1.4;display:block;box-sizing:border-box"></textarea>
+              <div style="background:var(--card);border-radius:12px;border:1px solid var(--border);padding:10px 14px;margin-bottom:10px">
+                <input type="file" id="sarahRmkImgInput" accept="image/*" style="display:none" onchange="sarahRmkHandleImg(event)">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button onclick="document.getElementById('sarahRmkImgInput').click()" style="padding:8px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0;white-space:nowrap">📷 Imagem</button>
+                  <span id="sarahRmkImgNome" style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">Nenhuma imagem</span>
+                  <button id="sarahRmkImgRemove" onclick="sarahRmkRemoveImg()" style="display:none;padding:4px 8px;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700;flex-shrink:0">✕</button>
+                </div>
+                <img id="sarahRmkImgPreview" src="" alt="" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin-top:10px">
+              </div>
+              <label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px;cursor:pointer;padding:10px 14px;background:var(--card);border-radius:12px;border:1px solid var(--border)">
+                <input type="checkbox" id="sarahRmkPausarApos" style="width:18px;height:18px;accent-color:var(--accent)" checked>
+                <span>Pausar contatos após envio</span>
+              </label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+                <button id="sarahRmkBtnEnviar" onclick="sarahRmkEnviar()" style="width:100%;padding:14px;border-radius:12px;background:#22c55e;color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer">📤 ENVIAR</button>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <button onclick="sarahRmkPausar()" style="padding:12px 8px;border-radius:12px;background:var(--warning);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏸ PAUSAR</button>
+                  <button onclick="sarahRmkRetomar()" style="padding:12px 8px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">▶ RETOMAR</button>
+                </div>
+                <button id="sarahRmkBtnParar" onclick="sarahRmkParar()" style="display:none;width:100%;padding:12px;border-radius:12px;background:var(--danger);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏹ PARAR ENVIO</button>
+              </div>
+              <div id="sarahRmkProgress" style="display:none;background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-size:13px;font-weight:600;color:var(--text)">Enviando...</span>
+                  <span id="sarahRmkProgressText" style="font-size:13px;color:var(--accent);font-weight:700">0 / 0</span>
+                </div>
+                <div style="background:var(--border);border-radius:99px;height:7px;overflow:hidden">
+                  <div id="sarahRmkProgressBar" style="height:100%;background:var(--accent);border-radius:99px;transition:width .3s;width:0%"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Conexão Logzz -->
@@ -463,7 +532,7 @@ a{color:var(--accent);text-decoration:none}
               <div class="conn-header">
                 <div class="conn-agent">
                   <div class="conn-dot" id="connDotLogzz"></div>
-                  <div><div class="conn-name">Agente Logzz</div><div class="conn-state" id="connStateLogzz">Verificando...</div></div>
+                  <div><div class="conn-name">Roberto (Logzz)</div><div class="conn-state" id="connStateLogzz">Verificando...</div></div>
                 </div>
                 <button class="btn-reconnect" onclick="reconnectAgent('logzz')">Reconectar</button>
               </div>
@@ -472,11 +541,34 @@ a{color:var(--accent);text-decoration:none}
                 <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
               </div>
             </div>
+            <div class="conn-card">
+              <div class="conn-header">
+                <div class="conn-agent">
+                  <div class="conn-dot" id="connDotSarah"></div>
+                  <div><div class="conn-name">Sara</div><div class="conn-state" id="connStateSarah">Verificando...</div></div>
+                </div>
+                <button class="btn-reconnect" onclick="reconnectAgent('sarah')">Reconectar</button>
+              </div>
+              <div class="qr-container" id="qrSarah">
+                <img id="qrImgSarah" src="" alt="QR Code">
+                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding:12px 14px;background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px;color:var(--accent)">
+              <a href="/scan/sarah" target="_blank" style="font-weight:700">📱 Escanear QR da Sara</a>
+            </div>
           </div>
 
           <!-- Conversa Logzz -->
           <div class="tab-pane" id="logzz-tab-conversa">
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+              <button class="conv-agent-btn active" data-agent="logzz" onclick="convSwitchAgent('logzz',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--logzz);color:#fff;border:none">Roberto</button>
+              <button class="conv-agent-btn" data-agent="sarah" onclick="convSwitchAgent('sarah',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Sara</button>
+            </div>
             <div id="convListLogzz" class="chat-list">
+              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
+            </div>
+            <div id="convListSarah" class="chat-list" style="display:none">
               <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
             </div>
           </div>
@@ -485,89 +577,6 @@ a{color:var(--accent);text-decoration:none}
     </div>
 
     <!-- PAGE: GESTOR -->
-    <!-- ===== SARAH ===== -->
-    <div class="page" id="pageSarah">
-      <div class="page-scroll">
-        <div class="page-content">
-          <div class="tabs" id="tabsSarah">
-            <button class="tab-btn active" onclick="showTab('sarah','agente')">Agente</button>
-            <button class="tab-btn" onclick="showTab('sarah','remarketing')">Mkt</button>
-            <button class="tab-btn" onclick="showTab('sarah','conexao')">Conexão</button>
-            <button class="tab-btn" onclick="showTab('sarah','conversa')">Conversa</button>
-          </div>
-
-          <!-- Agente -->
-          <div class="tab-pane active" id="sarah-tab-agente">
-            <div class="card" style="margin-bottom:14px">
-              <div style="font-weight:700;font-size:15px;margin-bottom:8px">💇 Sarah — Progressiva Vegetal Havana</div>
-              <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Instrução manual (sobrescreve comportamento padrão)</div>
-              <textarea id="sarahInstrucao" placeholder="Ex: Ofereça desconto para quem mencionar frete..." style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;min-height:80px;resize:vertical;outline:none;display:block;box-sizing:border-box"></textarea>
-              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('sarah')">Salvar Instrução</button>
-            </div>
-          </div>
-
-          <!-- Remarketing -->
-          <div class="tab-pane" id="sarah-tab-remarketing">
-            <div style="margin-bottom:12px">
-              <div style="display:flex;gap:8px;margin-bottom:10px">
-                <button class="sarah-rmk-filter active" data-filter="todos" onclick="sarahRmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
-                <button class="sarah-rmk-filter" data-filter="ativos" onclick="sarahRmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
-                <button class="sarah-rmk-filter" data-filter="pausados" onclick="sarahRmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                <input type="checkbox" id="sarahRmkSelectAll" onchange="sarahRmkToggleAll(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
-                <span style="font-size:13px;font-weight:600">Selecionar todos</span>
-                <span id="sarahRmkCounter" style="font-size:12px;color:var(--text-muted);font-weight:600;margin-left:auto">0 selecionados</span>
-              </div>
-              <div id="sarahRmkContatos" style="background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;max-height:240px;overflow-y:auto">
-                <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Carregando...</div>
-              </div>
-              <textarea id="sarahRmkTexto" placeholder="Mensagem do remarketing..." style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;min-height:90px;resize:vertical;outline:none;margin-bottom:10px;line-height:1.4;display:block;box-sizing:border-box"></textarea>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <input type="file" id="sarahRmkImgInput" accept="image/*" style="display:none" onchange="sarahRmkHandleImg(event)">
-                <button onclick="document.getElementById('sarahRmkImgInput').click()" style="padding:8px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0">📷 Imagem</button>
-                <span id="sarahRmkImgNome" style="font-size:12px;color:var(--text-muted);flex:1">Nenhuma imagem</span>
-                <button id="sarahRmkImgRemove" onclick="sarahRmkRemoveImg()" style="display:none;padding:4px 8px;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700">✕</button>
-              </div>
-              <img id="sarahRmkImgPreview" src="" alt="" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin-bottom:10px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <input type="checkbox" id="sarahRmkPausarApos" style="width:18px;height:18px;accent-color:var(--accent)" checked>
-                <label for="sarahRmkPausarApos" style="font-size:13px;font-weight:600">Pausar contatos após envio</label>
-              </div>
-              <button id="sarahRmkBtnEnviar" onclick="sarahRmkEnviar()" style="width:100%;padding:14px;border-radius:12px;background:#22c55e;color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer;margin-bottom:8px">📤 ENVIAR</button>
-              <div style="display:flex;gap:8px;margin-bottom:8px">
-                <button onclick="sarahRmkPausar()" style="flex:1;padding:12px 8px;border-radius:12px;background:var(--warning);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏸ PAUSAR</button>
-                <button onclick="sarahRmkRetomar()" style="flex:1;padding:12px 8px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">▶ RETOMAR</button>
-              </div>
-              <button id="sarahRmkBtnParar" onclick="sarahRmkParar()" style="display:none;width:100%;padding:12px;border-radius:12px;background:var(--danger);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏹ PARAR ENVIO</button>
-              <div id="sarahRmkProgress" style="display:none;background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px;margin-top:8px">
-                <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                  <span style="font-size:12px;color:var(--text-muted)">Progresso</span>
-                  <span id="sarahRmkProgressText" style="font-size:13px;color:var(--accent);font-weight:700">0 / 0</span>
-                </div>
-                <div style="height:8px;background:var(--bg);border-radius:99px;overflow:hidden">
-                  <div id="sarahRmkProgressBar" style="height:100%;background:var(--accent);border-radius:99px;transition:width .3s;width:0%"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Conexão -->
-          <div class="tab-pane" id="sarah-tab-conexao">
-            <div class="card" style="margin-bottom:14px">
-              <div style="font-weight:700;margin-bottom:8px">Status WhatsApp</div>
-              <div id="sarahConexaoStatus" style="font-size:14px;color:var(--text-muted)">Verificando...</div>
-              <a id="sarahScanLink" href="/scan/sarah" target="_blank" style="display:inline-block;margin-top:12px;padding:10px 18px;background:var(--accent);color:#fff;border-radius:10px;font-weight:700;font-size:13px">📱 Conectar WhatsApp</a>
-            </div>
-          </div>
-
-          <!-- Conversa -->
-          <div class="tab-pane" id="sarah-tab-conversa">
-            <div id="sarahConversaList" style="display:flex;flex-direction:column;gap:8px"></div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div class="page" id="pageGestor">
       <div class="page-scroll">
@@ -625,10 +634,7 @@ a{color:var(--accent);text-decoration:none}
       <div class="nav-icon">📦</div>
       <span class="nav-label">Logzz</span>
     </button>
-    <button class="nav-item" id="nav-sarah" onclick="showPage('sarah')">
-      <div class="nav-icon">💇</div>
-      <span class="nav-label">Sarah</span>
-    </button>
+
     <button class="nav-item" id="nav-gestor" onclick="showPage('gestor')">
       <div class="nav-icon">🧠</div>
       <span class="nav-label">Jarvis</span>
@@ -743,16 +749,15 @@ function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`pagePainel`);
-  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', sarah: 'pageSarah', gestor: 'pageGestor' };
-  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', sarah: 'Sarah — Progressiva Vegetal', gestor: 'Gestor Jarvis' };
+  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', gestor: 'pageGestor' };
+  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', gestor: 'Gestor Jarvis' };
   document.getElementById(pageMap[page])?.classList.add('active');
   document.getElementById(`nav-${page}`)?.classList.add('active');
   document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
   currentPage = page;
 
   if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); }
-  if (page === 'logzz') { loadConversas('logzz'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); }
-  if (page === 'sarah') { loadConversas('sarah'); loadInstrucao('sarah'); sarahRmkLoadContatos(); sarahCheckConexao(); }
+  if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
@@ -769,16 +774,15 @@ function showTab(page, tab) {
 
   if (page === 'info' && tab === 'conversa') loadConversas('rafael');
   if (page === 'info' && tab === 'conexao') loadAgentStatus();
-  if (page === 'logzz' && tab === 'conversa') loadConversas('logzz');
+  if (page === 'logzz' && tab === 'roberto') loadInstrucao('logzz');
+  if (page === 'logzz' && tab === 'sara') loadInstrucao('sarah');
+  if (page === 'logzz' && tab === 'conversa') { loadConversas('logzz'); loadConversas('sarah'); }
   if (page === 'logzz' && tab === 'conexao') loadAgentStatus();
   if (page === 'logzz' && tab === 'pedidos') loadPedidos();
   if (page === 'logzz' && tab === 'links') loadLinks();
-  if (page === 'logzz' && tab === 'remarketing') rmkLoadContatos();
+  if (page === 'logzz' && tab === 'remarketing') { rmkLoadContatos(); sarahRmkLoadContatos(); }
   if (page === 'rafael' && tab === 'conversa') loadConversas('rafael');
   if (page === 'rafael' && tab === 'conexao') loadAgentStatus();
-  if (page === 'sarah' && tab === 'conversa') loadConversas('sarah');
-  if (page === 'sarah' && tab === 'conexao') sarahCheckConexao();
-  if (page === 'sarah' && tab === 'remarketing') sarahRmkLoadContatos();
   if (page === 'gestor' && tab === 'logs') loadGestorLogs();
 }
 
@@ -789,7 +793,7 @@ function startPolling() {
   pollInterval = setInterval(() => {
     if (currentPage === 'painel') loadPainelData();
     if (currentPage === 'info') loadConversas('rafael');
-    if (currentPage === 'logzz') loadConversas('logzz');
+    if (currentPage === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); }
     if (currentPage === 'rafael') loadConversas('rafael');
   }, 5000);
   agentStatusPoll = setInterval(loadAgentStatus, 8000);
@@ -861,7 +865,7 @@ async function loadAgentStatus() {
   try {
     const data = await api('/api/agents/status');
     // 'info' slot mostra agente Rafael; 'logzz' slot mostra Roberto
-    const statusSlots = [{ slot: 'info', agent: 'rafael' }, { slot: 'logzz', agent: 'logzz' }];
+    const statusSlots = [{ slot: 'info', agent: 'rafael' }, { slot: 'logzz', agent: 'logzz' }, { slot: 'sarah', agent: 'sarah' }];
     for (const { slot: agentId, agent } of statusSlots) {
       const s = data[agent] || {};
       const connDot = document.getElementById(`connDot${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`);
@@ -1198,6 +1202,26 @@ function toast(msg, duration = 2500) {
   el.textContent = msg;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ----- Seletores Roberto / Sara -----
+function mktSwitchAgent(agent, btn) {
+  document.querySelectorAll('.mkt-agent-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--logzz)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  document.getElementById('mktSectionRoberto').style.display = agent === 'roberto' ? '' : 'none';
+  document.getElementById('mktSectionSara').style.display = agent === 'sara' ? '' : 'none';
+}
+
+function convSwitchAgent(agent, btn) {
+  document.querySelectorAll('.conv-agent-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--logzz)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  document.getElementById('convListLogzz').style.display = agent === 'logzz' ? '' : 'none';
+  document.getElementById('convListSarah').style.display = agent === 'sarah' ? '' : 'none';
+  loadConversas(agent === 'logzz' ? 'logzz' : 'sarah');
 }
 
 // ============================================================
