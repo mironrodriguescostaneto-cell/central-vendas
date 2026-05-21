@@ -56,7 +56,7 @@ router.get('/api/health', (req, res) => {
 router.get('/api/agents/status', auth, (req, res) => {
   const status = baileys.getAllStatus();
   const result = {};
-  for (const agentId of ['info', 'logzz', 'rafael']) {
+  for (const agentId of ['info', 'logzz', 'rafael', 'sarah']) {
     const baileysStatus = status[CONFIG.sessionIds[agentId]] || { state: 'disconnected', hasQR: false };
     result[agentId] = {
       state: baileysStatus.state,
@@ -80,7 +80,7 @@ router.get('/api/agents/:agentId/qr', auth, (req, res) => {
 // ----- Página de scan local (sem auth, só localhost) -----
 router.get('/scan/:agentId', (req, res) => {
   const { agentId } = req.params;
-  if (!['info', 'logzz', 'rafael'].includes(agentId)) return res.status(404).end();
+  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).end();
   res.setHeader('Content-Type', 'text/html');
   res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conectar - ${agentId}</title>
@@ -527,7 +527,7 @@ router.post('/admin/upload-session', auth, async (req, res) => {
 // ----- Limpar pausas de um agente -----
 router.delete('/api/agents/:agentId/pauses', auth, (req, res) => {
   const { agentId } = req.params;
-  if (!['info', 'logzz', 'rafael'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
   db.clearPauses(agentId);
   res.json({ ok: true, message: `Pausas do agente ${agentId} limpas` });
 });
@@ -537,7 +537,7 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   const { agentId } = req.params;
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).json({ error: 'phone e message obrigatórios' });
-  if (!['info', 'logzz', 'rafael'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
   try {
     const agentMap = { logzz: './agents/logzz', rafael: './agents/rafael', info: './agents/info-produtos' };
     const agent = require(agentMap[agentId]);
@@ -552,6 +552,7 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
 const _remarkTempImgs = new Map();
 const _remarkState = {
   logzz: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  sarah: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
 };
 
 router.post('/api/remarketing/temp-img', auth, (req, res) => {
@@ -573,7 +574,7 @@ router.get('/api/remarketing/temp-img/:id', (req, res) => {
 
 router.get('/api/remarketing/contatos', auth, (req, res) => {
   const agentId = req.query.agente;
-  if (!['logzz'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
   const contatos = [];
   db.state.conversations[agentId].forEach((conv, numero) => {
     contatos.push({
@@ -589,7 +590,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
 
 router.post('/api/remarketing/enviar', auth, async (req, res) => {
   const { agente, numeros, texto, imagemUrl, pausarAposEnvio } = req.body;
-  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
   if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
@@ -661,13 +662,13 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
 
 router.get('/api/remarketing/status', auth, (req, res) => {
   const agentId = req.query.agente;
-  if (!['logzz'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
   res.json(_remarkState[agentId]);
 });
 
 router.post('/api/remarketing/parar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].cancelar = true;
   // Force-reset ativo após 25s para desbloquear caso o loop esteja travado
   setTimeout(() => { _remarkState[agente].ativo = false; }, 25000);
@@ -676,14 +677,14 @@ router.post('/api/remarketing/parar', auth, (req, res) => {
 
 router.post('/api/remarketing/pausar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].pausado = true;
   res.json({ ok: true });
 });
 
 router.post('/api/remarketing/retomar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].pausado = false;
   res.json({ ok: true });
 });

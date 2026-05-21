@@ -89,6 +89,13 @@ const CONFIG = {
       numero: env('RAFAEL_NUMERO'),
       provider: env('RAFAEL_PROVIDER', 'baileys'),
     },
+
+    sarah: {
+      id: 'sarah',
+      name: env('SARAH_AGENT_NAME', 'Sarah'),
+      numero: env('SARAH_NUMERO'),
+      provider: env('SARAH_PROVIDER', 'baileys'),
+    },
   },
 
   // IDs usados para controle de sessão Baileys
@@ -96,6 +103,7 @@ const CONFIG = {
     info: 'info-session',
     logzz: 'logzz-session',
     rafael: 'rafael-session',
+    sarah: 'sarah-session',
   },
 };
 

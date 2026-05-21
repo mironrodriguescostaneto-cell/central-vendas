@@ -48,10 +48,12 @@ async function main() {
       const infoAgent = require('./src/agents/info-produtos');
       const logzzAgent = require('./src/agents/logzz');
       const rafaelAgent = require('./src/agents/rafael');
+      const sarahAgent = require('./src/agents/sarah');
       await Promise.allSettled([
         infoAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente info:', e.message)),
         logzzAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente logzz:', e.message)),
         rafaelAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente rafael:', e.message)),
+        sarahAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente sarah:', e.message)),
       ]);
       console.log('[MAIN] Agentes iniciados');
     } catch (e) {

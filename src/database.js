@@ -12,10 +12,10 @@ const DB_PATH = path.join(
 // Estado global em memória
 const state = {
   // Conversas por agente: agentId → Map(phone → {msgs, ultimaMensagem, pushName, pausado})
-  conversations: { info: new Map(), logzz: new Map(), rafael: new Map() },
+  conversations: { info: new Map(), logzz: new Map(), rafael: new Map(), sarah: new Map() },
 
   // Números pausados por agente
-  paused: { info: new Set(), logzz: new Set(), rafael: new Set() },
+  paused: { info: new Set(), logzz: new Set(), rafael: new Set(), sarah: new Set() },
 
   // Pedidos Logzz: [{id, phone, nome, produto, status, criadoEm}]
   pedidos: [],
@@ -34,11 +34,11 @@ const state = {
   gestorChat: [],
 
   // Sessão do gestor — instruções ativas por agente
-  instrucoes: { info: '', logzz: '', rafael: '' },
+  instrucoes: { info: '', logzz: '', rafael: '', sarah: '' },
 
   // Status de conexão dos agentes
-  connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected' },
-  qrCodes: { info: null, logzz: null, rafael: null },
+  connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected', sarah: 'disconnected' },
+  qrCodes: { info: null, logzz: null, rafael: null, sarah: null },
 
   // Finanças familiares
   financas: {
@@ -61,11 +61,13 @@ function serialize() {
       info: Array.from(state.conversations.info.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
       logzz: Array.from(state.conversations.logzz.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
       rafael: Array.from(state.conversations.rafael.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
+      sarah: Array.from(state.conversations.sarah.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
     },
     paused: {
       info: Array.from(state.paused.info),
       logzz: Array.from(state.paused.logzz),
       rafael: Array.from(state.paused.rafael),
+      sarah: Array.from(state.paused.sarah),
     },
   };
 }
@@ -86,11 +88,13 @@ function deserialize(data) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);
     if (data.conversations.logzz) state.conversations.logzz = new Map(data.conversations.logzz);
     if (data.conversations.rafael) state.conversations.rafael = new Map(data.conversations.rafael);
+    if (data.conversations.sarah) state.conversations.sarah = new Map(data.conversations.sarah);
   }
   if (data.paused) {
     if (data.paused.info) state.paused.info = new Set(data.paused.info);
     if (data.paused.logzz) state.paused.logzz = new Set(data.paused.logzz);
     if (data.paused.rafael) state.paused.rafael = new Set(data.paused.rafael);
+    if (data.paused.sarah) state.paused.sarah = new Set(data.paused.sarah);
   }
 }
 
