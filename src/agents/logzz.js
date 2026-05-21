@@ -74,6 +74,14 @@ const MEDIA = {
   ],
 };
 
+const MSGS_REMARKETING = [
+  (nome) => `Oi${nome}! 👋 Ainda pensando na Resina Extreme?\n\nConsegui uma condição especial só para você 🎁\n\n✅ 1 frasco + microfibra de brinde por R$89,99\n${LINKS.rmk1}\n\n✅ 2 frascos + microfibra de brinde por R$109,99\n${LINKS.rmk2}\n\nFrete grátis e você paga só na entrega. Qual fica melhor?`,
+  (nome) => `${nome ? `${nome}, ` : ''}o brilho do seu carro merece mais! ✨\n\nA Resina Extreme vitrifica a pintura e repele água — cada aplicação dura até 2 meses e o frasco rende 8x.\n\n🛡️ 1 frasco + microfibra: R$89,99 → ${LINKS.rmk1}\n🛡️ 2 frascos + microfibra: R$109,99 → ${LINKS.rmk2}\n\nPaga só na entrega, frete grátis. 😊`,
+  (nome) => `Oi${nome}! Passando pra lembrar que a promoção ainda tá ativa 🔥\n\nClientes que usaram a Resina Extreme adoraram o resultado — a pintura fica espelhada e a água escorrega.\n\n👉 Kit com brinde a partir de R$89,99, pago só na entrega:\n${LINKS.rmk1}\n\nQuer garantir o seu?`,
+  (nome) => `${nome ? `${nome}, não` : 'Não'} deixa o sol acabar com a pintura do seu veículo! ☀️\n\nSem proteção, a tinta vai desbotando e uma repintura pode custar R$2.000 ou mais...\n\nCom a Resina Extreme por R$89,99 (pago na entrega) você protege por meses:\n${LINKS.rmk1}\n\nAinda temos entrega disponível na sua região!`,
+  (nome) => `Oi${nome}! 😊 Último aviso sobre a condição especial da Resina Extreme.\n\n✅ Paga só na entrega\n✅ Frete grátis\n✅ Microfibra de brinde\n✅ Brilho espelhado garantido\n\n1 frasco: R$89,99 → ${LINKS.rmk1}\n2 frascos: R$109,99 → ${LINKS.rmk2}\n\nSe não for o momento certo, sem problema — mas a oferta encerra em breve! 🙏`,
+];
+
 function buildSystemPrompt(instrucaoManual = '', remarketingCtx = '') {
   return `Você é Roberto, consultor de vendas da Resina Extreme. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
 
@@ -422,19 +430,29 @@ async function checkFollowUps() {
       }
     }
 
-    // Remarketing 24h (só após follow-up já enviado)
-    if (conv.followUpEnviado && !conv.remarketingEnviado && elapsed >= VINTE_QUATRO_HORAS) {
+    // Remarketing diário (só após follow-up 2h, repete a cada 24h com mensagem rotativa)
+    if (conv.followUpEnviado && elapsed >= VINTE_QUATRO_HORAS) {
+      const ultimoRmk = conv.ultimoRemarketingEm || 0;
+      const passou24hDesdeUltimoRmk = (agora - ultimoRmk) >= VINTE_QUATRO_HORAS;
+      if (!passou24hDesdeUltimoRmk) continue;
+
       try {
         const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 👋 Ainda pensando na Resina Extreme?\n\nConsegui uma condição especial só para você 🎁\n\n✅ 1 frasco + microfibra de brinde por R$89,99\n${LINKS.rmk1}\n\n✅ 2 frascos + microfibra de brinde por R$109,99\n${LINKS.rmk2}\n\nFrete grátis e você paga só na entrega. Qual fica melhor?`;
+        const rmkCount = conv.rmkCount || 0;
+        const msg = MSGS_REMARKETING[rmkCount % MSGS_REMARKETING.length](nome);
+
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
-        for (const url of MEDIA.provasRemarketing) {
-          await new Promise(r => setTimeout(r, 1500));
-          await baileys.sendMedia(sessionId, phone, 'video', url);
-        }
+
+        // Alterna entre os 2 vídeos de prova
+        const videoUrl = MEDIA.provasRemarketing[rmkCount % MEDIA.provasRemarketing.length];
+        await new Promise(r => setTimeout(r, 1500));
+        await baileys.sendMedia(sessionId, phone, 'video', videoUrl);
+
+        conv.rmkCount = rmkCount + 1;
+        conv.ultimoRemarketingEm = agora;
         conv.remarketingEnviado = true;
-        console.log(`[LOGZZ] Remarketing → ${phone}`);
+        console.log(`[LOGZZ] Remarketing diário #${rmkCount + 1} → ${phone}`);
       } catch (e) {
         console.error(`[LOGZZ] Erro remarketing ${phone}:`, e.message);
       }
