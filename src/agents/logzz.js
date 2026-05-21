@@ -51,7 +51,7 @@ const CIDADES_ENTREGA = new Set([
 ]);
 
 const LINKS = {
-  un1:  'https://entrega.logzz.com.br/pay/memmonxkn/hbcxg-1-por-100',
+  un1:  'https://entrega.logzz.com.br/pay/memmonxkn/kugww-1-por-99',
   un2:  'https://entrega.logzz.com.br/pay/memmonxkn/hhrxr-2-un',
   rmk1: 'https://entrega.logzz.com.br/pay/memmonxkn/1-por-88-199-order-bump',
   rmk2: 'https://entrega.logzz.com.br/pay/memmonxkn/2-por-108-199-order-bump',
