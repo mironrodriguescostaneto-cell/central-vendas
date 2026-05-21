@@ -277,8 +277,8 @@ async function checkFollowUps() {
 async function init() {
   const sessionId = CONFIG.sessionIds.rafael;
   console.log('[RAFAEL-AGENTE] Inicializando Rafael — TVO Fotografias...');
-  await baileys.connect(sessionId, processMessage);
   setInterval(checkFollowUps, 5 * 60 * 1000);
+  await baileys.connect(sessionId, processMessage);
   console.log('[RAFAEL-AGENTE] Rafael pronto');
 }
 

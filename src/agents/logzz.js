@@ -418,8 +418,8 @@ async function checkFollowUps() {
 async function init() {
   const sessionId = CONFIG.sessionIds.logzz;
   console.log('[LOGZZ-AGENTE] Inicializando Roberto — Resina Extreme...');
-  await baileys.connect(sessionId, processMessage);
   setInterval(checkFollowUps, 5 * 60 * 1000);
+  await baileys.connect(sessionId, processMessage);
   console.log('[LOGZZ-AGENTE] Roberto pronto');
 }
 

@@ -396,8 +396,8 @@ async function checkFollowUps() {
 async function init() {
   const sessionId = CONFIG.sessionIds.sarah;
   console.log('[SARAH-AGENTE] Inicializando Sarah — Progressiva Vegetal Havana...');
-  await baileys.connect(sessionId, processMessage);
   setInterval(checkFollowUps, 5 * 60 * 1000);
+  await baileys.connect(sessionId, processMessage);
   console.log('[SARAH-AGENTE] Sarah pronta');
 }
 
