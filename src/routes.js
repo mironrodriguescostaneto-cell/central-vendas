@@ -532,6 +532,51 @@ router.delete('/api/agents/:agentId/pauses', auth, (req, res) => {
   res.json({ ok: true, message: `Pausas do agente ${agentId} limpas` });
 });
 
+// ----- Migração: restaurar linkEnviadoEm e desbloquear conversas travadas pelo echo bug -----
+router.post('/api/agents/:agentId/fix-followup', auth, (req, res) => {
+  const { agentId } = req.params;
+  if (!['logzz', 'sarah'].includes(agentId)) return res.status(404).json({ error: 'Apenas logzz e sarah' });
+
+  const convMap = db.state.conversations[agentId];
+  if (!convMap) return res.json({ ok: true, fixed: 0, unpaused: 0 });
+
+  const LINK_PATTERNS = ['entrega.logzz.com.br', 'logzz.com.br'];
+  let fixed = 0, unpaused = 0;
+
+  for (const [phone, conv] of convMap.entries()) {
+    const msgs = conv.msgs || [];
+
+    // 1. Restaurar linkEnviadoEm se link foi enviado mas campo está vazio
+    if (!conv.linkEnviadoEm) {
+      const linkMsg = [...msgs].reverse().find(m =>
+        m.role === 'assistant' && LINK_PATTERNS.some(p => (m.text || '').includes(p))
+      );
+      if (linkMsg) {
+        conv.linkEnviadoEm = linkMsg.ts || (Date.now() - 2 * 60 * 60 * 1000);
+        conv.followUpEnviado = false;
+        conv.remarketingEnviado = false;
+        fixed++;
+      }
+    }
+
+    // 2. Desbloquear conversas pausadas pelo echo bug:
+    //    últimas 3+ mensagens são todas [mídia] do usuário E há mensagem do assistente antes delas
+    if (db.isPaused(agentId, phone) && conv.linkEnviadoEm) {
+      const ultimas = msgs.slice(-6);
+      const todasMidiaUser = ultimas.length >= 3 && ultimas.every(m => m.role === 'user' && (m.text || '').trim() === '[mídia]');
+      if (todasMidiaUser) {
+        db.resumePhone(agentId, phone);
+        // Limpar as mensagens [mídia] falsas do histórico
+        conv.msgs = msgs.filter((m, i) => !(i >= msgs.length - 6 && m.role === 'user' && (m.text || '').trim() === '[mídia]'));
+        unpaused++;
+      }
+    }
+  }
+
+  db.saveDB().catch(() => {});
+  res.json({ ok: true, fixed, unpaused, total: convMap.size });
+});
+
 // ----- Endpoint de teste para simular mensagem recebida -----
 router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   const { agentId } = req.params;
