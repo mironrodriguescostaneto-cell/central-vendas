@@ -449,6 +449,13 @@ function _syncContactsFromLidMap(sessionId) {
   } catch { /* ignore */ }
 }
 
+function _markSentId(session, sent) {
+  const id = sent?.key?.id;
+  if (!id) return;
+  if (!session._seenMsgIds) session._seenMsgIds = new Set();
+  session._seenMsgIds.add(id);
+}
+
 async function sendText(sessionId, phone, text, originalJid) {
   const session = getSession(sessionId);
   if (!session.sock || session.connectionState !== 'connected') {
@@ -456,7 +463,8 @@ async function sendText(sessionId, phone, text, originalJid) {
   }
   const jid = originalJid || phoneToJid(phone);
   console.log(`[BAILEYS:${sessionId}] sendText → jid=${jid}`);
-  await session.sock.sendMessage(jid, { text });
+  const sent = await session.sock.sendMessage(jid, { text });
+  _markSentId(session, sent);
 }
 
 async function fetchBuffer(url, hops = 5) {
@@ -482,18 +490,20 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
     throw new Error(`WhatsApp ${sessionId} não conectado`);
   }
   const jid = originalJid || phoneToJid(phone);
+  let sent;
   if (type === 'image') {
-    await session.sock.sendMessage(jid, { image: { url }, caption: caption || '' });
+    sent = await session.sock.sendMessage(jid, { image: { url }, caption: caption || '' });
   } else if (type === 'video') {
     try {
       const buf = await fetchBuffer(url);
-      await session.sock.sendMessage(jid, { video: buf, caption: caption || '', mimetype: 'video/mp4' });
+      sent = await session.sock.sendMessage(jid, { video: buf, caption: caption || '', mimetype: 'video/mp4' });
     } catch {
-      await session.sock.sendMessage(jid, { video: { url }, caption: caption || '' });
+      sent = await session.sock.sendMessage(jid, { video: { url }, caption: caption || '' });
     }
   } else if (type === 'audio') {
-    await session.sock.sendMessage(jid, { audio: { url }, mimetype: 'audio/mp4' });
+    sent = await session.sock.sendMessage(jid, { audio: { url }, mimetype: 'audio/mp4' });
   }
+  _markSentId(session, sent);
 }
 
 async function requestPairingCodeFor(sessionId, phone) {
