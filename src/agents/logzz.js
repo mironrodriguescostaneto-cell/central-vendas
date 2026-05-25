@@ -75,11 +75,11 @@ const MEDIA = {
 };
 
 const MSGS_REMARKETING = [
-  (nome) => `Oi${nome}! 👋 Ainda pensando na Resina Extreme?\n\nConsegui uma condição especial só para você 🎁\n\n✅ 1 frasco + microfibra de brinde por R$89,99\n${LINKS.rmk1}\n\n✅ 2 frascos + microfibra de brinde por R$109,99\n${LINKS.rmk2}\n\nFrete grátis e você paga só na entrega. Qual fica melhor?`,
-  (nome) => `${nome ? `${nome}, ` : ''}o brilho do seu carro merece mais! ✨\n\nA Resina Extreme vitrifica a pintura e repele água — cada aplicação dura até 2 meses e o frasco rende 8x.\n\n🛡️ 1 frasco + microfibra: R$89,99 → ${LINKS.rmk1}\n🛡️ 2 frascos + microfibra: R$109,99 → ${LINKS.rmk2}\n\nPaga só na entrega, frete grátis. 😊`,
-  (nome) => `Oi${nome}! Passando pra lembrar que a promoção ainda tá ativa 🔥\n\nClientes que usaram a Resina Extreme adoraram o resultado — a pintura fica espelhada e a água escorrega.\n\n👉 Kit com brinde a partir de R$89,99, pago só na entrega:\n${LINKS.rmk1}\n\nQuer garantir o seu?`,
-  (nome) => `${nome ? `${nome}, não` : 'Não'} deixa o sol acabar com a pintura do seu veículo! ☀️\n\nSem proteção, a tinta vai desbotando e uma repintura pode custar R$2.000 ou mais...\n\nCom a Resina Extreme por R$89,99 (pago na entrega) você protege por meses:\n${LINKS.rmk1}\n\nAinda temos entrega disponível na sua região!`,
-  (nome) => `Oi${nome}! 😊 Último aviso sobre a condição especial da Resina Extreme.\n\n✅ Paga só na entrega\n✅ Frete grátis\n✅ Microfibra de brinde\n✅ Brilho espelhado garantido\n\n1 frasco: R$89,99 → ${LINKS.rmk1}\n2 frascos: R$109,99 → ${LINKS.rmk2}\n\nSe não for o momento certo, sem problema — mas a oferta encerra em breve! 🙏`,
+  (nome) => `Oi${nome}! 👋 Ainda pensando na Resina Extreme?\n\nConsegui incluir uma microfibra de brinde pra você 🎁\n\n✅ 1 frasco + microfibra por R$89,99: ${LINKS.rmk1}\n✅ 2 frascos + microfibra por R$109,99: ${LINKS.rmk2}\n\nFrete grátis, paga só na entrega. Qual fica melhor?`,
+  (nome) => `${nome ? `${nome}, ` : ''}tivemos mais entregas confirmadas na sua região hoje 🚚\n\nA Resina Extreme ainda tem disponibilidade essa semana — brilho espelhado, repele água, dura 2 meses por aplicação.\n\n🛡️ 1 frasco + microfibra: ${LINKS.rmk1}\n🛡️ 2 frascos + microfibra: ${LINKS.rmk2}\n\nPaga só na entrega. Frete grátis. 😊`,
+  (nome) => `Oi${nome}! Passando pra avisar que ainda consigo garantir a entrega essa semana 🔥\n\nClientes que usaram a Resina Extreme amaram — pintura espelhada e água escorregando.\n\n👉 Kit com microfibra de brinde, pago só na entrega:\n${LINKS.rmk1}\n\nQuer garantir o seu?`,
+  (nome) => `${nome ? `${nome}, não` : 'Não'} deixa o sol acabar com a pintura do seu veículo! ☀️\n\nSem proteção, a tinta vai desbotando e uma repintura pode custar R$2.000 ou mais...\n\nCom a Resina Extreme (pago na entrega, frete grátis) você protege por meses + leva microfibra de brinde:\n${LINKS.rmk1}\n\nAinda temos entrega disponível na sua região!`,
+  (nome) => `Oi${nome}! 😊 Última chamada antes de encerrarmos as entregas dessa semana na sua região.\n\n✅ Paga só na entrega\n✅ Frete grátis\n✅ Microfibra de brinde\n✅ Brilho espelhado garantido\n\n1 frasco: ${LINKS.rmk1}\n2 frascos: ${LINKS.rmk2}\n\nSe não for o momento certo, sem problema — mas a disponibilidade encerra em breve! 🙏`,
 ];
 
 function buildSystemPrompt(instrucaoManual = '', remarketingCtx = '') {
@@ -88,9 +88,9 @@ function buildSystemPrompt(instrucaoManual = '', remarketingCtx = '') {
 ## PRODUTO — Resina Extreme
 Protetor automotivo que vitrifica a pintura, repele água e dá brilho espelhado. Frasco de 500ml — rende 8–10 aplicações, cada uma dura 1–2 meses. Funciona em carro, moto e caminhão de qualquer cor.
 
-## KITS E PREÇOS
-Kit 1 frasco: R$100 → link: ${LINKS.un1}
-Kit 2 frascos: R$119,99 → link: ${LINKS.un2}
+## KITS E PREÇOS — APRESENTE SEMPRE O KIT 2 PRIMEIRO (âncora no premium)
+Kit 2 frascos: R$119,99 → link: ${LINKS.un2}  ← APRESENTE PRIMEIRO como "o mais pedido"
+Kit 1 frasco: R$100 → link: ${LINKS.un1}       ← opção secundária
 Frete: GRÁTIS | Pagamento: na entrega — dinheiro, pix ou cartão (o entregador leva maquininha)
 
 ## PARCELAMENTO NO CARTÃO (maquininha na entrega)
@@ -142,13 +142,14 @@ REGRA FUNDAMENTAL: Faça UMA pergunta por mensagem no máximo. Nunca empilhe per
 Cumprimente, apresente-se como Roberto da Resina Extreme e pergunte o nome do cliente.
 Exemplo: "Olá! Aqui é o Roberto da Resina Extreme. Com quem tenho o prazer?"
 
-### Etapa 2 — APRESENTAÇÃO RÁPIDA (após saber o nome)
-Explique o produto em 2–3 linhas, já mostrando o valor. Use [ENVIAR_FOTO] e [ENVIAR_PROVA] aqui para mandar as fotos e os vídeos de resultado de clientes.
-Exemplo: "A Resina Extreme é um protetor automotivo que vitrifica a pintura, repele água e dá brilho espelhado. Rende 8 aplicações, cada uma dura até 2 meses. Paga só na entrega, frete grátis. [ENVIAR_FOTO][ENVIAR_PROVA]"
-Em seguida pergunte a cidade: "Qual é a sua cidade para eu confirmar a entrega?"
+### Etapa 2 — CIDADE (logo após saber o nome — ANTES de enviar qualquer mídia)
+Pergunte a cidade ANTES de apresentar o produto. Não envie fotos nem vídeos antes de confirmar a entrega.
+Exemplo: "Prazer, [nome]! Me fala sua cidade que já confirmo se a entrega chega aí 😊"
 
-### Etapa 3 — CIDADE E DISPONIBILIDADE
-- Cidade ATENDIDA → confirme a entrega e apresente os kits: "Temos entrega aí! Kit 1 frasco R$100 ou 2 frascos por R$119,99 — os dois com frete grátis. Qual você prefere?"
+### Etapa 3 — DISPONIBILIDADE E APRESENTAÇÃO
+- Cidade ATENDIDA → confirme, apresente o produto em 2 linhas, envie as mídias e apresente os kits com âncora no Kit 2:
+  "Temos entrega em [cidade]! A Resina Extreme vitrifica a pintura, repele água e dá brilho espelhado — rende 8 aplicações, cada uma dura até 2 meses. [ENVIAR_FOTO][ENVIAR_PROVA]
+  O mais pedido é o Kit 2 frascos por R$119,99 — protege mais tempo e rende dobrado. Ou tem o Kit 1 por R$100. Frete grátis, paga só na entrega. Qual você prefere?"
 - Cidade NÃO ATENDIDA → "Ainda não chegamos aí, mas estamos expandindo! Posso te avisar quando tiver."
 
 ### Etapa 4 — FECHAR
@@ -159,7 +160,7 @@ Após SIM → envie o link correto + [LINK_ENVIADO]
 
 ## REGRA DE PREÇO — RESPONDA SEMPRE NA HORA
 Se o cliente perguntar o valor ANTES de você apresentar os kits, responda imediatamente:
-"1 frasco R$100 ou 2 frascos por R$119,99. Frete grátis, paga na entrega — dinheiro, pix ou cartão parcelado (entregador leva maquininha). Qual é a sua cidade?"
+"O mais pedido é o Kit 2 frascos por R$119,99 — ou Kit 1 por R$100. Frete grátis, paga na entrega — dinheiro, pix ou cartão parcelado (entregador leva maquininha). Qual é a sua cidade?"
 NUNCA desvie da pergunta de preço para fazer outras perguntas antes.
 
 ## TAGS DE AÇÃO
@@ -420,7 +421,7 @@ async function checkFollowUps() {
     if (!conv.followUpEnviado && elapsed >= DUAS_HORAS) {
       try {
         const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 😊 Conseguiu abrir o link e escolher o dia da entrega? Se precisar de ajuda é só falar!`;
+        const msg = `Oi${nome}! 🚚 Tivemos mais pedidos confirmados na sua região hoje. Ainda consigo garantir entrega essa semana — o link continua ativo. Precisa de ajuda para finalizar?`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
         conv.followUpEnviado = true;
