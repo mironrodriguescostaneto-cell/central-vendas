@@ -126,13 +126,19 @@ Paraíba: João Pessoa, Santa Rita, Cabedelo, Bayeux
 Outros: Manaus, Campo Grande, Ananindeua, Belém, Marituba
 Santa Catarina: Balneário Camboriú, Barra Velha, Camboriú, Itajaí, Itapema, Navegantes, Penha, Balneário Piçarras, Jaraguá do Sul, Joinville, Blumenau
 
-## REGRA DO LINK — NUNCA VIOLAR
-1. NUNCA inclua o link sem antes perguntar: "Posso te enviar o link para você escolher o dia da entrega?"
-2. Envie SOMENTE após o cliente dizer sim/pode/manda/claro/ok
-3. Ao enviar o link, inclua a tag [LINK_ENVIADO] no final da mensagem
-4. Após enviar o link, se o cliente perguntar sobre agendamento ou entrega → [TRANSFERIR_HUMANO] imediatamente
-5. Se o cliente confirmar que fez o agendamento → agradeça e use [PAUSAR_AGENTE]
-6. Após [PAUSAR_AGENTE] NUNCA mais envie mensagem para este cliente
+## REGRA DE AGENDAMENTO — NUNCA VIOLAR
+1. Quando o cliente escolher o kit, peça os dados de entrega em UMA mensagem:
+   "Perfeito! Vamos fazer o agendamento da sua entrega então 😊 Me manda:
+   • Seu nome completo
+   • CEP da sua rua
+   • Número da casa, quadra e lote
+   • Ponto de referência (se tiver)
+   Com essas informações já verifico aqui no sistema o dia que consigo entregar pra você."
+2. Aguarde o cliente enviar os dados. NÃO pressione nem repita o pedido.
+3. Assim que o cliente enviar os dados de endereço → confirme e use [AGENDAMENTO_RECEBIDO]:
+   "Perfeito, [nome]! Já anotei tudo aqui 📋 Em breve você vai receber a confirmação da sua entrega. Obrigado por escolher a Resina Extreme! [AGENDAMENTO_RECEBIDO]"
+4. Após [AGENDAMENTO_RECEBIDO] NUNCA mais envie mensagem para este cliente.
+5. NUNCA envie link de pagamento no fluxo de fechamento — o agendamento é feito por aqui mesmo.
 
 ## FLUXO DE ATENDIMENTO — DIRETO E SEM ENROLAÇÃO
 
@@ -152,11 +158,11 @@ Exemplo: "Prazer, [nome]! Me fala sua cidade que já confirmo se a entrega chega
   O mais pedido é o Kit 2 frascos por R$119,99 — protege mais tempo e rende dobrado. Ou tem o Kit 1 por R$100. Frete grátis, paga só na entrega. Qual você prefere?"
 - Cidade NÃO ATENDIDA → "Ainda não chegamos aí, mas estamos expandindo! Posso te avisar quando tiver."
 
-### Etapa 4 — FECHAR
-Quando o cliente escolher o kit, pergunte: "Posso te enviar o link para você escolher o dia da entrega?"
+### Etapa 4 — AGENDAR
+Quando o cliente escolher o kit, peça os dados de entrega em UMA mensagem (nome completo, CEP, número da casa, quadra e lote, ponto de referência). Não pergunte se pode — já solicite diretamente de forma natural.
 
-### Etapa 5 — LINK
-Após SIM → envie o link correto + [LINK_ENVIADO]
+### Etapa 5 — CONFIRMAR E PAUSAR
+Quando o cliente enviar os dados de endereço → agradeça, confirme que vai verificar o dia disponível e use [AGENDAMENTO_RECEBIDO].
 
 ## REGRA DE PREÇO — RESPONDA SEMPRE NA HORA
 Se o cliente perguntar o valor ANTES de você apresentar os kits, responda imediatamente:
@@ -164,11 +170,11 @@ Se o cliente perguntar o valor ANTES de você apresentar os kits, responda imedi
 NUNCA desvie da pergunta de preço para fazer outras perguntas antes.
 
 ## TAGS DE AÇÃO
-[LINK_ENVIADO] — registra envio do link, sistema faz follow-up automático em 2h
+[AGENDAMENTO_RECEBIDO] — cliente enviou os dados de entrega; sistema notifica o responsável e pausa a conversa
 [ENVIAR_FOTO] — enviar foto do produto (use na apresentação)
 [ENVIAR_PROVA] — enviar vídeo de prova social (use ao fechar)
-[PAUSAR_AGENTE] — pausar conversa (usar após confirmação de pedido)
-[TRANSFERIR_HUMANO] — transferir para humano (dúvidas de agendamento pós-link)
+[PAUSAR_AGENTE] — pausar conversa (situações especiais)
+[TRANSFERIR_HUMANO] — transferir para humano (reclamações, situações fora do fluxo)
 
 ## SPIN SELLING — MANEJO DE OBJEÇÕES DE SAÍDA
 
@@ -214,6 +220,7 @@ function extractTags(text) {
   if (text.includes('[LINK_ENVIADO]')) tags.push('LINK_ENVIADO');
   if (text.includes('[TRANSFERIR_HUMANO]')) tags.push('TRANSFERIR_HUMANO');
   if (text.includes('[PAUSAR_AGENTE]')) tags.push('PAUSAR_AGENTE');
+  if (text.includes('[AGENDAMENTO_RECEBIDO]')) tags.push('AGENDAMENTO_RECEBIDO');
   return tags;
 }
 
@@ -224,6 +231,7 @@ function removeTags(text) {
     .replace(/\[LINK_ENVIADO\]/gi, '')
     .replace(/\[TRANSFERIR_HUMANO\]/gi, '')
     .replace(/\[PAUSAR_AGENTE\]/gi, '')
+    .replace(/\[AGENDAMENTO_RECEBIDO\]/gi, '')
     .trim();
 }
 
@@ -375,6 +383,13 @@ async function processMessage(event, payload) {
         enviadas.add(url);
       }
       _midiaEnviada.set(phone, enviadas);
+    }
+
+    if (tags.includes('AGENDAMENTO_RECEBIDO')) {
+      pausePhone(AGENT_ID, phone);
+      const cs = getConvState(phone);
+      if (cs) delete cs.remarketingContexto;
+      sendTelegram(`📦 *Roberto — Agendamento recebido!*\nCliente: ${pushName || phone} (${phone})\nDados:\n${body?.slice(0, 400)}`).catch(() => {});
     }
 
     if (tags.includes('TRANSFERIR_HUMANO')) {
