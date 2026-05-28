@@ -714,6 +714,73 @@ async function chat(userMessage) {
   return finalText;
 }
 
+// ----- Scheduler de finanças -----
+function initFinancasScheduler() {
+  const { botToken, grupoFinancasId } = CONFIG.telegram;
+  if (!botToken || !grupoFinancasId) return;
+
+  const TelegramBot = require('node-telegram-bot-api');
+  // Usa o mesmo token mas sem polling (já tem no listener)
+  const bot = new TelegramBot(botToken);
+
+  async function enviarGrupo(mensagem) {
+    try {
+      await bot.sendMessage(grupoFinancasId, mensagem, { parse_mode: 'Markdown' });
+    } catch (_) {
+      await bot.sendMessage(grupoFinancasId, mensagem);
+    }
+  }
+
+  let ultimoDiario = '';
+  let ultimoSemanal = '';
+  let ultimoMensal = '';
+
+  setInterval(async () => {
+    try {
+      // Hora BRT = UTC - 3
+      const agora = new Date();
+      const brt = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+      const hora = brt.getHours();
+      const min = brt.getMinutes();
+      const diaSemana = brt.getDay(); // 0 = domingo
+      const diaStr = brt.toISOString().slice(0, 10);
+      const mesStr = brt.toISOString().slice(0, 7);
+      const ultimoDiaMes = new Date(brt.getFullYear(), brt.getMonth() + 1, 0).getDate();
+      const diaDoMes = brt.getDate();
+
+      const db = require('./database');
+
+      // Relatório diário às 22h BRT
+      if (hora === 22 && min < 5 && ultimoDiario !== diaStr) {
+        ultimoDiario = diaStr;
+        const relatorio = financas.gerarRelatorioDiario(db);
+        await enviarGrupo(relatorio);
+        console.log('[JARVIS-FINANCAS] Relatório diário enviado');
+      }
+
+      // Relatório semanal domingo às 20h BRT
+      if (diaSemana === 0 && hora === 20 && min < 5 && ultimoSemanal !== diaStr) {
+        ultimoSemanal = diaStr;
+        const relatorio = financas.gerarRelatorioSemanal(db);
+        await enviarGrupo(relatorio);
+        console.log('[JARVIS-FINANCAS] Relatório semanal enviado');
+      }
+
+      // Fechamento do mês — último dia às 21h BRT
+      if (diaDoMes === ultimoDiaMes && hora === 21 && min < 5 && ultimoMensal !== mesStr) {
+        ultimoMensal = mesStr;
+        const relatorio = financas.gerarRelatorioFimMes(db);
+        await enviarGrupo(relatorio);
+        console.log('[JARVIS-FINANCAS] Relatório de fechamento enviado');
+      }
+    } catch (e) {
+      console.error('[JARVIS-FINANCAS] Erro no scheduler:', e.message);
+    }
+  }, 60 * 1000); // verifica a cada minuto
+
+  console.log('[JARVIS-FINANCAS] Scheduler ativo (diário 22h, semanal dom 20h, mensal último dia 21h)');
+}
+
 // ----- Telegram Listener -----
 function initTelegramListener() {
   const { botToken, chatId } = CONFIG.telegram;
@@ -806,6 +873,7 @@ function initErrorMonitor() {
   });
 
   initTelegramListener();
+  initFinancasScheduler();
   console.log('[JARVIS] Monitor de erros ativo');
 }
 

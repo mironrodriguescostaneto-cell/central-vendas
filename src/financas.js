@@ -1,17 +1,18 @@
 'use strict';
 
-// ============================================================
-// MÓDULO FINANCEIRO — JARVIS
-// Controle financeiro familiar via grupo Telegram
-// Parser de mensagens + storage + análise com IA
-// ============================================================
-
 const { callClaudeText } = require('./services');
 
 const CATEGORIAS = [
   'alimentação', 'transporte', 'moradia', 'saúde', 'educação',
   'lazer', 'roupas', 'contas', 'trabalho', 'outros',
 ];
+
+// Categorias de impulso (monitoradas para streak)
+const CATS_IMPULSO = ['lazer', 'roupas'];
+
+// Classificação 50/30/20
+const CATS_NECESSIDADE = ['alimentação', 'moradia', 'saúde', 'contas', 'transporte', 'educação'];
+const CATS_DESEJO = ['lazer', 'roupas', 'outros'];
 
 const KNOWLEDGE_FINANCEIRA = `
 ## WARREN BUFFETT
@@ -50,6 +51,41 @@ const KNOWLEDGE_FINANCEIRA = `
 - Moradia ≤ 30% | Alimentação ≤ 15% | Transporte ≤ 10%
 - Saúde ≤ 10% | Lazer ≤ 5% | Poupança/Investimento ≥ 20%
 `;
+
+// ----- Helpers de data -----
+function mesAtual() { return new Date().toISOString().slice(0, 7); }
+function mesAnterior() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 7);
+}
+function diaAtual() { return new Date().toISOString().slice(0, 10); }
+function diasNoMes(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  return new Date(a, m, 0).getDate();
+}
+function diaDoMes() { return new Date().getDate(); }
+function nomeMes(mes) {
+  const nomes = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const [, m] = mes.split('-');
+  return nomes[parseInt(m)];
+}
+function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ''; }
+
+// ----- Barras de progresso -----
+function barraProgresso(pct, tamanho = 10) {
+  const filled = Math.round((Math.min(pct, 100) / 100) * tamanho);
+  return '█'.repeat(filled) + '░'.repeat(tamanho - filled);
+}
+
+function statusOrcamento(pct) {
+  if (pct >= 100) return { emoji: '🚨', texto: 'LIMITE ULTRAPASSADO' };
+  if (pct >= 80) return { emoji: '⚠️', texto: 'Quase no limite' };
+  if (pct >= 50) return { emoji: '🟡', texto: 'Atenção' };
+  return { emoji: '✅', texto: 'Ok' };
+}
 
 // ----- Parser de mensagem financeira via Claude -----
 async function parseMensagemFinanceira(texto, quem) {
@@ -99,7 +135,7 @@ Responda APENAS o JSON ou null, sem explicações.`;
   }
 }
 
-// ----- Funções de banco de dados -----
+// ----- Banco de dados -----
 function addTransacao(db, transacao) {
   const agora = new Date();
   const data = agora.toISOString().slice(0, 10);
@@ -118,22 +154,32 @@ function addTransacao(db, transacao) {
   };
 
   db.state.financas.transacoes.unshift(entrada);
-  if (db.state.financas.transacoes.length > 2000) {
-    db.state.financas.transacoes = db.state.financas.transacoes.slice(0, 2000);
+  if (db.state.financas.transacoes.length > 5000) {
+    db.state.financas.transacoes = db.state.financas.transacoes.slice(0, 5000);
   }
   db.saveDB().catch(() => {});
   return entrada;
 }
 
 function getTransacoesMes(db, mes) {
-  // mes formato: "2026-05"
-  const alvo = mes || new Date().toISOString().slice(0, 7);
+  const alvo = mes || mesAtual();
   return db.state.financas.transacoes.filter(t => t.mes === alvo);
+}
+
+function getTransacoesHoje(db) {
+  const hoje = diaAtual();
+  return db.state.financas.transacoes.filter(t => t.data === hoje);
+}
+
+function getTransacoesSemana(db) {
+  const agora = Date.now();
+  const semanaAtras = agora - 7 * 24 * 60 * 60 * 1000;
+  return db.state.financas.transacoes.filter(t => t.ts >= semanaAtras);
 }
 
 function getResumoMensal(db, mes) {
   const transacoes = getTransacoesMes(db, mes);
-  const alvo = mes || new Date().toISOString().slice(0, 7);
+  const alvo = mes || mesAtual();
 
   let totalReceitas = 0;
   let totalDespesas = 0;
@@ -155,6 +201,7 @@ function getResumoMensal(db, mes) {
   const taxaEconomia = totalReceitas > 0 ? ((saldo / totalReceitas) * 100).toFixed(1) : 0;
   const meta = db.state.financas.metas.economiasMensal || 0;
   const progressoMeta = meta > 0 ? Math.min(100, ((saldo / meta) * 100).toFixed(0)) : null;
+  const orcamentos = db.state.financas.metas.orcamentos || {};
 
   return {
     mes: alvo,
@@ -167,12 +214,115 @@ function getResumoMensal(db, mes) {
     totalTransacoes: transacoes.length,
     meta,
     progressoMeta,
+    orcamentos,
   };
+}
+
+// ----- Orçamentos por categoria -----
+function setOrcamento(db, categoria, valor) {
+  if (!db.state.financas.metas.orcamentos) db.state.financas.metas.orcamentos = {};
+  db.state.financas.metas.orcamentos[categoria] = parseFloat(valor);
+  db.saveDB().catch(() => {});
+}
+
+function getProgressoOrcamento(db, categoria, mes) {
+  const orcamentos = db.state.financas.metas.orcamentos || {};
+  const limite = orcamentos[categoria] || 0;
+  const transacoes = getTransacoesMes(db, mes || mesAtual());
+  const gasto = transacoes
+    .filter(t => t.tipo === 'despesa' && t.categoria === categoria)
+    .reduce((s, t) => s + t.valor, 0);
+  const pct = limite > 0 ? (gasto / limite) * 100 : null;
+  return { gasto, limite, pct };
+}
+
+// ----- Comparativo com mês anterior -----
+function getComparativoCategoria(db, categoria) {
+  const mes = mesAtual();
+  const mesAnt = mesAnterior();
+  const txAtual = getTransacoesMes(db, mes).filter(t => t.tipo === 'despesa' && t.categoria === categoria);
+  const txAnt = getTransacoesMes(db, mesAnt).filter(t => t.tipo === 'despesa' && t.categoria === categoria);
+  const valorAtual = txAtual.reduce((s, t) => s + t.valor, 0);
+  const valorAnterior = txAnt.reduce((s, t) => s + t.valor, 0);
+  if (valorAnterior === 0) return null;
+  const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
+  return { valorAtual, valorAnterior, variacao: parseFloat(variacao.toFixed(1)) };
+}
+
+// ----- Projeção do mês -----
+function gerarProjecaoMes(db) {
+  const mes = mesAtual();
+  const resumo = getResumoMensal(db, mes);
+  const totalDias = diasNoMes(mes);
+  const diaHoje = diaDoMes();
+  if (diaHoje === 0) return null;
+
+  const mediaDiaria = resumo.totalDespesas / diaHoje;
+  const diasRestantes = totalDias - diaHoje;
+  const projecaoDespesas = resumo.totalDespesas + (mediaDiaria * diasRestantes);
+  const projecaoSaldo = resumo.totalReceitas - projecaoDespesas;
+  const projecaoTaxaEconomia = resumo.totalReceitas > 0
+    ? (projecaoSaldo / resumo.totalReceitas) * 100 : 0;
+
+  return {
+    totalDias,
+    diaHoje,
+    diasRestantes,
+    mediaDiaria: parseFloat(mediaDiaria.toFixed(2)),
+    projecaoDespesas: parseFloat(projecaoDespesas.toFixed(2)),
+    projecaoSaldo: parseFloat(projecaoSaldo.toFixed(2)),
+    projecaoTaxaEconomia: parseFloat(projecaoTaxaEconomia.toFixed(1)),
+    gastoAtual: resumo.totalDespesas,
+    receitas: resumo.totalReceitas,
+  };
+}
+
+// ----- Plano de pagamento (ao registrar receita) -----
+function gerarPlanoPagamento(valorReceita, db) {
+  const mes = mesAtual();
+  const gastoAtual = getTransacoesMes(db, mes)
+    .filter(t => t.tipo === 'despesa')
+    .reduce((s, t) => s + t.valor, 0);
+
+  const poupar = valorReceita * 0.20;
+  const necessidades = valorReceita * 0.50;
+  const desejos = valorReceita * 0.30;
+  const disponivelRestante = (valorReceita - poupar) - gastoAtual;
+
+  return {
+    valorReceita,
+    poupar,
+    necessidades,
+    desejos,
+    gastoAtual,
+    disponivelRestante: Math.max(0, disponivelRestante),
+  };
+}
+
+// ----- Streak de economia -----
+function calcularStreak(db) {
+  const hoje = diaAtual();
+  const streaks = {};
+  for (const cat of CATS_IMPULSO) {
+    let dias = 0;
+    const d = new Date();
+    while (dias < 30) {
+      const dStr = d.toISOString().slice(0, 10);
+      const temGasto = db.state.financas.transacoes.some(
+        t => t.data === dStr && t.tipo === 'despesa' && t.categoria === cat
+      );
+      if (temGasto) break;
+      dias++;
+      d.setDate(d.getDate() - 1);
+    }
+    streaks[cat] = dias;
+  }
+  return streaks;
 }
 
 // ----- Análise de gastos desnecessários via Claude -----
 async function analisarGastosDesnecessarios(db) {
-  const mes = new Date().toISOString().slice(0, 7);
+  const mes = mesAtual();
   const resumo = getResumoMensal(db, mes);
   const transacoes = getTransacoesMes(db, mes);
 
@@ -185,6 +335,9 @@ async function analisarGastosDesnecessarios(db) {
     .map(t => `- ${t.descricao} (${t.categoria}): R$${t.valor.toFixed(2)} — ${t.quem}`)
     .join('\n');
 
+  const projecao = gerarProjecaoMes(db);
+  const projecaoTxt = projecao ? `Projeção de despesas até o fim do mês: R$${projecao.projecaoDespesas.toFixed(2)}` : '';
+
   const prompt = `${KNOWLEDGE_FINANCEIRA}
 
 Você é Jarvis, consultor financeiro pessoal de Miron e sua esposa.
@@ -194,6 +347,7 @@ Receita total: R$${resumo.totalReceitas.toFixed(2)}
 Despesa total: R$${resumo.totalDespesas.toFixed(2)}
 Saldo: R$${resumo.saldo.toFixed(2)}
 Taxa de economia: ${resumo.taxaEconomia}%
+${projecaoTxt}
 
 GASTOS REGISTRADOS:
 ${listaGastos}
@@ -203,6 +357,7 @@ Analise esses gastos com a sabedoria dos maiores investidores do mundo e identif
 2. Padrões preocupantes (muita alimentação fora, muito lazer, etc)
 3. Como melhorar a taxa de economia
 4. Meta concreta para o próximo mês
+5. Uma ação específica que podem tomar AMANHÃ para melhorar
 
 Seja direto, objetivo e específico. Use valores reais. Máximo 400 palavras.`;
 
@@ -216,76 +371,148 @@ Seja direto, objetivo e específico. Use valores reais. Máximo 400 palavras.`;
   }
 }
 
-// ----- Processador de mensagem do grupo Telegram -----
-async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) {
-  const textLower = texto.toLowerCase().trim();
+// ----- Relatório diário -----
+function gerarRelatorioDiario(db) {
+  const hoje = diaAtual();
+  const mes = mesAtual();
+  const txHoje = getTransacoesHoje(db).filter(t => t.tipo === 'despesa');
+  const resumo = getResumoMensal(db, mes);
+  const projecao = gerarProjecaoMes(db);
 
-  // Comandos especiais do grupo
-  if (textLower === 'resumo' || textLower === '/resumo') {
-    const resumo = getResumoMensal(db);
-    const msg = formatarResumo(resumo);
-    await sendTelegramGroup(msg);
-    return;
+  const totalHoje = txHoje.reduce((s, t) => s + t.valor, 0);
+  const porCatHoje = {};
+  for (const t of txHoje) {
+    porCatHoje[t.categoria] = (porCatHoje[t.categoria] || 0) + t.valor;
   }
 
-  if (textLower === 'análise' || textLower === 'analise' || textLower === '/analise') {
-    await sendTelegramGroup('🔍 Analisando seus gastos...');
-    const analise = await analisarGastosDesnecessarios(db);
-    await sendTelegramGroup(`📊 *Análise Financeira — Jarvis*\n\n${analise}`);
-    return;
-  }
+  const [, , dia] = hoje.split('-');
+  let txt = `📅 *Resumo do dia, ${dia}/${hoje.slice(5, 7)}:*\n\n`;
 
-  if (textLower.startsWith('meta ') || textLower.startsWith('/meta ')) {
-    const valorStr = texto.replace(/[^0-9.,]/g, '').replace(',', '.');
-    const valor = parseFloat(valorStr);
-    if (valor > 0) {
-      db.state.financas.metas.economiasMensal = valor;
-      db.saveDB().catch(() => {});
-      await sendTelegramGroup(`🎯 Meta de economia definida: *R$${valor.toFixed(2)}/mês*\nJarvis vai monitorar e te avisar sobre o progresso.`);
+  if (totalHoje === 0) {
+    txt += `🎉 Dia sem gastos! Ótimo!\n\n`;
+  } else {
+    txt += `Hoje vocês gastaram: *R$${totalHoje.toFixed(2)}*\n`;
+    const cats = Object.entries(porCatHoje).sort((a, b) => b[1] - a[1]);
+    for (const [cat, val] of cats) {
+      txt += `• ${capitalize(cat)}: R$${val.toFixed(2)}\n`;
     }
-    return;
+    txt += '\n';
   }
 
-  if (textLower === 'ajuda' || textLower === '/ajuda' || textLower === 'help') {
-    const ajuda = `💰 *Comandos do Grupo Financeiro*\n\n` +
-      `📝 *Registrar gasto:*\n"gastei R$50 no mercado"\n"paguei 120 de luz"\n"farmácia 45"\n\n` +
-      `💵 *Registrar receita:*\n"recebi 3000 de salário"\n"ganhei 500 de freelance"\n\n` +
-      `📊 *Comandos:*\n\`resumo\` — Ver resumo do mês\n\`analise\` — Análise de gastos desnecessários\n\`meta 1000\` — Definir meta de economia mensal\n\`ajuda\` — Mostrar este menu`;
-    await sendTelegramGroup(ajuda);
-    return;
+  txt += `📊 *${nomeMes(mes)} até agora:*\n`;
+  txt += `💵 Receitas: R$${resumo.totalReceitas.toFixed(2)}\n`;
+  txt += `💸 Despesas: R$${resumo.totalDespesas.toFixed(2)}\n`;
+  txt += `💰 Saldo: *R$${resumo.saldo.toFixed(2)}*\n`;
+
+  if (projecao) {
+    txt += `\n📈 *Projeção do mês:*\n`;
+    const status = projecao.projecaoTaxaEconomia >= 20 ? '✅ No caminho certo' :
+      projecao.projecaoTaxaEconomia >= 10 ? '⚠️ Pode melhorar' : '🚨 Atenção ao ritmo!';
+    txt += `Projeção de gastos: R$${projecao.projecaoDespesas.toFixed(2)}\n`;
+    txt += `Taxa de economia projetada: ${projecao.projecaoTaxaEconomia}% — ${status}`;
   }
 
-  // Tentar parsear como transação financeira
-  const transacao = await parseMensagemFinanceira(texto, senderName);
-  if (!transacao) return; // não é transação, ignorar
+  // Streaks
+  const streaks = calcularStreak(db);
+  const streaksMsgs = [];
+  if (streaks.lazer >= 3) streaksMsgs.push(`🔥 ${streaks.lazer} dias sem gastar em Lazer!`);
+  if (streaks.roupas >= 7) streaksMsgs.push(`🔥 ${streaks.roupas} dias sem gastar em Roupas!`);
+  if (streaksMsgs.length) txt += '\n\n' + streaksMsgs.join('\n');
 
-  const entrada = addTransacao(db, transacao);
-  const emoji = transacao.tipo === 'receita' ? '💵' : '💸';
-  const tipoLabel = transacao.tipo === 'receita' ? 'Receita' : 'Despesa';
+  return txt;
+}
 
-  let confirmacao = `${emoji} *${tipoLabel} registrada*\nR$${entrada.valor.toFixed(2)} — ${capitalize(entrada.categoria)}\n📝 ${entrada.descricao}\n👤 ${entrada.quem}`;
+// ----- Relatório semanal -----
+function gerarRelatorioSemanal(db) {
+  const mes = mesAtual();
+  const agora = Date.now();
+  const semanaAtras = agora - 7 * 24 * 60 * 60 * 1000;
+  const duasSemanas = agora - 14 * 24 * 60 * 60 * 1000;
 
-  if (transacao.tipo === 'despesa') {
-    const mes = new Date().toISOString().slice(0, 7);
-    const totalCategoria = db.state.financas.transacoes
-      .filter(t => t.mes === mes && t.tipo === 'despesa' && t.categoria === entrada.categoria)
-      .reduce((sum, t) => sum + t.valor, 0);
-    confirmacao += `\n\n📊 Esse mês vocês já gastaram *R$${totalCategoria.toFixed(2)}* com ${capitalize(entrada.categoria)}`;
+  const txSemana = db.state.financas.transacoes.filter(t => t.ts >= semanaAtras && t.tipo === 'despesa');
+  const txSemanaAnt = db.state.financas.transacoes.filter(t => t.ts >= duasSemanas && t.ts < semanaAtras && t.tipo === 'despesa');
+
+  const totalSemana = txSemana.reduce((s, t) => s + t.valor, 0);
+  const totalSemanaAnt = txSemanaAnt.reduce((s, t) => s + t.valor, 0);
+
+  const porCat = {};
+  for (const t of txSemana) porCat[t.categoria] = (porCat[t.categoria] || 0) + t.valor;
+
+  let txt = `📊 *Relatório Semanal — ${nomeMes(mes)}*\n\n`;
+  txt += `Total gasto esta semana: *R$${totalSemana.toFixed(2)}*\n`;
+
+  const cats = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+  for (const [cat, val] of cats.slice(0, 5)) {
+    txt += `• ${capitalize(cat)}: R$${val.toFixed(2)}\n`;
   }
 
-  await sendTelegramGroup(confirmacao);
+  if (totalSemanaAnt > 0) {
+    const var_ = ((totalSemana - totalSemanaAnt) / totalSemanaAnt * 100).toFixed(1);
+    const emoji = parseFloat(var_) <= 0 ? '🟢' : parseFloat(var_) <= 10 ? '🟡' : '🔴';
+    txt += `\n${emoji} Comparado à semana passada: ${var_ > 0 ? '+' : ''}${var_}%\n`;
+  }
+
+  // Top gastador
+  const porQuem = {};
+  for (const t of txSemana) porQuem[t.quem] = (porQuem[t.quem] || 0) + t.valor;
+  const topGastador = Object.entries(porQuem).sort((a, b) => b[1] - a[1])[0];
+  if (topGastador) txt += `\n👤 Maior gasto: ${topGastador[0]} — R$${topGastador[1].toFixed(2)}`;
+
+  return txt;
+}
+
+// ----- Relatório fim de mês -----
+function gerarRelatorioFimMes(db) {
+  const mes = mesAtual();
+  const mesAnt = mesAnterior();
+  const resumo = getResumoMensal(db, mes);
+  const resumoAnt = getResumoMensal(db, mesAnt);
+
+  let txt = `🗓 *Fechamento de ${nomeMes(mes)}*\n\n`;
+  txt += `💵 Receitas: R$${resumo.totalReceitas.toFixed(2)}\n`;
+  txt += `💸 Despesas: R$${resumo.totalDespesas.toFixed(2)}\n`;
+  txt += `💰 Economizaram: *R$${resumo.saldo.toFixed(2)}* (${resumo.taxaEconomia}%)\n`;
+
+  // Meta
+  if (resumo.meta > 0) {
+    const bateuMeta = resumo.saldo >= resumo.meta;
+    txt += bateuMeta
+      ? `\n🏆 Meta de R$${resumo.meta.toFixed(2)} — ✅ Superada! Parabéns!\n`
+      : `\n🎯 Meta de R$${resumo.meta.toFixed(2)} — ❌ Não atingida (${resumo.progressoMeta}%)\n`;
+  }
+
+  // Comparativo com mês anterior
+  if (resumoAnt.totalDespesas > 0) {
+    const var_ = ((resumo.totalDespesas - resumoAnt.totalDespesas) / resumoAnt.totalDespesas * 100).toFixed(1);
+    const emoji = parseFloat(var_) <= 0 ? '🟢' : '🔴';
+    txt += `\n${emoji} Total de gastos vs ${nomeMes(mesAnt)}: ${var_ > 0 ? '+' : ''}${var_}%\n`;
+  }
+
+  // Melhores e piores categorias vs mês anterior
+  const cats = Object.entries(resumo.porCategoria);
+  const comparativos = cats.map(([cat]) => {
+    const comp = getComparativoCategoria(db, cat);
+    return comp ? { cat, variacao: comp.variacao } : null;
+  }).filter(Boolean).sort((a, b) => a.variacao - b.variacao);
+
+  if (comparativos.length >= 2) {
+    txt += `\n🏆 Melhor categoria: ${capitalize(comparativos[0].cat)} (${comparativos[0].variacao}%)\n`;
+    txt += `⚠️ Pior categoria: ${capitalize(comparativos[comparativos.length - 1].cat)} (+${comparativos[comparativos.length - 1].variacao}%)`;
+  }
+
+  return txt;
 }
 
 // ----- Formatador de resumo -----
 function formatarResumo(resumo) {
   const { mes, totalReceitas, totalDespesas, saldo, taxaEconomia, porCategoria, meta, progressoMeta } = resumo;
 
-  const [ano, mesNum] = mes.split('-');
   const nomesMes = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  const nomeMes = `${nomesMes[parseInt(mesNum)]}/${ano}`;
+  const [ano, mesNum] = mes.split('-');
+  const nomeMesStr = `${nomesMes[parseInt(mesNum)]}/${ano}`;
 
-  let txt = `📊 *Resumo Financeiro — ${nomeMes}*\n\n`;
+  let txt = `📊 *Resumo Financeiro — ${nomeMesStr}*\n\n`;
   txt += `💵 Receitas: *R$${totalReceitas.toFixed(2)}*\n`;
   txt += `💸 Despesas: *R$${totalDespesas.toFixed(2)}*\n`;
   txt += `💰 Saldo: *R$${saldo.toFixed(2)}*\n`;
@@ -309,18 +536,202 @@ function formatarResumo(resumo) {
   return txt;
 }
 
-function capitalize(str) {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1);
+// ----- Processador de mensagem do grupo Telegram -----
+async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) {
+  const textLower = texto.toLowerCase().trim();
+
+  // ===== COMANDOS ESPECIAIS =====
+
+  if (textLower === 'resumo' || textLower === '/resumo') {
+    const resumo = getResumoMensal(db);
+    await sendTelegramGroup(formatarResumo(resumo));
+    return;
+  }
+
+  if (textLower === 'análise' || textLower === 'analise' || textLower === '/analise') {
+    await sendTelegramGroup('🔍 Analisando seus gastos...');
+    const analise = await analisarGastosDesnecessarios(db);
+    await sendTelegramGroup(`📊 *Análise Financeira — Jarvis*\n\n${analise}`);
+    return;
+  }
+
+  if (textLower.startsWith('meta ') || textLower.startsWith('/meta ')) {
+    const valorStr = texto.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const valor = parseFloat(valorStr);
+    if (valor > 0) {
+      db.state.financas.metas.economiasMensal = valor;
+      db.saveDB().catch(() => {});
+      await sendTelegramGroup(`🎯 Meta de economia definida: *R$${valor.toFixed(2)}/mês*\nJarvis vai monitorar e te avisar sobre o progresso.`);
+    }
+    return;
+  }
+
+  // Definir orçamento: "limite alimentacao 600" ou "orcamento transporte 300"
+  const limiteMatch = textLower.match(/^(limite|orçamento|orcamento)\s+(\w+)\s+([\d.,]+)/);
+  if (limiteMatch) {
+    const catInput = limiteMatch[2];
+    const cat = CATEGORIAS.find(c => c.startsWith(catInput) || catInput.startsWith(c.slice(0, 4)));
+    const valor = parseFloat(limiteMatch[3].replace(',', '.'));
+    if (cat && valor > 0) {
+      setOrcamento(db, cat, valor);
+      const prog = getProgressoOrcamento(db, cat, mesAtual());
+      const pct = prog.limite > 0 ? ((prog.gasto / prog.limite) * 100).toFixed(0) : 0;
+      await sendTelegramGroup(
+        `✅ Orçamento definido para *${capitalize(cat)}*: R$${valor.toFixed(2)}/mês\n` +
+        `📊 Gasto atual: R$${prog.gasto.toFixed(2)} (${pct}%)\n` +
+        `${barraProgresso(parseFloat(pct))} ${pct}%`
+      );
+    }
+    return;
+  }
+
+  // Ver todos orçamentos
+  if (textLower === 'orcamentos' || textLower === 'orçamentos' || textLower === '/orcamentos') {
+    const orcamentos = db.state.financas.metas.orcamentos || {};
+    if (Object.keys(orcamentos).length === 0) {
+      await sendTelegramGroup('Nenhum orçamento definido ainda.\n\nDefina com: *limite alimentacao 800*');
+      return;
+    }
+    let msg = `💰 *Orçamentos de ${nomeMes(mesAtual())}:*\n\n`;
+    for (const [cat, limite] of Object.entries(orcamentos)) {
+      const prog = getProgressoOrcamento(db, cat, mesAtual());
+      const pct = prog.pct || 0;
+      const { emoji } = statusOrcamento(pct);
+      msg += `${emoji} *${capitalize(cat)}*\n`;
+      msg += `R$${prog.gasto.toFixed(2)} de R$${limite.toFixed(2)}\n`;
+      msg += `${barraProgresso(pct)} ${pct.toFixed(0)}%\n\n`;
+    }
+    await sendTelegramGroup(msg.trim());
+    return;
+  }
+
+  // Projeção
+  if (textLower === 'projeção' || textLower === 'projecao' || textLower === '/projecao') {
+    const proj = gerarProjecaoMes(db);
+    if (!proj || proj.gastoAtual === 0) {
+      await sendTelegramGroup('Sem dados suficientes para projeção ainda. Continue registrando seus gastos!');
+      return;
+    }
+    const status = proj.projecaoTaxaEconomia >= 20 ? '✅ No caminho certo!' :
+      proj.projecaoTaxaEconomia >= 10 ? '⚠️ Pode melhorar' : '🚨 Atenção ao ritmo!';
+    const msg = `📈 *Projeção — ${nomeMes(mesAtual())}*\n\n` +
+      `Gastos até hoje (dia ${proj.diaHoje}): R$${proj.gastoAtual.toFixed(2)}\n` +
+      `Média diária: R$${proj.mediaDiaria.toFixed(2)}\n` +
+      `Dias restantes: ${proj.diasRestantes}\n\n` +
+      `📊 Projeção de gastos: *R$${proj.projecaoDespesas.toFixed(2)}*\n` +
+      `💰 Saldo projetado: R$${proj.projecaoSaldo.toFixed(2)}\n` +
+      `📈 Taxa economia projetada: ${proj.projecaoTaxaEconomia}%\n\n${status}`;
+    await sendTelegramGroup(msg);
+    return;
+  }
+
+  // Relatório semanal
+  if (textLower === 'semana' || textLower === '/semana') {
+    await sendTelegramGroup(gerarRelatorioSemanal(db));
+    return;
+  }
+
+  // Streak
+  if (textLower === 'streak' || textLower === '/streak') {
+    const streaks = calcularStreak(db);
+    let msg = `🔥 *Seus Streaks de Economia:*\n\n`;
+    for (const [cat, dias] of Object.entries(streaks)) {
+      const emoji = dias >= 7 ? '🏆' : dias >= 3 ? '🔥' : dias >= 1 ? '✅' : '❌';
+      msg += `${emoji} ${capitalize(cat)}: *${dias} dia${dias !== 1 ? 's' : ''}* sem gastar\n`;
+    }
+    await sendTelegramGroup(msg);
+    return;
+  }
+
+  if (textLower === 'ajuda' || textLower === '/ajuda' || textLower === 'help') {
+    const ajuda = `💰 *Comandos do Grupo Financeiro*\n\n` +
+      `📝 *Registrar gasto:*\n"gastei R$50 no mercado"\n"paguei 120 de luz"\n\n` +
+      `💵 *Registrar receita:*\n"recebi 3000 de salário"\n\n` +
+      `📊 *Consultas:*\n` +
+      `\`resumo\` — Resumo do mês\n` +
+      `\`projecao\` — Projeção até fim do mês\n` +
+      `\`semana\` — Relatório semanal\n` +
+      `\`orcamentos\` — Ver orçamentos\n` +
+      `\`streak\` — Dias sem gastar em categorias impulso\n` +
+      `\`analise\` — Análise IA dos gastos\n\n` +
+      `⚙️ *Configurar:*\n` +
+      `\`meta 1000\` — Meta de economia mensal\n` +
+      `\`limite alimentacao 800\` — Orçamento por categoria\n\n` +
+      `📋 *Categorias:* alimentação, transporte, moradia, saúde, educação, lazer, roupas, contas, trabalho, outros`;
+    await sendTelegramGroup(ajuda);
+    return;
+  }
+
+  // ===== REGISTRAR TRANSAÇÃO =====
+  const transacao = await parseMensagemFinanceira(texto, senderName);
+  if (!transacao) return;
+
+  const entrada = addTransacao(db, transacao);
+  const emoji = transacao.tipo === 'receita' ? '💵' : '💸';
+  const tipoLabel = transacao.tipo === 'receita' ? 'Receita' : 'Despesa';
+
+  let confirmacao = `${emoji} *${tipoLabel} registrada*\nR$${entrada.valor.toFixed(2)} — ${capitalize(entrada.categoria)}\n📝 ${entrada.descricao}\n👤 ${entrada.quem}`;
+
+  if (transacao.tipo === 'despesa') {
+    // Total da categoria no mês
+    const totalCategoria = db.state.financas.transacoes
+      .filter(t => t.mes === mesAtual() && t.tipo === 'despesa' && t.categoria === entrada.categoria)
+      .reduce((sum, t) => sum + t.valor, 0);
+    confirmacao += `\n\n📊 ${capitalize(entrada.categoria)} em ${nomeMes(mesAtual())}: *R$${totalCategoria.toFixed(2)}*`;
+
+    // Orçamento da categoria
+    const prog = getProgressoOrcamento(db, entrada.categoria, mesAtual());
+    if (prog.limite > 0) {
+      const pct = (prog.gasto / prog.limite) * 100;
+      const { emoji: eOrc } = statusOrcamento(pct);
+      confirmacao += `\n${eOrc} Orçamento: ${barraProgresso(pct, 8)} ${pct.toFixed(0)}% (R$${prog.gasto.toFixed(2)} de R$${prog.limite.toFixed(2)})`;
+      if (pct >= 100) {
+        confirmacao += `\n🚨 *Limite de ${capitalize(entrada.categoria)} ultrapassado!*`;
+      } else if (pct >= 80) {
+        confirmacao += `\n⚠️ Só restam R$${(prog.limite - prog.gasto).toFixed(2)} no orçamento!`;
+      }
+    }
+
+    // Comparativo com mês anterior
+    const comp = getComparativoCategoria(db, entrada.categoria);
+    if (comp && comp.valorAnterior > 0) {
+      const varEmoji = comp.variacao <= 0 ? '🟢' : comp.variacao <= 20 ? '🟡' : '🔴';
+      const varSinal = comp.variacao > 0 ? '+' : '';
+      confirmacao += `\n${varEmoji} vs ${nomeMes(mesAnterior())}: ${varSinal}${comp.variacao}%`;
+    }
+  }
+
+  if (transacao.tipo === 'receita') {
+    // Plano de pagamento automático
+    const plano = gerarPlanoPagamento(entrada.valor, db);
+    confirmacao += `\n\n📋 *Plano Buffett para o mês:*\n`;
+    confirmacao += `• 💰 Poupar primeiro: R$${plano.poupar.toFixed(2)} (20%)\n`;
+    confirmacao += `• 🏠 Necessidades: R$${plano.necessidades.toFixed(2)} (50%)\n`;
+    confirmacao += `• 🎯 Desejos: R$${plano.desejos.toFixed(2)} (30%)\n`;
+    if (plano.gastoAtual > 0) {
+      confirmacao += `\n📊 Já gasto este mês: R$${plano.gastoAtual.toFixed(2)}\n`;
+      confirmacao += `💳 Disponível restante: *R$${plano.disponivelRestante.toFixed(2)}*`;
+    }
+  }
+
+  await sendTelegramGroup(confirmacao);
 }
 
 module.exports = {
   parseMensagemFinanceira,
   addTransacao,
   getTransacoesMes,
+  getTransacoesHoje,
   getResumoMensal,
   analisarGastosDesnecessarios,
   processarMensagemGrupo,
   formatarResumo,
+  gerarRelatorioDiario,
+  gerarRelatorioSemanal,
+  gerarRelatorioFimMes,
+  gerarProjecaoMes,
+  setOrcamento,
+  getProgressoOrcamento,
+  calcularStreak,
   CATEGORIAS,
 };

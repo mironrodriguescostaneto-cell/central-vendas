@@ -500,6 +500,24 @@ body{
         </div>
       </div>
 
+      <!-- Orçamentos -->
+      <div class="section" id="orcamentos-section" style="display:none">
+        <div class="section-header">
+          <span class="section-title">Orçamentos</span>
+          <button onclick="showTab('adicionar');document.getElementById('f-orcamento').scrollIntoView({behavior:'smooth'})"
+            style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer;font-weight:600">+ Editar</button>
+        </div>
+        <div class="cat-list" id="orc-list"></div>
+      </div>
+
+      <!-- Projeção -->
+      <div class="section" id="proj-section" style="display:none">
+        <div class="section-header">
+          <span class="section-title">Projeção do Mês</span>
+        </div>
+        <div class="kpi-card full" id="proj-card"></div>
+      </div>
+
       <!-- Meta -->
       <div class="meta-card">
         <h3>🎯 Meta de Economia Mensal</h3>
@@ -590,6 +608,40 @@ body{
           </div>
           <button class="btn-registrar" onclick="adicionarTransacao()">Registrar</button>
           <div class="form-feedback" id="form-msg" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div style="padding:16px 16px 8px;margin-top:8px">
+        <div class="section-title">Orçamentos por Categoria</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Defina um limite mensal por categoria para controle automático</div>
+      </div>
+      <div class="form-wrap" id="f-orcamento">
+        <div class="form-card">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="orc-cat">Categoria</label>
+              <select id="orc-cat">
+                <option value="alimentação">🍽 Alimentação</option>
+                <option value="transporte">🚗 Transporte</option>
+                <option value="moradia">🏠 Moradia</option>
+                <option value="saúde">💊 Saúde</option>
+                <option value="educação">📚 Educação</option>
+                <option value="lazer">🎮 Lazer</option>
+                <option value="roupas">👕 Roupas</option>
+                <option value="contas">📄 Contas</option>
+                <option value="trabalho">💼 Trabalho</option>
+                <option value="outros">📦 Outros</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="orc-val">Limite (R$)</label>
+              <input type="number" id="orc-val" placeholder="Ex: 800" step="50" min="0" inputmode="decimal">
+            </div>
+          </div>
+          <button class="btn-registrar" onclick="salvarOrcamento()" style="background:linear-gradient(135deg,var(--green),#0284c7)">
+            Salvar Orçamento
+          </button>
+          <div class="form-feedback" id="orc-msg" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -734,7 +786,76 @@ document.addEventListener('click',e=>{
 });
 
 async function loadData(){
-  await Promise.all([loadResumo(),loadTransacoes()]);
+  await Promise.all([loadResumo(),loadTransacoes(),loadOrcamentos(),loadProjecao()]);
+}
+
+async function loadOrcamentos(){
+  const d=await api('/api/financas/orcamentos?mes='+mesAtual);
+  const sec=document.getElementById('orcamentos-section');
+  const list=document.getElementById('orc-list');
+  if(!d||!Object.keys(d.orcamentos||{}).length){sec.style.display='none';return;}
+  sec.style.display='block';
+  const CORES={'alimentação':'#F97316','transporte':'#3B82F6','moradia':'#8B5CF6',
+    'saúde':'#10B981','educação':'#EC4899','lazer':'#F59E0B',
+    'roupas':'#22C55E','contas':'#EF4444','trabalho':'#06B6D4','outros':'#94A3B8'};
+  list.innerHTML=Object.entries(d.orcamentos).map(([cat,{limite,gasto,pct}])=>{
+    const p=Math.min(100,pct||0);
+    const cor=p>=100?'var(--red)':p>=80?'var(--yellow)':'var(--green)';
+    const emoji=p>=100?'🚨':p>=80?'⚠️':p>=50?'🟡':'✅';
+    return `<div class="cat-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px 0;border-bottom:1px solid var(--border-light)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:14px;font-weight:600">${emoji} ${cap(cat)}</span>
+        <span style="font-size:13px;color:var(--text-muted)">${fmt(gasto)} / ${fmt(limite)}</span>
+      </div>
+      <div class="cat-bar-wrap" style="height:8px">
+        <div class="cat-bar-fill" style="width:${p}%;background:${cor}"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-align:right">${p.toFixed(0)}% usado — restam ${fmt(limite-gasto)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadProjecao(){
+  const d=await api('/api/financas/projecao');
+  const sec=document.getElementById('proj-section');
+  const card=document.getElementById('proj-card');
+  if(!d||!d.gastoAtual){sec.style.display='none';return;}
+  sec.style.display='block';
+  const tx=d.projecaoTaxaEconomia||0;
+  const cor=tx>=20?'var(--green)':tx>=10?'var(--yellow)':'var(--red)';
+  const status=tx>=20?'✅ No caminho certo!':tx>=10?'⚠️ Pode melhorar':'🚨 Atenção ao ritmo!';
+  card.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+      <div>
+        <div class="kpi-label">Projeção de gastos</div>
+        <div class="kpi-value c-red">${fmt(d.projecaoDespesas)}</div>
+        <div class="kpi-sub">Média diária: ${fmt(d.mediaDiaria)} · ${d.diasRestantes} dias restantes</div>
+      </div>
+      <div style="text-align:right">
+        <div class="kpi-label">Economia projetada</div>
+        <div class="kpi-value" style="color:${cor}">${tx}%</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,tx)}%;background:${cor}"></div></div>
+    <div style="font-size:12px;margin-top:8px;color:var(--text-muted)">${status}</div>`;
+}
+
+async function salvarOrcamento(){
+  const cat=document.getElementById('orc-cat').value;
+  const val=parseFloat(document.getElementById('orc-val').value);
+  const msg=document.getElementById('orc-msg');
+  msg.className='form-feedback';msg.textContent='';
+  if(!val||val<=0){msg.className='form-feedback err';msg.textContent='Informe um valor válido';return;}
+  msg.textContent='Salvando...';
+  const d=await api('/api/financas/orcamentos',{method:'POST',body:JSON.stringify({categoria:cat,valor:val})});
+  if(d&&d.ok){
+    msg.className='form-feedback ok';msg.textContent='✓ Orçamento salvo!';
+    document.getElementById('orc-val').value='';
+    loadOrcamentos();
+    setTimeout(()=>{msg.textContent='';},3000);
+  }else{
+    msg.className='form-feedback err';msg.textContent='Erro ao salvar';
+  }
 }
 
 async function loadResumo(){

@@ -769,6 +769,31 @@ router.post('/api/financas/meta', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/api/financas/orcamentos', auth, (req, res) => {
+  const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+  const orcamentos = db.state.financas.metas.orcamentos || {};
+  const resultado = {};
+  for (const [cat, limite] of Object.entries(orcamentos)) {
+    const prog = financas.getProgressoOrcamento(db, cat, mes);
+    resultado[cat] = { limite, gasto: prog.gasto, pct: prog.pct };
+  }
+  res.json({ orcamentos: resultado });
+});
+
+router.post('/api/financas/orcamentos', auth, (req, res) => {
+  const { categoria, valor } = req.body;
+  if (!categoria || !valor || parseFloat(valor) <= 0) {
+    return res.status(400).json({ error: 'categoria e valor obrigatórios' });
+  }
+  financas.setOrcamento(db, categoria, parseFloat(valor));
+  res.json({ ok: true });
+});
+
+router.get('/api/financas/projecao', auth, (req, res) => {
+  const proj = financas.gerarProjecaoMes(db);
+  res.json(proj || {});
+});
+
 router.get('/api/financas/meses', auth, (req, res) => {
   const meses = [...new Set(db.state.financas.transacoes.map(t => t.mes))]
     .sort((a, b) => b.localeCompare(a));

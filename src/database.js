@@ -43,7 +43,7 @@ const state = {
   // Finanças familiares
   financas: {
     transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
-    metas: { economiasMensal: 0 },
+    metas: { economiasMensal: 0, orcamentos: {} }, // orcamentos: { 'alimentação': 600, ... }
   },
 };
 
@@ -82,7 +82,10 @@ function deserialize(data) {
   if (data.instrucoes) state.instrucoes = data.instrucoes;
   if (data.financas) {
     if (data.financas.transacoes) state.financas.transacoes = data.financas.transacoes;
-    if (data.financas.metas) state.financas.metas = data.financas.metas;
+    if (data.financas.metas) {
+      state.financas.metas = data.financas.metas;
+      if (!state.financas.metas.orcamentos) state.financas.metas.orcamentos = {};
+    }
   }
   if (data.conversations) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);
