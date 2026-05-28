@@ -809,6 +809,54 @@ router.get('/api/financas/analise', auth, async (req, res) => {
   }
 });
 
+// ----- Dívidas -----
+router.get('/api/financas/dividas', auth, (req, res) => {
+  const apenasAtivas = req.query.ativas !== 'false';
+  res.json({ dividas: financas.getDividas(db, apenasAtivas) });
+});
+
+router.post('/api/financas/dividas', auth, (req, res) => {
+  const { descricao, valor, vencimento } = req.body;
+  if (!descricao || !valor || parseFloat(valor) <= 0) return res.status(400).json({ error: 'descricao e valor obrigatórios' });
+  const nova = financas.addDivida(db, { descricao, valor: parseFloat(valor), vencimento: vencimento || null });
+  res.json({ ok: true, divida: nova });
+});
+
+router.put('/api/financas/dividas/:id/pagar', auth, (req, res) => {
+  const div = financas.marcarDividaPaga(db, req.params.id);
+  if (!div) return res.status(404).json({ error: 'Não encontrada' });
+  res.json({ ok: true, divida: div });
+});
+
+router.delete('/api/financas/dividas/:id', auth, (req, res) => {
+  financas.deleteDivida(db, req.params.id);
+  res.json({ ok: true });
+});
+
+// ----- A Receber -----
+router.get('/api/financas/areceber', auth, (req, res) => {
+  const apenasAtivos = req.query.ativos !== 'false';
+  res.json({ aReceber: financas.getAReceber(db, apenasAtivos) });
+});
+
+router.post('/api/financas/areceber', auth, (req, res) => {
+  const { descricao, valor, dataRecebimento } = req.body;
+  if (!descricao || !valor || parseFloat(valor) <= 0) return res.status(400).json({ error: 'descricao e valor obrigatórios' });
+  const novo = financas.addAReceber(db, { descricao, valor: parseFloat(valor), dataRecebimento: dataRecebimento || null });
+  res.json({ ok: true, item: novo });
+});
+
+router.put('/api/financas/areceber/:id/receber', auth, (req, res) => {
+  const item = financas.marcarRecebido(db, req.params.id);
+  if (!item) return res.status(404).json({ error: 'Não encontrado' });
+  res.json({ ok: true, item });
+});
+
+router.delete('/api/financas/areceber/:id', auth, (req, res) => {
+  financas.deleteAReceber(db, req.params.id);
+  res.json({ ok: true });
+});
+
 router.get('/financas', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard_financas.html'));
 });

@@ -519,6 +519,7 @@ body{
     <button class="tab-btn active" onclick="showTab('resumo')" role="tab">Resumo</button>
     <button class="tab-btn" onclick="showTab('transacoes')" role="tab">Transações</button>
     <button class="tab-btn" onclick="showTab('adicionar')" role="tab">+ Registrar</button>
+    <button class="tab-btn" onclick="showTab('dividas')" role="tab">Dívidas</button>
     <button class="tab-btn" onclick="showTab('analise')" role="tab">Análise IA</button>
   </div>
 
@@ -723,6 +724,69 @@ body{
       </div>
     </div>
 
+    <!-- ===== ABA: DÍVIDAS ===== -->
+    <div id="tab-dividas" style="display:none">
+      <div style="padding:16px 16px 12px">
+        <div class="section-title">Dívidas & A Receber</div>
+      </div>
+
+      <!-- Cards resumo -->
+      <div style="padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div class="card" style="border-left:3px solid var(--red)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">TOTAL A PAGAR</div>
+          <div id="div-total-pagar" style="font-size:20px;font-weight:700;color:var(--red)">R$0</div>
+          <div id="div-count-dividas" style="font-size:11px;color:var(--text-muted)">0 dívidas</div>
+        </div>
+        <div class="card" style="border-left:3px solid var(--green)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">TOTAL A RECEBER</div>
+          <div id="div-total-receber" style="font-size:20px;font-weight:700;color:var(--green)">R$0</div>
+          <div id="div-count-receber" style="font-size:11px;color:var(--text-muted)">0 recebimentos</div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SALDO LÍQUIDO</div>
+          <div id="div-saldo-liquido" style="font-size:24px;font-weight:800">R$0</div>
+          <div id="div-saldo-status" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+      </div>
+
+      <!-- Lista Dívidas -->
+      <div style="padding:0 16px 12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-secondary)">🔴 Dívidas Ativas</div>
+          <button onclick="openModalDiv('divida')" style="font-size:12px;padding:6px 12px;background:var(--red);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">+ Adicionar</button>
+        </div>
+        <div id="lista-dividas">
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- Lista A Receber -->
+      <div style="padding:0 16px 24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-secondary)">🟢 A Receber</div>
+          <button onclick="openModalDiv('areceber')" style="font-size:12px;padding:6px 12px;background:var(--green);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">+ Adicionar</button>
+        </div>
+        <div id="lista-areceber">
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">Carregando...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Adicionar Dívida/Receber -->
+    <div id="modal-div" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;padding:24px;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;margin:0 auto">
+        <div id="modal-div-titulo" style="font-size:17px;font-weight:700;margin-bottom:16px">Nova Dívida</div>
+        <input id="modal-div-desc" type="text" placeholder="Descrição (ex: Nubank, João)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;margin-bottom:10px">
+        <input id="modal-div-valor" type="number" placeholder="Valor (R$)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;margin-bottom:10px" min="0.01" step="0.01">
+        <input id="modal-div-data" type="date" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;margin-bottom:16px">
+        <div id="modal-div-data-label" style="font-size:12px;color:var(--text-muted);margin-top:-8px;margin-bottom:16px">Data de vencimento (opcional)</div>
+        <div style="display:flex;gap:10px">
+          <button onclick="document.getElementById('modal-div').style.display='none'" style="flex:1;padding:14px;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;font-weight:600">Cancelar</button>
+          <button id="modal-div-btn" onclick="salvarItemDiv()" style="flex:2;padding:14px;border:none;border-radius:10px;background:var(--blue);color:#fff;cursor:pointer;font-weight:700;font-size:15px">Salvar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== ABA: ANÁLISE ===== -->
     <div id="tab-analise" style="display:none">
       <div style="padding:16px 16px 12px">
@@ -864,6 +928,122 @@ document.addEventListener('click',e=>{
 
 async function loadData(){
   await Promise.all([loadResumo(),loadTransacoes(),loadOrcamentos(),loadProjecao()]);
+}
+
+// ----- Dívidas & A Receber -----
+let _divModalTipo = 'divida';
+
+async function loadDividas(){
+  const [dRes, rRes] = await Promise.all([
+    api('/api/financas/dividas?ativas=true'),
+    api('/api/financas/areceber?ativos=true'),
+  ]);
+  const dividas = dRes.dividas || [];
+  const aReceber = rRes.aReceber || [];
+
+  const totalPagar = dividas.reduce((s,d)=>s+d.valor,0);
+  const totalReceber = aReceber.reduce((s,r)=>s+r.valor,0);
+  const saldo = totalReceber - totalPagar;
+
+  document.getElementById('div-total-pagar').textContent = 'R$'+totalPagar.toFixed(2);
+  document.getElementById('div-count-dividas').textContent = dividas.length+' dívida'+(dividas.length!==1?'s':'');
+  document.getElementById('div-total-receber').textContent = 'R$'+totalReceber.toFixed(2);
+  document.getElementById('div-count-receber').textContent = aReceber.length+' recebimento'+(aReceber.length!==1?'s':'');
+  const slEl = document.getElementById('div-saldo-liquido');
+  slEl.textContent = 'R$'+saldo.toFixed(2);
+  slEl.style.color = saldo >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('div-saldo-status').textContent = saldo >= 0
+    ? 'Você vai receber mais do que deve 💚'
+    : 'Você deve mais do que vai receber ⚠️';
+
+  // Lista dívidas
+  const ldEl = document.getElementById('lista-dividas');
+  if(dividas.length === 0){
+    ldEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:14px">Nenhuma dívida ativa ✅</div>';
+  } else {
+    const hoje = new Date().toISOString().slice(0,10);
+    ldEl.innerHTML = dividas.map(d=>{
+      const atrasada = d.vencimento && d.vencimento < hoje;
+      const venc = d.vencimento ? ' · vence '+d.vencimento.slice(8,10)+'/'+d.vencimento.slice(5,7) : '';
+      return `<div style="background:var(--surface);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid ${atrasada?'var(--red)':'#E2E8F0'}">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${d.descricao}</div>
+          <div style="font-size:12px;color:${atrasada?'var(--red)':'var(--text-muted)'}">R$${d.valor.toFixed(2)}${venc}${atrasada?' ⚠️ ATRASADA':''}</div>
+        </div>
+        <button onclick="pagarDivida('${d.id}')" style="padding:7px 12px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Paguei</button>
+        <button onclick="deletarDivida('${d.id}')" style="padding:7px 10px;background:var(--red-light);color:var(--red);border:none;border-radius:8px;font-size:14px;cursor:pointer">×</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Lista a receber
+  const lrEl = document.getElementById('lista-areceber');
+  if(aReceber.length === 0){
+    lrEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:14px">Nada a receber cadastrado</div>';
+  } else {
+    lrEl.innerHTML = aReceber.map(r=>{
+      const data = r.dataRecebimento ? ' · dia '+r.dataRecebimento.slice(8,10)+'/'+r.dataRecebimento.slice(5,7) : '';
+      return `<div style="background:var(--surface);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid var(--green)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${r.descricao}</div>
+          <div style="font-size:12px;color:var(--text-muted)">R$${r.valor.toFixed(2)}${data}</div>
+        </div>
+        <button onclick="receberItem('${r.id}')" style="padding:7px 12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Recebi</button>
+        <button onclick="deletarAReceber('${r.id}')" style="padding:7px 10px;background:var(--red-light);color:var(--red);border:none;border-radius:8px;font-size:14px;cursor:pointer">×</button>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function pagarDivida(id){
+  if(!confirm('Marcar dívida como paga?')) return;
+  await api('/api/financas/dividas/'+id+'/pagar', {method:'PUT'});
+  loadDividas();
+}
+
+async function deletarDivida(id){
+  if(!confirm('Excluir esta dívida?')) return;
+  await api('/api/financas/dividas/'+id, {method:'DELETE'});
+  loadDividas();
+}
+
+async function receberItem(id){
+  if(!confirm('Marcar como recebido?')) return;
+  await api('/api/financas/areceber/'+id+'/receber', {method:'PUT'});
+  loadDividas();
+}
+
+async function deletarAReceber(id){
+  if(!confirm('Excluir este item?')) return;
+  await api('/api/financas/areceber/'+id, {method:'DELETE'});
+  loadDividas();
+}
+
+function openModalDiv(tipo){
+  _divModalTipo = tipo;
+  const modal = document.getElementById('modal-div');
+  document.getElementById('modal-div-titulo').textContent = tipo === 'divida' ? '🔴 Nova Dívida' : '🟢 Novo Recebimento';
+  document.getElementById('modal-div-data-label').textContent = tipo === 'divida' ? 'Data de vencimento (opcional)' : 'Data prevista de recebimento (opcional)';
+  document.getElementById('modal-div-btn').style.background = tipo === 'divida' ? 'var(--red)' : 'var(--green)';
+  document.getElementById('modal-div-desc').value = '';
+  document.getElementById('modal-div-valor').value = '';
+  document.getElementById('modal-div-data').value = '';
+  modal.style.display = 'flex';
+}
+
+async function salvarItemDiv(){
+  const desc = document.getElementById('modal-div-desc').value.trim();
+  const valor = parseFloat(document.getElementById('modal-div-valor').value);
+  const data = document.getElementById('modal-div-data').value || null;
+  if(!desc || !valor || valor <= 0){ alert('Preencha descrição e valor'); return; }
+
+  if(_divModalTipo === 'divida'){
+    await api('/api/financas/dividas', {method:'POST', body:JSON.stringify({descricao:desc, valor, vencimento:data})});
+  } else {
+    await api('/api/financas/areceber', {method:'POST', body:JSON.stringify({descricao:desc, valor, dataRecebimento:data})});
+  }
+  document.getElementById('modal-div').style.display = 'none';
+  loadDividas();
 }
 
 async function loadOrcamentos(){
@@ -1066,15 +1246,16 @@ async function fazerAnalise(){
 }
 
 function showTab(t){
-  ['resumo','transacoes','adicionar','analise'].forEach(x=>{
+  ['resumo','transacoes','adicionar','dividas','analise'].forEach(x=>{
     const el=document.getElementById('tab-'+x);
     if(el)el.style.display=x===t?'block':'none';
   });
   document.querySelectorAll('.tab-btn').forEach((el,i)=>{
-    const tabs=['resumo','transacoes','adicionar','analise'];
+    const tabs=['resumo','transacoes','adicionar','dividas','analise'];
     el.className='tab-btn'+(tabs[i]===t?' active':'');
   });
   if(t==='transacoes')loadTransacoes();
+  if(t==='dividas')loadDividas();
 }
 
 // Init

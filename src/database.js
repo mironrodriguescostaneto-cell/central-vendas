@@ -44,6 +44,8 @@ const state = {
   financas: {
     transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
     metas: { economiasMensal: 0, orcamentos: {} }, // orcamentos: { 'alimentação': 600, ... }
+    dividas: [],   // [{id, descricao, valor, vencimento, pago, pagouEm, criadoEm}]
+    aReceber: [],  // [{id, descricao, valor, dataRecebimento, recebido, recebidoEm, criadoEm}]
   },
 };
 
@@ -86,6 +88,8 @@ function deserialize(data) {
       state.financas.metas = data.financas.metas;
       if (!state.financas.metas.orcamentos) state.financas.metas.orcamentos = {};
     }
+    if (data.financas.dividas) state.financas.dividas = data.financas.dividas;
+    if (data.financas.aReceber) state.financas.aReceber = data.financas.aReceber;
   }
   if (data.conversations) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);

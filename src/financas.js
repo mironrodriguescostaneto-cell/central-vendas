@@ -503,6 +503,159 @@ function gerarRelatorioFimMes(db) {
   return txt;
 }
 
+// ----- Parser de dívidas/a-receber em lote (mensagem multi-linha) -----
+function parsarDataVencimento(str) {
+  if (!str) return null;
+  const parts = str.split('/');
+  if (parts.length < 2) return null;
+  const dia = parseInt(parts[0]);
+  const mes = parseInt(parts[1]);
+  const anoAtual = new Date().getFullYear();
+  const ano = parts[2] ? (parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2])) : anoAtual;
+  if (isNaN(dia) || isNaN(mes)) return null;
+  return new Date(ano, mes - 1, dia).toISOString().slice(0, 10);
+}
+
+function parseMensagemDividasAReceber(texto) {
+  const temDivida = /d[íi]vida/i.test(texto);
+  const temReceber = /a\s+receber|recebimento/i.test(texto);
+  if (!temDivida && !temReceber) return null;
+
+  const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  const dividas = [];
+  const aReceber = [];
+  let secao = null;
+
+  for (const linha of linhas) {
+    const low = linha.toLowerCase();
+    if (/^d[íi]vida/.test(low)) { secao = 'dividas'; continue; }
+    if (/^a\s+receber|^recebimento/.test(low)) { secao = 'areceber'; continue; }
+    if (!secao) continue;
+
+    // Formatos: "nubank 1500 vence 10/06" | "João 300 dia 05/06" | "luz 200" | "fulano 300 10/06"
+    const match = linha.match(/^(.+?)\s+([\d.,]+)(?:\s+(?:vence?|dia|em|até|ate|para)\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?))?(?:\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?))?/i);
+    if (!match) continue;
+
+    const descricao = match[1].trim();
+    const valor = parseFloat(match[2].replace(',', '.'));
+    const vencimentoStr = match[3] || match[4] || null;
+    const vencimento = parsarDataVencimento(vencimentoStr);
+
+    if (!descricao || !valor || valor <= 0) continue;
+
+    if (secao === 'dividas') dividas.push({ descricao, valor, vencimento });
+    else aReceber.push({ descricao, valor, dataRecebimento: vencimento });
+  }
+
+  return (dividas.length > 0 || aReceber.length > 0) ? { dividas, aReceber } : null;
+}
+
+// ----- CRUD Dívidas -----
+function addDivida(db, divida) {
+  if (!db.state.financas.dividas) db.state.financas.dividas = [];
+  const id = `DIV-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+  const novo = { id, descricao: divida.descricao, valor: parseFloat(divida.valor), vencimento: divida.vencimento || null, pago: false, criadoEm: Date.now() };
+  db.state.financas.dividas.push(novo);
+  db.saveDB().catch(() => {});
+  return novo;
+}
+
+function getDividas(db, apenasAtivas = false) {
+  const lista = db.state.financas.dividas || [];
+  return apenasAtivas ? lista.filter(d => !d.pago) : lista;
+}
+
+function marcarDividaPaga(db, id) {
+  const div = (db.state.financas.dividas || []).find(d => d.id === id);
+  if (div) { div.pago = true; div.pagouEm = Date.now(); db.saveDB().catch(() => {}); }
+  return div;
+}
+
+function deleteDivida(db, id) {
+  if (!db.state.financas.dividas) return;
+  db.state.financas.dividas = db.state.financas.dividas.filter(d => d.id !== id);
+  db.saveDB().catch(() => {});
+}
+
+// ----- CRUD A Receber -----
+function addAReceber(db, item) {
+  if (!db.state.financas.aReceber) db.state.financas.aReceber = [];
+  const id = `REC-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+  const novo = { id, descricao: item.descricao, valor: parseFloat(item.valor), dataRecebimento: item.dataRecebimento || null, recebido: false, criadoEm: Date.now() };
+  db.state.financas.aReceber.push(novo);
+  db.saveDB().catch(() => {});
+  return novo;
+}
+
+function getAReceber(db, apenasAtivos = false) {
+  const lista = db.state.financas.aReceber || [];
+  return apenasAtivos ? lista.filter(r => !r.recebido) : lista;
+}
+
+function marcarRecebido(db, id) {
+  const item = (db.state.financas.aReceber || []).find(r => r.id === id);
+  if (item) { item.recebido = true; item.recebidoEm = Date.now(); db.saveDB().catch(() => {}); }
+  return item;
+}
+
+function deleteAReceber(db, id) {
+  if (!db.state.financas.aReceber) return;
+  db.state.financas.aReceber = db.state.financas.aReceber.filter(r => r.id !== id);
+  db.saveDB().catch(() => {});
+}
+
+// ----- Balanço de dívidas -----
+function formatarBalancoDividas(db) {
+  const dividas = getDividas(db, true);
+  const aReceber = getAReceber(db, true);
+
+  const totalDividas = dividas.reduce((s, d) => s + d.valor, 0);
+  const totalAReceber = aReceber.reduce((s, r) => s + r.valor, 0);
+  const saldoLiquido = totalAReceber - totalDividas;
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  let msg = `💰 *Balanço — Dívidas & Recebimentos*\n\n`;
+
+  if (dividas.length > 0) {
+    const ordenadas = [...dividas].sort((a, b) => {
+      if (!a.vencimento) return 1;
+      if (!b.vencimento) return -1;
+      return a.vencimento.localeCompare(b.vencimento);
+    });
+    msg += `🔴 *Dívidas ativas (${dividas.length}):*\n`;
+    for (const d of ordenadas) {
+      const venc = d.vencimento ? ` — vence ${d.vencimento.slice(8, 10)}/${d.vencimento.slice(5, 7)}` : '';
+      const atrasado = d.vencimento && d.vencimento < hoje ? ' ⚠️ ATRASADA' : '';
+      msg += `• ${d.descricao}: *R$${d.valor.toFixed(2)}*${venc}${atrasado}\n`;
+    }
+    msg += `Total: *R$${totalDividas.toFixed(2)}*\n\n`;
+  } else {
+    msg += `✅ Sem dívidas ativas!\n\n`;
+  }
+
+  if (aReceber.length > 0) {
+    const ordenados = [...aReceber].sort((a, b) => {
+      if (!a.dataRecebimento) return 1;
+      if (!b.dataRecebimento) return -1;
+      return a.dataRecebimento.localeCompare(b.dataRecebimento);
+    });
+    msg += `🟢 *A receber (${aReceber.length}):*\n`;
+    for (const r of ordenados) {
+      const data = r.dataRecebimento ? ` — dia ${r.dataRecebimento.slice(8, 10)}/${r.dataRecebimento.slice(5, 7)}` : '';
+      msg += `• ${r.descricao}: *R$${r.valor.toFixed(2)}*${data}\n`;
+    }
+    msg += `Total: *R$${totalAReceber.toFixed(2)}*\n\n`;
+  } else {
+    msg += `📭 Nada a receber.\n\n`;
+  }
+
+  const emoji = saldoLiquido >= 0 ? '💚' : '🔴';
+  msg += `${emoji} *Saldo líquido: R$${saldoLiquido.toFixed(2)}*`;
+  if (saldoLiquido < 0) msg += `\n⚠️ Você deve mais do que vai receber. Priorize quitar dívidas!`;
+
+  return msg;
+}
+
 // ----- Formatador de resumo -----
 function formatarResumo(resumo) {
   const { mes, totalReceitas, totalDespesas, saldo, taxaEconomia, porCategoria, meta, progressoMeta } = resumo;
@@ -653,12 +806,105 @@ async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) 
       `\`semana\` — Relatório semanal\n` +
       `\`orcamentos\` — Ver orçamentos\n` +
       `\`streak\` — Dias sem gastar em categorias impulso\n` +
-      `\`analise\` — Análise IA dos gastos\n\n` +
+      `\`analise\` — Análise IA dos gastos\n` +
+      `\`dividas\` — Balanço de dívidas e a receber\n\n` +
+      `💳 *Dívidas & Recebimentos:*\n` +
+      `\`paguei nubank\` — Marcar dívida como paga\n` +
+      `\`recebi joao\` — Marcar recebimento como recebido\n` +
+      `Ou envie tudo de uma vez (veja exemplo abaixo)\n\n` +
       `⚙️ *Configurar:*\n` +
       `\`meta 1000\` — Meta de economia mensal\n` +
       `\`limite alimentacao 800\` — Orçamento por categoria\n\n` +
-      `📋 *Categorias:* alimentação, transporte, moradia, saúde, educação, lazer, roupas, contas, trabalho, outros`;
+      `📋 *Categorias:* alimentação, transporte, moradia, saúde, educação, lazer, roupas, contas, trabalho, outros\n\n` +
+      `📋 *Exemplo dívidas em lote:*\n` +
+      `dívidas:\nnubank 1500 vence 10/06\nempréstimo 800 vence 15/06\n\na receber:\nJoão 300 dia 05/06\ncliente 500`;
     await sendTelegramGroup(ajuda);
+    return;
+  }
+
+  // Balanço de dívidas
+  if (textLower === 'dividas' || textLower === 'dívidas' || textLower === '/dividas') {
+    await sendTelegramGroup(formatarBalancoDividas(db));
+    return;
+  }
+
+  // Marcar dívida como paga: "paguei nubank" | "paguei DIV-123"
+  const pagueiMatch = textLower.match(/^paguei\s+(.+)/);
+  if (pagueiMatch) {
+    const termo = pagueiMatch[1].trim();
+    const dividas = getDividas(db, true);
+    const encontrada = dividas.find(d =>
+      d.id === termo || d.descricao.toLowerCase().includes(termo)
+    );
+    if (encontrada) {
+      marcarDividaPaga(db, encontrada.id);
+      const restante = getDividas(db, true).reduce((s, d) => s + d.valor, 0);
+      await sendTelegramGroup(
+        `✅ *${encontrada.descricao}* marcada como paga!\n` +
+        `Valor quitado: R$${encontrada.valor.toFixed(2)}\n` +
+        `💰 Ainda a pagar: R$${restante.toFixed(2)}`
+      );
+    } else {
+      await sendTelegramGroup(`Dívida não encontrada: "${termo}"\nVeja suas dívidas com: *dividas*`);
+    }
+    return;
+  }
+
+  // Marcar recebimento: "recebi joao" | "recebi REC-123"
+  // (só se não for parseável como transação normal)
+  const recebiMatch = textLower.match(/^recebi\s+(?![\d])(.+)/);
+  if (recebiMatch) {
+    const termo = recebiMatch[1].trim();
+    const lista = getAReceber(db, true);
+    const encontrado = lista.find(r =>
+      r.id === termo || r.descricao.toLowerCase().includes(termo)
+    );
+    if (encontrado) {
+      marcarRecebido(db, encontrado.id);
+      const restante = getAReceber(db, true).reduce((s, r) => s + r.valor, 0);
+      await sendTelegramGroup(
+        `💚 *${encontrado.descricao}* marcado como recebido!\n` +
+        `Valor: R$${encontrado.valor.toFixed(2)}\n` +
+        `📥 Ainda a receber: R$${restante.toFixed(2)}`
+      );
+      return;
+    }
+    // Se não achou na lista, deixa cair no parser de transação abaixo
+  }
+
+  // ===== REGISTRO DE DÍVIDAS EM LOTE =====
+  const lote = parseMensagemDividasAReceber(texto);
+  if (lote) {
+    let msg = `📋 *Dívidas e recebimentos registrados:*\n\n`;
+    let totalDiv = 0, totalRec = 0;
+
+    if (lote.dividas.length > 0) {
+      msg += `🔴 *Dívidas:*\n`;
+      for (const d of lote.dividas) {
+        addDivida(db, d);
+        const venc = d.vencimento ? ` (vence ${d.vencimento.slice(8, 10)}/${d.vencimento.slice(5, 7)})` : '';
+        msg += `• ${d.descricao}: R$${d.valor.toFixed(2)}${venc}\n`;
+        totalDiv += d.valor;
+      }
+      msg += `Total: *R$${totalDiv.toFixed(2)}*\n\n`;
+    }
+
+    if (lote.aReceber.length > 0) {
+      msg += `🟢 *A receber:*\n`;
+      for (const r of lote.aReceber) {
+        addAReceber(db, r);
+        const data = r.dataRecebimento ? ` (dia ${r.dataRecebimento.slice(8, 10)}/${r.dataRecebimento.slice(5, 7)})` : '';
+        msg += `• ${r.descricao}: R$${r.valor.toFixed(2)}${data}\n`;
+        totalRec += r.valor;
+      }
+      msg += `Total: *R$${totalRec.toFixed(2)}*\n\n`;
+    }
+
+    const saldo = totalRec - totalDiv;
+    const emoji = saldo >= 0 ? '💚' : '🔴';
+    msg += `${emoji} Saldo líquido: *R$${saldo.toFixed(2)}*\n`;
+    msg += `\nDigite *dividas* para ver o balanço completo.`;
+    await sendTelegramGroup(msg);
     return;
   }
 
@@ -734,4 +980,14 @@ module.exports = {
   getProgressoOrcamento,
   calcularStreak,
   CATEGORIAS,
+  // Dívidas & A Receber
+  addDivida,
+  getDividas,
+  marcarDividaPaga,
+  deleteDivida,
+  addAReceber,
+  getAReceber,
+  marcarRecebido,
+  deleteAReceber,
+  formatarBalancoDividas,
 };
