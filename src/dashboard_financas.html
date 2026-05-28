@@ -401,11 +401,88 @@ body{
 .empty-state-icon{font-size:40px;margin-bottom:12px;}
 .empty-state p{font-size:14px;color:var(--text-muted);}
 
-/* Responsive */
-@media(max-width:340px){
+/* ---- Responsive Mobile ---- */
+@media(max-width:480px){
+  :root{font-size:15px;}
+
+  /* Header compacto */
+  .header{padding:0 14px;height:54px;}
+  .header-title{font-size:15px;}
+  .header-icon{width:30px;height:30px;border-radius:8px;font-size:14px;}
+
+  /* Tab bar */
+  .tab-bar{padding:0 8px;gap:2px;}
+  .tab-btn{padding:12px 10px;font-size:12px;}
+
+  /* Mes nav */
+  .mes-nav{padding:12px 14px 6px;gap:8px;}
+  .mes-label{font-size:14px;min-width:90px;padding:5px 10px;}
+  .mes-btn{width:32px;height:32px;font-size:16px;}
+  .mes-picker{min-width:160px;}
+  .mes-picker-item{padding:11px 14px;font-size:13px;}
+
+  /* Cards */
+  .cards-grid{gap:10px;padding:6px 12px 12px;}
+  .kpi-card{padding:14px 12px;}
+  .kpi-icon{width:32px;height:32px;font-size:15px;margin-bottom:10px;}
+  .kpi-value{font-size:19px;}
+  .kpi-label{font-size:11px;}
+  .kpi-sub{font-size:11px;}
+
+  /* Section */
+  .section{padding:0 12px 12px;}
+  .section-title{font-size:11px;}
+
+  /* Categorias */
+  .cat-name{font-size:13px;width:80px;}
+  .cat-val{font-size:12px;min-width:60px;}
+
+  /* Meta card */
+  .meta-card{margin:0 12px 12px;padding:14px;}
+  .meta-card h3{font-size:13px;}
+
+  /* Transações */
+  .tx-filters{padding:6px 12px 10px;}
+  .filter-chip{padding:7px 12px;font-size:12px;}
+  .tx-list{padding:0 12px;}
+  .tx-item{padding:12px;}
+  .tx-ico{width:36px;height:36px;font-size:16px;border-radius:10px;}
+  .tx-desc{font-size:13px;}
+  .tx-meta{font-size:11px;}
+  .tx-valor{font-size:14px;}
+
+  /* Form */
+  .form-wrap{padding:0 12px;}
+  .form-card{padding:16px;}
+  .form-row{grid-template-columns:1fr 1fr;gap:8px;}
+  .form-field input,.form-field select{font-size:16px;padding:11px 12px;} /* 16px evita zoom no iOS */
+  .form-field-full input{font-size:16px;}
+  .btn-registrar{padding:13px;font-size:14px;}
+
+  /* Orçamentos */
+  #f-orcamento .form-row{grid-template-columns:1fr 1fr;}
+
+  /* Análise */
+  .analise-wrap{padding:0 12px;}
+  .analise-info{padding:12px;font-size:12px;}
+  .btn-analise{padding:14px;font-size:14px;}
+
+  /* Picker */
+  .mes-picker{left:50%;transform:translateX(-50%);min-width:150px;}
+}
+
+@media(max-width:360px){
   .cards-grid{grid-template-columns:1fr;}
   .kpi-card.full{grid-column:1;}
   .form-row{grid-template-columns:1fr;}
+  #f-orcamento .form-row{grid-template-columns:1fr;}
+  .kpi-value{font-size:22px;}
+  .cat-name{width:72px;}
+}
+
+/* Safe area para iPhone com notch */
+@supports(padding-bottom:env(safe-area-inset-bottom)){
+  .content{padding-bottom:calc(80px + env(safe-area-inset-bottom));}
 }
 </style>
 </head>
@@ -577,7 +654,7 @@ body{
               <label for="f-quem">Quem</label>
               <select id="f-quem">
                 <option value="Miron">Miron</option>
-                <option value="Esposa">Esposa</option>
+                <option value="Aquilla">Aquilla</option>
               </select>
             </div>
           </div>
