@@ -149,7 +149,7 @@ body{
 /* Mes nav */
 .mes-nav{
   display:flex;align-items:center;justify-content:center;
-  gap:12px;padding:16px 20px 8px;
+  gap:12px;padding:16px 20px 8px;position:relative;
 }
 .mes-btn{
   width:36px;height:36px;border-radius:var(--radius-sm);
@@ -159,7 +159,36 @@ body{
   box-shadow:var(--shadow-sm);transition:background .15s;
 }
 .mes-btn:active{background:var(--surface2);}
-.mes-label{font-size:16px;font-weight:600;color:var(--text-primary);min-width:110px;text-align:center;}
+.mes-label{
+  font-size:16px;font-weight:600;color:var(--text-primary);min-width:110px;text-align:center;
+  cursor:pointer;padding:6px 12px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--border);background:var(--surface);
+  box-shadow:var(--shadow-sm);transition:background .15s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.mes-label:active{background:var(--surface2);}
+.mes-picker{
+  position:absolute;top:calc(100% - 4px);left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);
+  z-index:200;min-width:180px;overflow:hidden;display:none;
+}
+.mes-picker.open{display:block;}
+.mes-picker-header{
+  padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);
+}
+.mes-picker-item{
+  padding:12px 16px;font-size:14px;font-weight:500;color:var(--text-primary);
+  cursor:pointer;transition:background .1s;display:flex;justify-content:space-between;
+  align-items:center;
+}
+.mes-picker-item:hover{background:var(--surface2);}
+.mes-picker-item.current{color:var(--blue);font-weight:700;}
+.mes-picker-item .mes-badge{
+  font-size:11px;padding:2px 8px;border-radius:20px;
+  background:var(--blue-light);color:var(--blue);font-weight:600;
+}
 
 /* Cards grid */
 .cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px 16px;}
@@ -422,8 +451,12 @@ body{
     <div id="tab-resumo">
       <div class="mes-nav">
         <button class="mes-btn" onclick="changeMonth(-1)" aria-label="Mês anterior">‹</button>
-        <span class="mes-label" id="mes-label">Mai/2026</span>
+        <span class="mes-label" id="mes-label" onclick="togglePicker(this)">Mai/2026 <span style="font-size:10px;opacity:.6">▼</span></span>
         <button class="mes-btn" onclick="changeMonth(1)" aria-label="Próximo mês">›</button>
+        <div class="mes-picker" id="mes-picker">
+          <div class="mes-picker-header">Selecionar mês</div>
+          <div id="mes-picker-list"></div>
+        </div>
       </div>
 
       <div class="cards-grid">
@@ -490,7 +523,7 @@ body{
     <div id="tab-transacoes" style="display:none">
       <div class="mes-nav">
         <button class="mes-btn" onclick="changeMonth(-1)" aria-label="Mês anterior">‹</button>
-        <span class="mes-label" id="mes-label2">Mai/2026</span>
+        <span class="mes-label" id="mes-label2" onclick="togglePicker(this)">Mai/2026 <span style="font-size:10px;opacity:.6">▼</span></span>
         <button class="mes-btn" onclick="changeMonth(1)" aria-label="Próximo mês">›</button>
       </div>
       <div class="tx-filters" role="group" aria-label="Filtros">
@@ -653,11 +686,52 @@ function changeMonth(d){
   let nm=m+d,na=a;
   if(nm>12){nm=1;na++;}if(nm<1){nm=12;na--;}
   mesAtual=`${na}-${String(nm).padStart(2,'0')}`;
-  ['mes-label','mes-label2'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.textContent=fmtMes(mesAtual);
-  });
+  updateMesLabels();
   loadData();
 }
+
+function updateMesLabels(){
+  ['mes-label','mes-label2'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=fmtMes(mesAtual)+' <span style="font-size:10px;opacity:.6">▼</span>';
+  });
+}
+
+async function loadMeses(){
+  const d=await api('/api/financas/meses');
+  if(!d||!d.meses)return;
+  const list=document.getElementById('mes-picker-list');
+  if(!list)return;
+  const hoje=new Date().toISOString().slice(0,7);
+  const meses=d.meses.length?d.meses:[hoje];
+  list.innerHTML=meses.map(m=>`
+    <div class="mes-picker-item${m===mesAtual?' current':''}" onclick="selectMes('${m}')">
+      <span>${fmtMes(m)}</span>
+      ${m===hoje?'<span class="mes-badge">Atual</span>':''}
+    </div>
+  `).join('');
+}
+
+function togglePicker(el){
+  const picker=document.getElementById('mes-picker');
+  if(!picker)return;
+  const isOpen=picker.classList.contains('open');
+  picker.classList.toggle('open',!isOpen);
+  if(!isOpen)loadMeses();
+}
+
+function selectMes(m){
+  mesAtual=m;
+  updateMesLabels();
+  const picker=document.getElementById('mes-picker');
+  if(picker)picker.classList.remove('open');
+  loadData();
+}
+
+document.addEventListener('click',e=>{
+  const picker=document.getElementById('mes-picker');
+  if(picker&&!e.target.closest('.mes-nav'))picker.classList.remove('open');
+});
 
 async function loadData(){
   await Promise.all([loadResumo(),loadTransacoes()]);

@@ -769,6 +769,12 @@ router.post('/api/financas/meta', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/api/financas/meses', auth, (req, res) => {
+  const meses = [...new Set(db.state.financas.transacoes.map(t => t.mes))]
+    .sort((a, b) => b.localeCompare(a));
+  res.json({ meses });
+});
+
 router.get('/api/financas/analise', auth, async (req, res) => {
   try {
     const analise = await financas.analisarGastosDesnecessarios(db);
