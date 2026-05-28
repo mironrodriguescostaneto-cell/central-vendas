@@ -263,7 +263,16 @@ async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) 
   const emoji = transacao.tipo === 'receita' ? '💵' : '💸';
   const tipoLabel = transacao.tipo === 'receita' ? 'Receita' : 'Despesa';
 
-  const confirmacao = `${emoji} *${tipoLabel} registrada*\nR$${entrada.valor.toFixed(2)} — ${capitalize(entrada.categoria)}\n📝 ${entrada.descricao}\n👤 ${entrada.quem}`;
+  let confirmacao = `${emoji} *${tipoLabel} registrada*\nR$${entrada.valor.toFixed(2)} — ${capitalize(entrada.categoria)}\n📝 ${entrada.descricao}\n👤 ${entrada.quem}`;
+
+  if (transacao.tipo === 'despesa') {
+    const mes = new Date().toISOString().slice(0, 7);
+    const totalCategoria = db.state.financas.transacoes
+      .filter(t => t.mes === mes && t.tipo === 'despesa' && t.categoria === entrada.categoria)
+      .reduce((sum, t) => sum + t.valor, 0);
+    confirmacao += `\n\n📊 Esse mês vocês já gastaram *R$${totalCategoria.toFixed(2)}* com ${capitalize(entrada.categoria)}`;
+  }
+
   await sendTelegramGroup(confirmacao);
 }
 
