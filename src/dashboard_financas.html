@@ -743,9 +743,20 @@ body{
           <div id="div-count-receber" style="font-size:11px;color:var(--text-muted)">0 recebimentos</div>
         </div>
         <div class="card" style="grid-column:1/-1">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SALDO LÍQUIDO</div>
-          <div id="div-saldo-liquido" style="font-size:24px;font-weight:800">R$0</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SALDO LÍQUIDO (dívidas vs recebimentos)</div>
+          <div id="div-saldo-liquido" style="font-size:22px;font-weight:800">R$0</div>
           <div id="div-saldo-status" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <div class="card" id="card-fluxo-mensal" style="grid-column:1/-1;display:none">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">RESULTADO MENSAL REAL</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Renda: <span id="fluxo-renda" style="font-weight:700;color:var(--green)">—</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">(-) Contas fixas: <span id="fluxo-fixas" style="font-weight:600">—</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">(-) Cartão mensal: <span id="fluxo-cartao" style="font-weight:600">—</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px" id="fluxo-parcelas-row">(-) Parcelas: <span id="fluxo-parcelas" style="font-weight:600">—</span></div>
+          <div style="border-top:1px solid var(--border);padding-top:8px">
+            <div style="font-size:13px;font-weight:700" id="fluxo-resultado-label">RESULTADO:</div>
+            <div style="font-size:24px;font-weight:800;margin-top:2px" id="fluxo-resultado">—</div>
+          </div>
         </div>
       </div>
 
@@ -971,7 +982,14 @@ async function loadDividas(){
   const totalReceber = aReceber.reduce((s,r)=>s+r.valor,0);
   const totalContasFixas = contasFixas.filter(c=>c.ativa).reduce((s,c)=>s+c.valor,0);
   const totalRendaFixa = receitasFixas.filter(r=>r.ativa).reduce((s,r)=>s+r.valor,0);
+  // Saldo líquido = dívidas avulsas vs recebimentos avulsos
   const saldo = totalReceber - totalPagar;
+  // Fluxo mensal real = renda - fixas - cartão mensal (cartão = gastos recorrentes mensais)
+  const totalCartaoMensal = totalPagar; // dívidas ativas representam os gastos mensais no cartão
+  const situacaoRes = await api('/api/financas/situacao');
+  const parcelaMensal = situacaoRes.dividaParceladaMensal || 0;
+  const totalGastoMensal = totalContasFixas + totalCartaoMensal + parcelaMensal;
+  const resultadoMensal = totalRendaFixa - totalGastoMensal;
 
   document.getElementById('div-total-pagar').textContent = 'R$'+totalPagar.toFixed(2);
   document.getElementById('div-count-dividas').textContent = dividas.length+' dívida'+(dividas.length!==1?'s':'');
@@ -983,6 +1001,33 @@ async function loadDividas(){
   document.getElementById('div-saldo-status').textContent = saldo >= 0
     ? 'Você vai receber mais do que deve 💚'
     : 'Você deve mais do que vai receber ⚠️';
+
+  // Card de fluxo mensal real (só mostra se tiver renda e contas cadastradas)
+  if(totalRendaFixa > 0 && totalContasFixas > 0){
+    document.getElementById('card-fluxo-mensal').style.display = 'block';
+    document.getElementById('fluxo-renda').textContent = 'R$'+totalRendaFixa.toFixed(2);
+    document.getElementById('fluxo-fixas').textContent = 'R$'+totalContasFixas.toFixed(2);
+    document.getElementById('fluxo-cartao').textContent = 'R$'+totalCartaoMensal.toFixed(2);
+    if(parcelaMensal > 0){
+      document.getElementById('fluxo-parcelas-row').style.display='block';
+      document.getElementById('fluxo-parcelas').textContent = 'R$'+parcelaMensal.toFixed(2);
+    } else {
+      document.getElementById('fluxo-parcelas-row').style.display='none';
+    }
+    const resEl = document.getElementById('fluxo-resultado');
+    const labEl = document.getElementById('fluxo-resultado-label');
+    resEl.textContent = 'R$'+Math.abs(resultadoMensal).toFixed(2);
+    if(resultadoMensal < 0){
+      labEl.textContent = '🚨 DÉFICIT MENSAL:';
+      resEl.style.color = 'var(--red)';
+    } else if(resultadoMensal < 300){
+      labEl.textContent = '⚠️ SOBRA MENSAL:';
+      resEl.style.color = 'var(--yellow)';
+    } else {
+      labEl.textContent = '✅ SOBRA MENSAL:';
+      resEl.style.color = 'var(--green)';
+    }
+  }
 
   // Lista dívidas
   const ldEl = document.getElementById('lista-dividas');
