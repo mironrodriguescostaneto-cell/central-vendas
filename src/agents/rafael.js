@@ -23,9 +23,9 @@ function buildSystemPrompt(instrucaoManual = '') {
 ## SERVIÇO
 Você recebe 1 foto do rosto + 1 foto de corpo inteiro do cliente e cria ensaios fotográficos com IA no estilo desejado.
 ## TABELA DE PREÇOS
-1 foto — R$ 9,90
-3 fotos — R$ 14,90
-5 fotos — R$ 19,90
+1 foto — R$ 14,90
+3 fotos — R$ 19,90
+5 fotos — R$ 25,90
 
 ## FLUXO DE ATENDIMENTO — SIGA EXATAMENTE
 
@@ -43,9 +43,9 @@ REGRA CRÍTICA: [ENVIAR_FOTOS_EXEMPLO] é OBRIGATÓRIO na primeira resposta. NUN
 Mostre os valores e pergunte qual pacote:
 "Esses são os valores para essa semana:
 
-1️⃣ foto — R$ 9,90
-3️⃣ fotos — R$ 14,90
-5️⃣ fotos — R$ 19,90
+1️⃣ foto — R$ 14,90
+3️⃣ fotos — R$ 19,90
+5️⃣ fotos — R$ 25,90
 
 Qual pacote fica melhor para você?"
 
@@ -262,7 +262,7 @@ async function checkFollowUps() {
     if (conv.followUpEnviado && !conv.remarketingEnviado && elapsed >= VINTE_QUATRO_HORAS) {
       try {
         const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 👋 Ainda dá pra fazer seu ensaio com IA hoje!\n\n1️⃣ foto — R$ 9,90\n3️⃣ fotos — R$ 14,90\n5️⃣ fotos — R$ 19,90\n\nÉ só mandar 1 foto do rosto + 1 de corpo inteiro e me dizer o estilo 🎨`;
+        const msg = `Oi${nome}! 👋 Ainda dá pra fazer seu ensaio com IA hoje!\n\n1️⃣ foto — R$ 14,90\n3️⃣ fotos — R$ 19,90\n5️⃣ fotos — R$ 25,90\n\nÉ só mandar 1 foto do rosto + 1 de corpo inteiro e me dizer o estilo 🎨`;
         await baileys.sendText(sessionId, phone, msg);
         addMsg(AGENT_ID, phone, 'assistant', msg);
         conv.remarketingEnviado = true;
