@@ -761,13 +761,35 @@ body{
       </div>
 
       <!-- Lista A Receber -->
-      <div style="padding:0 16px 24px">
+      <div style="padding:0 16px 16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="font-size:13px;font-weight:600;color:var(--text-secondary)">🟢 A Receber</div>
           <button onclick="openModalDiv('areceber')" style="font-size:12px;padding:6px 12px;background:var(--green);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">+ Adicionar</button>
         </div>
         <div id="lista-areceber">
           <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- Renda Fixa Mensal -->
+      <div style="padding:0 16px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-secondary)">💵 Renda Fixa Mensal</div>
+          <div id="div-total-rendafixa" style="font-size:13px;font-weight:700;color:var(--green)">R$0</div>
+        </div>
+        <div id="lista-receitasfixas">
+          <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">—</div>
+        </div>
+      </div>
+
+      <!-- Contas Fixas Mensais -->
+      <div style="padding:0 16px 32px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-secondary)">🏠 Contas Fixas Mensais</div>
+          <div id="div-total-contasfixas" style="font-size:13px;font-weight:700;color:var(--red)">R$0</div>
+        </div>
+        <div id="lista-contasfixas">
+          <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">—</div>
         </div>
       </div>
     </div>
@@ -934,15 +956,21 @@ async function loadData(){
 let _divModalTipo = 'divida';
 
 async function loadDividas(){
-  const [dRes, rRes] = await Promise.all([
+  const [dRes, rRes, cfRes, rfRes] = await Promise.all([
     api('/api/financas/dividas?ativas=true'),
     api('/api/financas/areceber?ativos=true'),
+    api('/api/financas/contasfixas'),
+    api('/api/financas/receitasfixas'),
   ]);
   const dividas = dRes.dividas || [];
   const aReceber = rRes.aReceber || [];
+  const contasFixas = cfRes.contasFixas || [];
+  const receitasFixas = rfRes.receitasFixas || [];
 
   const totalPagar = dividas.reduce((s,d)=>s+d.valor,0);
   const totalReceber = aReceber.reduce((s,r)=>s+r.valor,0);
+  const totalContasFixas = contasFixas.filter(c=>c.ativa).reduce((s,c)=>s+c.valor,0);
+  const totalRendaFixa = receitasFixas.filter(r=>r.ativa).reduce((s,r)=>s+r.valor,0);
   const saldo = totalReceber - totalPagar;
 
   document.getElementById('div-total-pagar').textContent = 'R$'+totalPagar.toFixed(2);
@@ -992,6 +1020,32 @@ async function loadDividas(){
         <button onclick="deletarAReceber('${r.id}')" style="padding:7px 10px;background:var(--red-light);color:var(--red);border:none;border-radius:8px;font-size:14px;cursor:pointer">×</button>
       </div>`;
     }).join('');
+  }
+
+  // Receitas fixas
+  const rfEl = document.getElementById('lista-receitasfixas');
+  document.getElementById('div-total-rendafixa').textContent = 'R$'+totalRendaFixa.toFixed(2);
+  if(receitasFixas.length === 0){
+    rfEl.innerHTML = '<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:13px">Nenhuma cadastrada</div>';
+  } else {
+    rfEl.innerHTML = receitasFixas.filter(r=>r.ativa).sort((a,b)=>a.dia-b.dia).map(r=>`
+      <div style="background:var(--green-light);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:13px;font-weight:600">${r.descricao}</div><div style="font-size:11px;color:var(--text-muted)">Todo dia ${r.dia||'?'}</div></div>
+        <div style="font-size:14px;font-weight:700;color:var(--green)">R$${r.valor.toFixed(2)}</div>
+      </div>`).join('');
+  }
+
+  // Contas fixas
+  const cfEl = document.getElementById('lista-contasfixas');
+  document.getElementById('div-total-contasfixas').textContent = 'R$'+totalContasFixas.toFixed(2);
+  if(contasFixas.length === 0){
+    cfEl.innerHTML = '<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:13px">Nenhuma cadastrada</div>';
+  } else {
+    cfEl.innerHTML = contasFixas.filter(c=>c.ativa).sort((a,b)=>a.dia-b.dia).map(c=>`
+      <div style="background:var(--red-light);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:13px;font-weight:600">${c.descricao}</div><div style="font-size:11px;color:var(--text-muted)">Todo dia ${c.dia||'?'} · ${c.categoria||''}</div></div>
+        <div style="font-size:14px;font-weight:700;color:var(--red)">R$${c.valor.toFixed(2)}</div>
+      </div>`).join('');
   }
 }
 

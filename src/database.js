@@ -44,8 +44,11 @@ const state = {
   financas: {
     transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
     metas: { economiasMensal: 0, orcamentos: {} }, // orcamentos: { 'alimentação': 600, ... }
-    dividas: [],   // [{id, descricao, valor, vencimento, pago, pagouEm, criadoEm}]
-    aReceber: [],  // [{id, descricao, valor, dataRecebimento, recebido, recebidoEm, criadoEm}]
+    dividas: [],      // [{id, descricao, valor, vencimento, pago, pagouEm, criadoEm}]
+    aReceber: [],     // [{id, descricao, valor, dataRecebimento, recebido, recebidoEm, criadoEm}]
+    contasFixas: [],  // [{id, descricao, valor, dia, categoria, ativa, criadoEm}]
+    receitasFixas: [],// [{id, descricao, valor, dia, ativa, criadoEm}]
+    situacao: null,   // {saldoConta, dividaParcelada, mesesParcelamento, cartoes, atualizadoEm}
   },
 };
 
@@ -90,6 +93,9 @@ function deserialize(data) {
     }
     if (data.financas.dividas) state.financas.dividas = data.financas.dividas;
     if (data.financas.aReceber) state.financas.aReceber = data.financas.aReceber;
+    if (data.financas.contasFixas) state.financas.contasFixas = data.financas.contasFixas;
+    if (data.financas.receitasFixas) state.financas.receitasFixas = data.financas.receitasFixas;
+    if (data.financas.situacao) state.financas.situacao = data.financas.situacao;
   }
   if (data.conversations) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);

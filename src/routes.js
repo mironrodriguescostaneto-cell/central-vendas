@@ -857,6 +857,59 @@ router.delete('/api/financas/areceber/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ----- Contas Fixas -----
+router.get('/api/financas/contasfixas', auth, (req, res) => {
+  res.json({ contasFixas: db.state.financas.contasFixas || [] });
+});
+
+router.post('/api/financas/contasfixas', auth, (req, res) => {
+  const { descricao, valor, dia, categoria } = req.body;
+  if (!descricao || !valor) return res.status(400).json({ error: 'descricao e valor obrigatórios' });
+  if (!db.state.financas.contasFixas) db.state.financas.contasFixas = [];
+  const id = `CF-${Date.now()}`;
+  const nova = { id, descricao, valor: parseFloat(valor), dia: parseInt(dia) || null, categoria: categoria || 'contas', ativa: true, criadoEm: Date.now() };
+  db.state.financas.contasFixas.push(nova);
+  db.saveDB().catch(() => {});
+  res.json({ ok: true, conta: nova });
+});
+
+router.delete('/api/financas/contasfixas/:id', auth, (req, res) => {
+  if (db.state.financas.contasFixas) {
+    db.state.financas.contasFixas = db.state.financas.contasFixas.filter(c => c.id !== req.params.id);
+    db.saveDB().catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+// ----- Receitas Fixas -----
+router.get('/api/financas/receitasfixas', auth, (req, res) => {
+  res.json({ receitasFixas: db.state.financas.receitasFixas || [] });
+});
+
+router.post('/api/financas/receitasfixas', auth, (req, res) => {
+  const { descricao, valor, dia } = req.body;
+  if (!descricao || !valor) return res.status(400).json({ error: 'descricao e valor obrigatórios' });
+  if (!db.state.financas.receitasFixas) db.state.financas.receitasFixas = [];
+  const id = `RF-${Date.now()}`;
+  const nova = { id, descricao, valor: parseFloat(valor), dia: parseInt(dia) || null, ativa: true, criadoEm: Date.now() };
+  db.state.financas.receitasFixas.push(nova);
+  db.saveDB().catch(() => {});
+  res.json({ ok: true, receita: nova });
+});
+
+router.delete('/api/financas/receitasfixas/:id', auth, (req, res) => {
+  if (db.state.financas.receitasFixas) {
+    db.state.financas.receitasFixas = db.state.financas.receitasFixas.filter(r => r.id !== req.params.id);
+    db.saveDB().catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+// ----- Situação atual -----
+router.get('/api/financas/situacao', auth, (req, res) => {
+  res.json(db.state.financas.situacao || {});
+});
+
 router.get('/financas', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard_financas.html'));
 });
