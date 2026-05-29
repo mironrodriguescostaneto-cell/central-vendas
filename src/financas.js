@@ -595,15 +595,20 @@ async function processarSituacaoCompleta(texto, db, sendTelegramGroup) {
 
   db.saveDB().catch(() => {});
 
-  // ----- Calcular números -----
+  // ----- Calcular números reais -----
   const totalRendaMensal = receitasMensais.reduce((s, r) => s + r.valor, 0);
   const totalContasFixas = contasFixas.reduce((s, c) => s + c.valor, 0);
-  const totalCartao = dividasCartao.reduce((s, d) => s + d.valor, 0);
+  // Cartão = gastos mensais recorrentes (supermercado, farmácia, combustível = todo mês)
+  const totalCartaoMensal = dividasCartao.reduce((s, d) => s + d.valor, 0);
   const parcelaMensal = dados.dividaParcelada?.valorMensal || 0;
   const saldo = dados.saldoAtual || 0;
-  const totalCompromissoMensal = totalContasFixas + parcelaMensal;
-  const sobra = totalRendaMensal - totalCompromissoMensal;
-  const pctComprometido = totalRendaMensal > 0 ? ((totalCompromissoMensal / totalRendaMensal) * 100).toFixed(1) : 0;
+
+  // Gasto total real mensal = fixos + cartão recorrente + parcelas
+  const totalGastoMensal = totalContasFixas + totalCartaoMensal + parcelaMensal;
+  // Déficit ou sobra real
+  const sobra = totalRendaMensal - totalGastoMensal;
+  const pctComprometido = totalRendaMensal > 0 ? ((totalGastoMensal / totalRendaMensal) * 100).toFixed(1) : 0;
+
   const diasParaPagarNeon = (() => {
     const neon = (dados.cartoes || []).find(c => c.nome === 'neon');
     if (!neon) return null;
@@ -612,64 +617,90 @@ async function processarSituacaoCompleta(texto, db, sendTelegramGroup) {
     return diff >= 0 ? diff : diff + 30;
   })();
 
+  // Receitas ordenadas por dia (fluxo de caixa)
+  const receitasOrdenadas = [...receitasMensais].sort((a, b) => (a.dia || 99) - (b.dia || 99));
+
   // ----- Montar resposta -----
   let msg = `✅ *Situação financeira registrada!*\n\n`;
 
   msg += `💰 *RENDA MENSAL: R$${totalRendaMensal.toFixed(2)}*\n`;
-  for (const r of receitasMensais) {
-    msg += `  • ${r.descricao}: R$${r.valor.toFixed(2)} (dia ${r.dia})\n`;
+  for (const r of receitasOrdenadas) {
+    msg += `  • ${r.descricao}: R$${r.valor.toFixed(2)} (dia ${r.dia || '?'})\n`;
   }
 
   msg += `\n🏠 *CONTAS FIXAS: R$${totalContasFixas.toFixed(2)}/mês*\n`;
-  for (const c of contasFixas) {
-    msg += `  • ${c.descricao}: R$${c.valor.toFixed(2)} (dia ${c.dia})\n`;
+  for (const c of [...contasFixas].sort((a, b) => (a.dia || 99) - (b.dia || 99))) {
+    msg += `  • ${c.descricao}: R$${c.valor.toFixed(2)} (dia ${c.dia || '?'})\n`;
   }
 
   if (parcelaMensal > 0) {
     msg += `\n📦 Parcelas: R$${parcelaMensal.toFixed(2)}/mês por ${dados.dividaParcelada.meses} meses\n`;
   }
 
-  msg += `\n💳 *CARTÃO (fatura atual): R$${totalCartao.toFixed(2)}*\n`;
+  msg += `\n💳 *GASTOS MENSAIS NO CARTÃO: R$${totalCartaoMensal.toFixed(2)}*\n`;
   for (const d of dividasCartao) {
     msg += `  • ${d.descricao}: R$${d.valor.toFixed(2)}\n`;
   }
+  msg += `  _(supermercado, feira, farmácia, combustível = todo mês)_\n`;
 
   msg += `\n🏦 Saldo atual em conta: R$${saldo.toFixed(2)}\n`;
 
   msg += `\n${'─'.repeat(30)}\n`;
-  msg += `📊 *ANÁLISE JARVIS:*\n\n`;
+  msg += `📊 *ANÁLISE REAL — JARVIS:*\n\n`;
 
-  // Situação crítica
-  const alertaCartao = saldo < totalCartao;
-  if (alertaCartao) {
-    msg += `🚨 *ALERTA CRÍTICO:* Seu saldo (R$${saldo.toFixed(2)}) é menor que a fatura do cartão Neon (R$${totalCartao.toFixed(2)}). `;
-    if (diasParaPagarNeon !== null) msg += `Faltam ${diasParaPagarNeon} dias para vencer.\n\n`;
-    else msg += `\n\n`;
-  }
+  // Tabela de contas reais
+  msg += `Renda mensal:          *R$${totalRendaMensal.toFixed(2)}*\n`;
+  msg += `(-) Contas fixas:      R$${totalContasFixas.toFixed(2)}\n`;
+  msg += `(-) Cartão (mensal):   R$${totalCartaoMensal.toFixed(2)}\n`;
+  if (parcelaMensal > 0) msg += `(-) Parcelas:          R$${parcelaMensal.toFixed(2)}\n`;
+  msg += `${'─'.repeat(28)}\n`;
 
-  msg += `📈 Renda: R$${totalRendaMensal.toFixed(2)}\n`;
-  msg += `📉 Compromissos fixos + parcelas: R$${totalCompromissoMensal.toFixed(2)} (${pctComprometido}% da renda)\n`;
-
-  const sobraEmoji = sobra >= 500 ? '✅' : sobra >= 0 ? '⚠️' : '🚨';
-  msg += `${sobraEmoji} Sobra para viver/poupar: *R$${sobra.toFixed(2)}*\n\n`;
-
-  // Análise qualitativa
   if (sobra < 0) {
-    msg += `❌ *Déficit mensal de R$${Math.abs(sobra).toFixed(2)}!* Você gasta mais do que ganha no fixo — o cartão está tapando esse buraco. Isso precisa parar urgente.\n\n`;
-  } else if (pctComprometido > 70) {
-    msg += `⚠️ *${pctComprometido}% da renda comprometida* — zona de risco. Qualquer imprevisto vai direto pro cartão.\n\n`;
+    msg += `🚨 *DÉFICIT REAL: -R$${Math.abs(sobra).toFixed(2)}/mês*\n\n`;
+    msg += `Você gasta *R$${Math.abs(sobra).toFixed(2)} a mais do que ganha* todo mês. Esse buraco vai direto pro cartão, que vira dívida, que acumula juros — ciclo que só piora.\n\n`;
+  } else if (sobra < 500) {
+    msg += `⚠️ *Sobra real: R$${sobra.toFixed(2)}/mês* — margem perigosamente pequena.\n\n`;
+  } else {
+    msg += `✅ *Sobra real: R$${sobra.toFixed(2)}/mês*\n\n`;
   }
 
-  // Prioridades
-  msg += `🎯 *PRIORIDADES AGORA:*\n`;
-  msg += `1️⃣ Neon vence dia 5 — R$${totalCartao.toFixed(2)} e você tem R$${saldo.toFixed(2)}. Faltam *R$${Math.max(0, totalCartao - saldo).toFixed(2)}*. Negocie ou parcele o restante.\n`;
-  msg += `2️⃣ Contas fixas (${totalContasFixas.toFixed(2)}/mês) consomem ${((totalContasFixas/totalRendaMensal)*100).toFixed(0)}% da renda — moradia (aluguel+cond) é R$${contasFixas.filter(c=>c.categoria==='moradia').reduce((s,c)=>s+c.valor,0).toFixed(2)}.\n`;
-  msg += `3️⃣ Nunca deixe o cartão acumular — use só até o que entra dia 5 (pró-labore R$3.000).\n\n`;
+  // Alerta fatura imediata
+  if (saldo < totalCartaoMensal) {
+    msg += `🚨 *URGENTE — Neon vence em ${diasParaPagarNeon !== null ? diasParaPagarNeon + ' dias' : 'breve'}:*\n`;
+    msg += `Fatura: R$${totalCartaoMensal.toFixed(2)} | Conta: R$${saldo.toFixed(2)}\n`;
+    msg += `Falta: *R$${(totalCartaoMensal - saldo).toFixed(2)}*\n\n`;
+  }
 
-  msg += `💡 *REGRA DE OURO PARA VOCÊ:*\n`;
-  msg += `Dia 5 entra R$3.000 → primeiro paga Neon, depois conta do mês.\n`;
-  msg += `Dia 25 entra R$720 (aluna) → reserva para Nubank e imprevistos.\n`;
-  msg += `Meta: cartão = R$0 de saldo devedor em 90 dias.\n\n`;
+  // Fluxo de caixa do mês (quando entra vs quando sai)
+  msg += `📅 *FLUXO DO MÊS:*\n`;
+  msg += `Dia 1  → +R$${(receitasOrdenadas.filter(r => r.dia === 1).reduce((s, r) => s + r.valor, 0)).toFixed(2)} (alunas)\n`;
+  msg += `Dia 5  → +R$3.000 (pró-labore) | Neon vence (R$${totalCartaoMensal.toFixed(2)})\n`;
+  msg += `Dia 10 → condomínio R$400\n`;
+  msg += `Dia 15 → plano saúde R$736\n`;
+  msg += `Dia 17 → energia R$460\n`;
+  msg += `Dia 20 → aluguel R$1.200\n`;
+  msg += `Dia 25 → +R$720 (aluna) | Nubank vence\n`;
+  msg += `Dia 27 → água R$160\n\n`;
+
+  // Diagnóstico e plano
+  msg += `🎯 *DIAGNÓSTICO:*\n`;
+  if (sobra < 0) {
+    const corteNecessario = Math.abs(sobra);
+    msg += `Para equilibrar as contas, você precisa cortar *R$${corteNecessario.toFixed(2)}/mês* OU aumentar a renda nesse valor.\n\n`;
+    msg += `*Onde cortar:*\n`;
+    // Sugestões específicas
+    const gastoAlimentacao = dividasCartao.filter(d => d.descricao.toLowerCase().includes('supermercado') || d.descricao.toLowerCase().includes('feira')).reduce((s, d) => s + d.valor, 0);
+    if (gastoAlimentacao > 1500) {
+      msg += `• Supermercado+feira (R$${gastoAlimentacao.toFixed(2)}) — meta: R$${(gastoAlimentacao * 0.75).toFixed(2)} (-25%)\n`;
+    }
+    msg += `• Planejamento de compras: lista semanal, evitar delivery\n`;
+    msg += `• Combustível (R$${dividasCartao.find(d => d.descricao.toLowerCase().includes('combustível') || d.descricao.toLowerCase().includes('combustivel'))?.valor.toFixed(2) || '?'}) — planejar saídas\n\n`;
+  }
+
+  msg += `💡 *REGRA IMEDIATA:*\n`;
+  msg += `Dia 5 entra R$3.000 → paga Neon PRIMEIRO, resto das contas depois.\n`;
+  msg += `Cartão Neon = só o que cabe nos R$3.000 menos as contas fixas do mês.\n`;
+  msg += `*Limite real do Neon: R$${Math.max(0, 3000 - totalContasFixas + parcelaMensal).toFixed(2)}/mês*\n\n`;
 
   msg += `Digite *dividas* para ver o painel completo.`;
 
