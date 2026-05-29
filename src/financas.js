@@ -547,9 +547,186 @@ Regras:
   }
 }
 
+// ----- Cálculo determinístico (toda matemática aqui, sem Claude) -----
+function calcularSituacaoReal(dados) {
+  const receitasMensais = dados.receitasMensais || [];
+  const contasFixas = dados.contasFixas || [];
+  const dividasCartao = dados.dividasCartao || [];
+  const parcelaMensal = dados.dividaParcelada?.valorMensal || 0;
+  const saldo = dados.saldoAtual || 0;
+
+  // Somas
+  const totalRenda = receitasMensais.reduce((s, r) => s + r.valor, 0);
+  const totalContasFixas = contasFixas.reduce((s, c) => s + c.valor, 0);
+  const totalCartao = dividasCartao.reduce((s, d) => s + d.valor, 0);
+
+  // Gasto real mensal = fixos + cartão (é recorrente todo mês) + parcelas
+  const totalGastoMensal = totalContasFixas + totalCartao + parcelaMensal;
+  const sobra = totalRenda - totalGastoMensal;
+  const pctComprometido = totalRenda > 0 ? (totalGastoMensal / totalRenda) * 100 : 0;
+
+  // Dias para vencer cartão Neon
+  const neon = (dados.cartoes || []).find(c => c.nome?.toLowerCase() === 'neon');
+  const diaHoje = new Date().getDate();
+  const diasNeon = neon ? (neon.diaVencimento >= diaHoje ? neon.diaVencimento - diaHoje : neon.diaVencimento + 30 - diaHoje) : null;
+
+  return {
+    totalRenda, totalContasFixas, totalCartao, parcelaMensal,
+    totalGastoMensal, sobra, pctComprometido, saldo, diasNeon,
+    receitasMensais, contasFixas, dividasCartao,
+  };
+}
+
+// ----- Formatar confirmação dos dados parseados -----
+function formatarConfirmacao(dados, calc) {
+  let msg = `📋 *Entendi sua situação. Confirme os dados antes de eu analisar:*\n\n`;
+
+  msg += `💰 *Renda mensal:* R$${calc.totalRenda.toFixed(2)}\n`;
+  for (const r of [...calc.receitasMensais].sort((a, b) => (a.dia || 99) - (b.dia || 99))) {
+    msg += `  • ${r.descricao}: R$${r.valor.toFixed(2)} (dia ${r.dia || '?'})\n`;
+  }
+
+  msg += `\n🏠 *Contas fixas:* R$${calc.totalContasFixas.toFixed(2)}/mês\n`;
+  for (const c of [...calc.contasFixas].sort((a, b) => (a.dia || 99) - (b.dia || 99))) {
+    msg += `  • ${c.descricao}: R$${c.valor.toFixed(2)} (dia ${c.dia || '?'})\n`;
+  }
+
+  if (calc.parcelaMensal > 0) {
+    msg += `\n📦 *Parcelas:* R$${calc.parcelaMensal.toFixed(2)}/mês (${dados.dividaParcelada?.meses || '?'} meses)\n`;
+  }
+
+  msg += `\n💳 *Gastos mensais no cartão:* R$${calc.totalCartao.toFixed(2)}\n`;
+  for (const d of calc.dividasCartao) {
+    msg += `  • ${d.descricao}: R$${d.valor.toFixed(2)}\n`;
+  }
+
+  msg += `\n🏦 *Saldo em conta:* R$${calc.saldo.toFixed(2)}\n`;
+
+  msg += `\n*Responda* SIM *para eu registrar tudo e gerar a análise.*\n`;
+  msg += `Ou corrija qualquer valor e mande novamente.`;
+
+  return msg;
+}
+
+// ----- Gerar análise completa (só chamada após confirmação) -----
+function gerarAnaliseCompleta(dados, calc) {
+  const { totalRenda, totalContasFixas, totalCartao, parcelaMensal, totalGastoMensal, sobra, pctComprometido, saldo, diasNeon } = calc;
+
+  let msg = `✅ *Registrado! Análise Jarvis:*\n\n`;
+
+  // Tabela de fluxo — explícita e verificável
+  msg += `*SUAS CONTAS — MÊS A MÊS:*\n`;
+  msg += `┌──────────────────────────────┐\n`;
+  msg += `│ Renda total    + R$${totalRenda.toFixed(2).padStart(8)} │\n`;
+  msg += `│ Contas fixas   - R$${totalContasFixas.toFixed(2).padStart(8)} │\n`;
+  msg += `│ Cartão (mensal)- R$${totalCartao.toFixed(2).padStart(8)} │\n`;
+  if (parcelaMensal > 0) {
+    msg += `│ Parcelas       - R$${parcelaMensal.toFixed(2).padStart(8)} │\n`;
+  }
+  msg += `├──────────────────────────────┤\n`;
+
+  if (sobra < 0) {
+    msg += `│ DÉFICIT REAL   - R$${Math.abs(sobra).toFixed(2).padStart(8)} │\n`;
+  } else {
+    msg += `│ SOBRA REAL     + R$${sobra.toFixed(2).padStart(8)} │\n`;
+  }
+  msg += `└──────────────────────────────┘\n\n`;
+
+  // Diagnóstico
+  if (sobra < 0) {
+    msg += `🚨 *DÉFICIT DE R$${Math.abs(sobra).toFixed(2)}/mês*\n`;
+    msg += `Sua renda não cobre seus gastos. Os R$${Math.abs(sobra).toFixed(2)} que faltam todo mês estão indo pro cartão — e o cartão cobra juros em cima disso. O buraco cresce sozinho.\n\n`;
+  } else if (pctComprometido > 80) {
+    msg += `⚠️ *${pctComprometido.toFixed(0)}% da renda comprometida* — qualquer imprevisto vai pro cartão.\n\n`;
+  } else {
+    msg += `✅ *Sobra de R$${sobra.toFixed(2)}/mês* — mas atenção: ${pctComprometido.toFixed(0)}% já está comprometido.\n\n`;
+  }
+
+  // Alerta imediato da fatura
+  if (saldo < totalCartao) {
+    const faltaNeon = totalCartao - saldo;
+    msg += `🚨 *URGENTE — Fatura Neon vence em ${diasNeon !== null ? diasNeon + ' dias' : 'breve'}:*\n`;
+    msg += `Fatura: R$${totalCartao.toFixed(2)}\n`;
+    msg += `Você tem: R$${saldo.toFixed(2)}\n`;
+    msg += `*Faltam: R$${faltaNeon.toFixed(2)}*\n\n`;
+    msg += `→ Opção: pague o mínimo agora, parcele o resto no próprio cartão Neon. Mas evite isso no próximo mês.\n\n`;
+  }
+
+  // Fluxo de caixa real por dia
+  const recOrdenadas = [...calc.receitasMensais].sort((a, b) => (a.dia || 99) - (b.dia || 99));
+  const contOrdenadas = [...calc.contasFixas].sort((a, b) => (a.dia || 99) - (b.dia || 99));
+
+  msg += `📅 *FLUXO DO MÊS — DIA A DIA:*\n`;
+  let saldoSimulado = saldo;
+  const eventos = [];
+  for (const r of recOrdenadas) if (r.dia) eventos.push({ dia: r.dia, tipo: 'entrada', desc: r.descricao, valor: r.valor });
+  for (const c of contOrdenadas) if (c.dia) eventos.push({ dia: c.dia, tipo: 'saida', desc: c.descricao, valor: c.valor });
+  const neonObj = (dados.cartoes || []).find(c => c.nome?.toLowerCase() === 'neon');
+  const nubankObj = (dados.cartoes || []).find(c => c.nome?.toLowerCase() === 'nubank');
+  if (neonObj?.diaVencimento) eventos.push({ dia: neonObj.diaVencimento, tipo: 'saida', desc: `Fatura Neon`, valor: totalCartao });
+  if (parcelaMensal > 0 && nubankObj?.diaVencimento) eventos.push({ dia: nubankObj.diaVencimento, tipo: 'saida', desc: `Parcelas Nubank`, valor: parcelaMensal });
+  eventos.sort((a, b) => a.dia - b.dia);
+
+  for (const ev of eventos) {
+    saldoSimulado += ev.tipo === 'entrada' ? ev.valor : -ev.valor;
+    const sinal = ev.tipo === 'entrada' ? '+' : '-';
+    const emj = ev.tipo === 'entrada' ? '💵' : '💸';
+    const alerta = saldoSimulado < 0 ? ' ⚠️' : '';
+    msg += `Dia ${String(ev.dia).padStart(2, '0')} ${emj} ${sinal}R$${ev.valor.toFixed(2)} ${ev.desc} → saldo: R$${saldoSimulado.toFixed(2)}${alerta}\n`;
+  }
+
+  msg += `\n`;
+
+  // Plano de ação
+  msg += `🎯 *O QUE FAZER:*\n`;
+  if (sobra < 0) {
+    const corte = Math.abs(sobra);
+    const alimentacao = calc.dividasCartao
+      .filter(d => /supermercado|feira|mercado/i.test(d.descricao))
+      .reduce((s, d) => s + d.valor, 0);
+    msg += `1️⃣ Cortar R$${corte.toFixed(2)}/mês nos gastos — ou aumentar renda nesse valor.\n`;
+    if (alimentacao > 1500) {
+      msg += `2️⃣ Supermercado+feira (R$${alimentacao.toFixed(2)}) está alto — meta: R$${(alimentacao * 0.75).toFixed(2)} com lista semanal.\n`;
+    }
+    msg += `3️⃣ Regra do cartão: só gasta o que entra no dia 5 (R$3.000) menos as contas do mês.\n`;
+    msg += `   Limite real do Neon: *R$${Math.max(0, 3000 - totalContasFixas).toFixed(2)}/mês*\n`;
+  } else {
+    msg += `1️⃣ Separe R$${Math.min(sobra * 0.5, 500).toFixed(2)} de reserva de emergência todo mês.\n`;
+    msg += `2️⃣ Regra do cartão: só gasta o que entra (R$3.000 dia 5 menos contas do mês).\n`;
+  }
+
+  msg += `\nDigite *dividas* para ver o painel ou *resumo* para ver o mês.`;
+
+  return msg;
+}
+
+// ----- Sessão de confirmação pendente -----
+const _pendenteSituacao = new Map(); // chatId → {dados, calc, ts}
+
+function salvarPendente(chatId, dados, calc) {
+  _pendenteSituacao.set(String(chatId), { dados, calc, ts: Date.now() });
+}
+
+function consumirPendente(chatId) {
+  const key = String(chatId);
+  const p = _pendenteSituacao.get(key);
+  if (!p) return null;
+  if (Date.now() - p.ts > 5 * 60 * 1000) { _pendenteSituacao.delete(key); return null; } // 5 min TTL
+  _pendenteSituacao.delete(key);
+  return p;
+}
+
+function temPendente(chatId) {
+  const key = String(chatId);
+  const p = _pendenteSituacao.get(key);
+  if (!p) return false;
+  if (Date.now() - p.ts > 5 * 60 * 1000) { _pendenteSituacao.delete(key); return false; }
+  return true;
+}
+
 // ----- Registrar situação completa e gerar análise -----
-async function processarSituacaoCompleta(texto, db, sendTelegramGroup) {
-  await sendTelegramGroup('📊 Analisando sua situação financeira completa...');
+async function processarSituacaoCompleta(texto, db, sendTelegramGroup, chatId) {
+  await sendTelegramGroup('🔍 Lendo sua situação financeira...');
 
   const dados = await parseSituacaoFinanceira(texto);
   if (!dados) {
@@ -557,154 +734,10 @@ async function processarSituacaoCompleta(texto, db, sendTelegramGroup) {
     return;
   }
 
-  // Registrar dívidas do cartão
-  const dividasCartao = dados.dividasCartao || [];
-  for (const d of dividasCartao) {
-    const anoAtual = new Date().getFullYear();
-    const mesAtualNum = new Date().getMonth() + 1;
-    const vencimento = d.diaVencimento
-      ? `${anoAtual}-${String(mesAtualNum).padStart(2,'0')}-${String(d.diaVencimento).padStart(2,'0')}`
-      : null;
-    addDivida(db, { descricao: d.cartao ? `${d.descricao} (${d.cartao})` : d.descricao, valor: d.valor, vencimento });
-  }
-
-  // Registrar contas fixas
-  const contasFixas = dados.contasFixas || [];
-  if (!db.state.financas.contasFixas) db.state.financas.contasFixas = [];
-  for (const c of contasFixas) {
-    const id = `CF-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;
-    db.state.financas.contasFixas.push({ id, descricao: c.descricao, valor: c.valor, dia: c.dia, categoria: c.categoria || 'contas', ativa: true, criadoEm: Date.now() });
-  }
-
-  // Registrar receitas fixas
-  const receitasMensais = dados.receitasMensais || [];
-  if (!db.state.financas.receitasFixas) db.state.financas.receitasFixas = [];
-  for (const r of receitasMensais) {
-    const id = `RF-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;
-    db.state.financas.receitasFixas.push({ id, descricao: r.descricao, valor: r.valor, dia: r.dia, ativa: true, criadoEm: Date.now() });
-  }
-
-  // Salvar situação atual
-  db.state.financas.situacao = {
-    saldoConta: dados.saldoAtual || 0,
-    dividaParceladaMensal: dados.dividaParcelada?.valorMensal || 0,
-    mesesParcelamento: dados.dividaParcelada?.meses || 0,
-    cartoes: dados.cartoes || [],
-    atualizadoEm: Date.now(),
-  };
-
-  db.saveDB().catch(() => {});
-
-  // ----- Calcular números reais -----
-  const totalRendaMensal = receitasMensais.reduce((s, r) => s + r.valor, 0);
-  const totalContasFixas = contasFixas.reduce((s, c) => s + c.valor, 0);
-  // Cartão = gastos mensais recorrentes (supermercado, farmácia, combustível = todo mês)
-  const totalCartaoMensal = dividasCartao.reduce((s, d) => s + d.valor, 0);
-  const parcelaMensal = dados.dividaParcelada?.valorMensal || 0;
-  const saldo = dados.saldoAtual || 0;
-
-  // Gasto total real mensal = fixos + cartão recorrente + parcelas
-  const totalGastoMensal = totalContasFixas + totalCartaoMensal + parcelaMensal;
-  // Déficit ou sobra real
-  const sobra = totalRendaMensal - totalGastoMensal;
-  const pctComprometido = totalRendaMensal > 0 ? ((totalGastoMensal / totalRendaMensal) * 100).toFixed(1) : 0;
-
-  const diasParaPagarNeon = (() => {
-    const neon = (dados.cartoes || []).find(c => c.nome === 'neon');
-    if (!neon) return null;
-    const hoje = new Date().getDate();
-    const diff = neon.diaVencimento - hoje;
-    return diff >= 0 ? diff : diff + 30;
-  })();
-
-  // Receitas ordenadas por dia (fluxo de caixa)
-  const receitasOrdenadas = [...receitasMensais].sort((a, b) => (a.dia || 99) - (b.dia || 99));
-
-  // ----- Montar resposta -----
-  let msg = `✅ *Situação financeira registrada!*\n\n`;
-
-  msg += `💰 *RENDA MENSAL: R$${totalRendaMensal.toFixed(2)}*\n`;
-  for (const r of receitasOrdenadas) {
-    msg += `  • ${r.descricao}: R$${r.valor.toFixed(2)} (dia ${r.dia || '?'})\n`;
-  }
-
-  msg += `\n🏠 *CONTAS FIXAS: R$${totalContasFixas.toFixed(2)}/mês*\n`;
-  for (const c of [...contasFixas].sort((a, b) => (a.dia || 99) - (b.dia || 99))) {
-    msg += `  • ${c.descricao}: R$${c.valor.toFixed(2)} (dia ${c.dia || '?'})\n`;
-  }
-
-  if (parcelaMensal > 0) {
-    msg += `\n📦 Parcelas: R$${parcelaMensal.toFixed(2)}/mês por ${dados.dividaParcelada.meses} meses\n`;
-  }
-
-  msg += `\n💳 *GASTOS MENSAIS NO CARTÃO: R$${totalCartaoMensal.toFixed(2)}*\n`;
-  for (const d of dividasCartao) {
-    msg += `  • ${d.descricao}: R$${d.valor.toFixed(2)}\n`;
-  }
-  msg += `  _(supermercado, feira, farmácia, combustível = todo mês)_\n`;
-
-  msg += `\n🏦 Saldo atual em conta: R$${saldo.toFixed(2)}\n`;
-
-  msg += `\n${'─'.repeat(30)}\n`;
-  msg += `📊 *ANÁLISE REAL — JARVIS:*\n\n`;
-
-  // Tabela de contas reais
-  msg += `Renda mensal:          *R$${totalRendaMensal.toFixed(2)}*\n`;
-  msg += `(-) Contas fixas:      R$${totalContasFixas.toFixed(2)}\n`;
-  msg += `(-) Cartão (mensal):   R$${totalCartaoMensal.toFixed(2)}\n`;
-  if (parcelaMensal > 0) msg += `(-) Parcelas:          R$${parcelaMensal.toFixed(2)}\n`;
-  msg += `${'─'.repeat(28)}\n`;
-
-  if (sobra < 0) {
-    msg += `🚨 *DÉFICIT REAL: -R$${Math.abs(sobra).toFixed(2)}/mês*\n\n`;
-    msg += `Você gasta *R$${Math.abs(sobra).toFixed(2)} a mais do que ganha* todo mês. Esse buraco vai direto pro cartão, que vira dívida, que acumula juros — ciclo que só piora.\n\n`;
-  } else if (sobra < 500) {
-    msg += `⚠️ *Sobra real: R$${sobra.toFixed(2)}/mês* — margem perigosamente pequena.\n\n`;
-  } else {
-    msg += `✅ *Sobra real: R$${sobra.toFixed(2)}/mês*\n\n`;
-  }
-
-  // Alerta fatura imediata
-  if (saldo < totalCartaoMensal) {
-    msg += `🚨 *URGENTE — Neon vence em ${diasParaPagarNeon !== null ? diasParaPagarNeon + ' dias' : 'breve'}:*\n`;
-    msg += `Fatura: R$${totalCartaoMensal.toFixed(2)} | Conta: R$${saldo.toFixed(2)}\n`;
-    msg += `Falta: *R$${(totalCartaoMensal - saldo).toFixed(2)}*\n\n`;
-  }
-
-  // Fluxo de caixa do mês (quando entra vs quando sai)
-  msg += `📅 *FLUXO DO MÊS:*\n`;
-  msg += `Dia 1  → +R$${(receitasOrdenadas.filter(r => r.dia === 1).reduce((s, r) => s + r.valor, 0)).toFixed(2)} (alunas)\n`;
-  msg += `Dia 5  → +R$3.000 (pró-labore) | Neon vence (R$${totalCartaoMensal.toFixed(2)})\n`;
-  msg += `Dia 10 → condomínio R$400\n`;
-  msg += `Dia 15 → plano saúde R$736\n`;
-  msg += `Dia 17 → energia R$460\n`;
-  msg += `Dia 20 → aluguel R$1.200\n`;
-  msg += `Dia 25 → +R$720 (aluna) | Nubank vence\n`;
-  msg += `Dia 27 → água R$160\n\n`;
-
-  // Diagnóstico e plano
-  msg += `🎯 *DIAGNÓSTICO:*\n`;
-  if (sobra < 0) {
-    const corteNecessario = Math.abs(sobra);
-    msg += `Para equilibrar as contas, você precisa cortar *R$${corteNecessario.toFixed(2)}/mês* OU aumentar a renda nesse valor.\n\n`;
-    msg += `*Onde cortar:*\n`;
-    // Sugestões específicas
-    const gastoAlimentacao = dividasCartao.filter(d => d.descricao.toLowerCase().includes('supermercado') || d.descricao.toLowerCase().includes('feira')).reduce((s, d) => s + d.valor, 0);
-    if (gastoAlimentacao > 1500) {
-      msg += `• Supermercado+feira (R$${gastoAlimentacao.toFixed(2)}) — meta: R$${(gastoAlimentacao * 0.75).toFixed(2)} (-25%)\n`;
-    }
-    msg += `• Planejamento de compras: lista semanal, evitar delivery\n`;
-    msg += `• Combustível (R$${dividasCartao.find(d => d.descricao.toLowerCase().includes('combustível') || d.descricao.toLowerCase().includes('combustivel'))?.valor.toFixed(2) || '?'}) — planejar saídas\n\n`;
-  }
-
-  msg += `💡 *REGRA IMEDIATA:*\n`;
-  msg += `Dia 5 entra R$3.000 → paga Neon PRIMEIRO, resto das contas depois.\n`;
-  msg += `Cartão Neon = só o que cabe nos R$3.000 menos as contas fixas do mês.\n`;
-  msg += `*Limite real do Neon: R$${Math.max(0, 3000 - totalContasFixas + parcelaMensal).toFixed(2)}/mês*\n\n`;
-
-  msg += `Digite *dividas* para ver o painel completo.`;
-
-  await sendTelegramGroup(msg);
+  // Calcula tudo deterministicamente e pede confirmação
+  const calc = calcularSituacaoReal(dados);
+  salvarPendente(chatId, dados, calc);
+  await sendTelegramGroup(formatarConfirmacao(dados, calc));
 }
 
 // ----- Parser de dívidas/a-receber em lote (mensagem multi-linha) -----
@@ -894,8 +927,47 @@ function formatarResumo(resumo) {
 }
 
 // ----- Processador de mensagem do grupo Telegram -----
-async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) {
+async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup, chatId) {
   const textLower = texto.toLowerCase().trim();
+
+  // ===== CONFIRMAÇÃO DE SITUAÇÃO FINANCEIRA PENDENTE =====
+  if (chatId && temPendente(chatId) && /^sim$/i.test(textLower)) {
+    const pendente = consumirPendente(chatId);
+    if (pendente) {
+      const { dados, calc } = pendente;
+      // Registrar no banco após confirmação
+      if (!db.state.financas.contasFixas) db.state.financas.contasFixas = [];
+      if (!db.state.financas.receitasFixas) db.state.financas.receitasFixas = [];
+      // Limpar dados anteriores de contas/receitas fixas para não duplicar
+      db.state.financas.contasFixas = db.state.financas.contasFixas.filter(c => c.origem !== 'situacao');
+      db.state.financas.receitasFixas = db.state.financas.receitasFixas.filter(r => r.origem !== 'situacao');
+      for (const c of (dados.contasFixas || [])) {
+        db.state.financas.contasFixas.push({ id: `CF-${Date.now()}-${Math.random().toString(36).slice(2,4)}`, descricao: c.descricao, valor: c.valor, dia: c.dia, categoria: c.categoria || 'contas', ativa: true, origem: 'situacao', criadoEm: Date.now() });
+      }
+      for (const r of (dados.receitasMensais || [])) {
+        db.state.financas.receitasFixas.push({ id: `RF-${Date.now()}-${Math.random().toString(36).slice(2,4)}`, descricao: r.descricao, valor: r.valor, dia: r.dia, ativa: true, origem: 'situacao', criadoEm: Date.now() });
+      }
+      // Registrar dívidas do cartão
+      const anoAtual = new Date().getFullYear();
+      const mesAtualNum = new Date().getMonth() + 1;
+      for (const d of (dados.dividasCartao || [])) {
+        const vencimento = d.diaVencimento
+          ? `${anoAtual}-${String(mesAtualNum).padStart(2,'0')}-${String(d.diaVencimento).padStart(2,'0')}`
+          : null;
+        addDivida(db, { descricao: d.cartao ? `${d.descricao} (${d.cartao})` : d.descricao, valor: d.valor, vencimento });
+      }
+      db.state.financas.situacao = {
+        saldoConta: dados.saldoAtual || 0,
+        dividaParceladaMensal: dados.dividaParcelada?.valorMensal || 0,
+        mesesParcelamento: dados.dividaParcelada?.meses || 0,
+        cartoes: dados.cartoes || [],
+        atualizadoEm: Date.now(),
+      };
+      db.saveDB().catch(() => {});
+      await sendTelegramGroup(gerarAnaliseCompleta(dados, calc));
+    }
+    return;
+  }
 
   // ===== COMANDOS ESPECIAIS =====
 
@@ -1078,7 +1150,7 @@ async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup) 
 
   // ===== SITUAÇÃO FINANCEIRA COMPLETA =====
   if (isSituacaoFinanceira(texto)) {
-    await processarSituacaoCompleta(texto, db, sendTelegramGroup);
+    await processarSituacaoCompleta(texto, db, sendTelegramGroup, chatId);
     return;
   }
 

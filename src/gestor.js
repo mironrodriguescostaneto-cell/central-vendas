@@ -810,7 +810,7 @@ function initTelegramListener() {
             } catch (_) {
               await bot.sendMessage(msgChatId, mensagem);
             }
-          });
+          }, msgChatId);
         } catch (e) {
           console.error('[JARVIS-FINANCAS] Erro:', e.message);
         }
