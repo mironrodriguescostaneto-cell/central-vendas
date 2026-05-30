@@ -1167,6 +1167,8 @@ router.get('/', (req, res) => {
 // Configurar no painel Kiwify: POST /webhook/kiwify/sarah
 // ═══════════════════════════════════════════════════════════
 
+let _lastKiwifyPayload = null;
+
 function normalizePhone(raw) {
   if (!raw) return null;
   const digits = String(raw).replace(/\D/g, '');
@@ -1178,10 +1180,18 @@ function normalizePhone(raw) {
   return null;
 }
 
+router.get('/api/kiwify/debug', auth, (req, res) => {
+  res.json({
+    lastPayload: _lastKiwifyPayload,
+    purchases: Array.from(db.state.sarahPurchases || []),
+  });
+});
+
 router.post('/webhook/kiwify/sarah', async (req, res) => {
   res.sendStatus(200); // responde rápido para Kiwify não retentar
   try {
     const body = req.body || {};
+    _lastKiwifyPayload = { ts: new Date().toISOString(), body };
     console.log('[KIWIFY] Webhook recebido:', JSON.stringify(body).slice(0, 300));
 
     // Kiwify envia diferentes formatos — cobrir todos
