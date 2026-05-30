@@ -312,13 +312,14 @@ a{color:var(--accent);text-decoration:none}
       <div class="page-scroll">
         <div class="page-content">
           <div class="tabs" id="tabsInfo">
-            <button class="tab-btn active" onclick="showTab('info','agente')">Agente</button>
+            <button class="tab-btn active" onclick="showTab('info','rafael')">Rafael</button>
+            <button class="tab-btn" onclick="showTab('info','sarah')">Sarah</button>
             <button class="tab-btn" onclick="showTab('info','conexao')">Conexão</button>
             <button class="tab-btn" onclick="showTab('info','conversa')">Conversa</button>
           </div>
 
-          <!-- Agente Info -->
-          <div class="tab-pane active" id="info-tab-agente">
+          <!-- Agente Rafael -->
+          <div class="tab-pane active" id="info-tab-rafael">
             <div class="card">
               <div class="card-header">
                 <div><div class="card-title">Agente Rafael</div><div class="card-subtitle">TVO Fotografias — fotos personalizadas com IA</div></div>
@@ -341,6 +342,28 @@ a{color:var(--accent);text-decoration:none}
             </div>
           </div>
 
+          <!-- Agente Sarah -->
+          <div class="tab-pane" id="info-tab-sarah">
+            <div class="card">
+              <div class="card-header">
+                <div><div class="card-title">Agente Sarah</div><div class="card-subtitle">Fotógrafo Online — curso digital R$47</div></div>
+              </div>
+              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
+                <div style="font-weight:700;margin-bottom:4px">Produto</div>
+                <div style="color:var(--text-muted)">Fotógrafo Online — R$47 à vista ou 11x R$5,22</div>
+              </div>
+              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px;margin-top:8px">
+                <div style="font-weight:700;margin-bottom:4px">Garantia</div>
+                <div style="color:var(--text-muted)">R$50 no 1º dia ou 100% de reembolso</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
+              <textarea class="form-input" id="instrucaoSarah" rows="4" placeholder="Instrução especial para a Sarah..."></textarea>
+              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('sarah')">Salvar Instrução</button>
+            </div>
+          </div>
+
           <!-- Conexão Info -->
           <div class="tab-pane" id="info-tab-conexao">
             <div class="conn-card">
@@ -356,11 +379,31 @@ a{color:var(--accent);text-decoration:none}
                 <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
               </div>
             </div>
+            <div class="conn-card">
+              <div class="conn-header">
+                <div class="conn-agent">
+                  <div class="conn-dot" id="connDotSarah"></div>
+                  <div><div class="conn-name">Sarah</div><div class="conn-state" id="connStateSarah">Verificando...</div></div>
+                </div>
+                <button class="btn-reconnect" onclick="reconnectAgent('sarah')">Reconectar</button>
+              </div>
+              <div class="qr-container" id="qrSarah">
+                <img id="qrImgSarah" src="" alt="QR Code">
+                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
+              </div>
+            </div>
           </div>
 
-          <!-- Conversa Rafael -->
+          <!-- Conversa Info -->
           <div class="tab-pane" id="info-tab-conversa">
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+              <button class="conv-agent-btn active" data-agent="rafael" onclick="convInfoSwitchAgent('rafael',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--rafael);color:#fff;border:none">Rafael</button>
+              <button class="conv-agent-btn" data-agent="sarah" onclick="convInfoSwitchAgent('sarah',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Sarah</button>
+            </div>
             <div id="convListRafael" class="chat-list">
+              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
+            </div>
+            <div id="convListSarah" class="chat-list" style="display:none">
               <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
             </div>
           </div>
@@ -374,7 +417,6 @@ a{color:var(--accent);text-decoration:none}
         <div class="page-content">
           <div class="tabs" id="tabsLogzz">
             <button class="tab-btn active" onclick="showTab('logzz','roberto')">Roberto</button>
-            <button class="tab-btn" onclick="showTab('logzz','sara')">Sara</button>
             <button class="tab-btn" onclick="showTab('logzz','pedidos')">Pedidos</button>
             <button class="tab-btn" onclick="showTab('logzz','links')">Links</button>
             <button class="tab-btn" onclick="showTab('logzz','remarketing')">Mkt</button>
@@ -400,20 +442,6 @@ a{color:var(--accent);text-decoration:none}
             </div>
           </div>
 
-          <!-- Agente Sara -->
-          <div class="tab-pane" id="logzz-tab-sara">
-            <div class="card">
-              <div class="card-header">
-                <div><div class="card-title">Agente Sara</div><div class="card-subtitle">Progressiva Vegetal Havana — COD</div></div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
-              <textarea class="form-input" id="instrucaoSarah" rows="4" placeholder="Instrução especial para a Sarah..."></textarea>
-              <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('sarah')">Salvar Instrução</button>
-            </div>
-          </div>
-
           <!-- Pedidos -->
           <div class="tab-pane" id="logzz-tab-pedidos">
             <div id="pedidosList">
@@ -434,7 +462,6 @@ a{color:var(--accent);text-decoration:none}
             <!-- Seletor de agente -->
             <div style="display:flex;gap:6px;margin-bottom:14px">
               <button class="mkt-agent-btn active" data-agent="roberto" onclick="mktSwitchAgent('roberto',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--logzz);color:#fff;border:none">Roberto</button>
-              <button class="mkt-agent-btn" data-agent="sara" onclick="mktSwitchAgent('sara',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Sara</button>
             </div>
             <!-- Roberto Mkt -->
             <div id="mktSectionRoberto" style="max-width:560px;margin:0 auto;width:100%">
@@ -493,55 +520,6 @@ a{color:var(--accent);text-decoration:none}
                 </div>
               </div>
             </div>
-            <!-- Sara Mkt -->
-            <div id="mktSectionSara" style="display:none;max-width:560px;margin:0 auto;width:100%">
-              <div style="display:flex;gap:8px;margin-bottom:10px">
-                <button class="sarah-rmk-filter active" data-filter="todos" onclick="sarahRmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
-                <button class="sarah-rmk-filter" data-filter="ativos" onclick="sarahRmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
-                <button class="sarah-rmk-filter" data-filter="pausados" onclick="sarahRmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
-                  <input type="checkbox" id="sarahRmkSelectAll" onchange="sarahRmkToggleAll(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
-                  Selecionar todos
-                </label>
-                <span id="sarahRmkCounter" style="font-size:12px;color:var(--text-muted);font-weight:600">0 selecionados</span>
-              </div>
-              <div id="sarahRmkContatos" style="background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;max-height:240px;overflow-y:auto">
-                <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Carregando...</div>
-              </div>
-              <textarea id="sarahRmkTexto" placeholder="Mensagem do remarketing..." style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;min-height:90px;resize:vertical;outline:none;margin-bottom:10px;line-height:1.4;display:block;box-sizing:border-box"></textarea>
-              <div style="background:var(--card);border-radius:12px;border:1px solid var(--border);padding:10px 14px;margin-bottom:10px">
-                <input type="file" id="sarahRmkImgInput" accept="image/*" style="display:none" onchange="sarahRmkHandleImg(event)">
-                <div style="display:flex;gap:8px;align-items:center">
-                  <button onclick="document.getElementById('sarahRmkImgInput').click()" style="padding:8px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0;white-space:nowrap">📷 Imagem</button>
-                  <span id="sarahRmkImgNome" style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">Nenhuma imagem</span>
-                  <button id="sarahRmkImgRemove" onclick="sarahRmkRemoveImg()" style="display:none;padding:4px 8px;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700;flex-shrink:0">✕</button>
-                </div>
-                <img id="sarahRmkImgPreview" src="" alt="" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin-top:10px">
-              </div>
-              <label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px;cursor:pointer;padding:10px 14px;background:var(--card);border-radius:12px;border:1px solid var(--border)">
-                <input type="checkbox" id="sarahRmkPausarApos" style="width:18px;height:18px;accent-color:var(--accent)" checked>
-                <span>Pausar contatos após envio</span>
-              </label>
-              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
-                <button id="sarahRmkBtnEnviar" onclick="sarahRmkEnviar()" style="width:100%;padding:14px;border-radius:12px;background:#22c55e;color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer">📤 ENVIAR</button>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                  <button onclick="sarahRmkPausar()" style="padding:12px 8px;border-radius:12px;background:var(--warning);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏸ PAUSAR</button>
-                  <button onclick="sarahRmkRetomar()" style="padding:12px 8px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">▶ RETOMAR</button>
-                </div>
-                <button id="sarahRmkBtnParar" onclick="sarahRmkParar()" style="display:none;width:100%;padding:12px;border-radius:12px;background:var(--danger);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏹ PARAR ENVIO</button>
-              </div>
-              <div id="sarahRmkProgress" style="display:none;background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px">
-                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                  <span style="font-size:13px;font-weight:600;color:var(--text)">Enviando...</span>
-                  <span id="sarahRmkProgressText" style="font-size:13px;color:var(--accent);font-weight:700">0 / 0</span>
-                </div>
-                <div style="background:var(--border);border-radius:99px;height:7px;overflow:hidden">
-                  <div id="sarahRmkProgressBar" style="height:100%;background:var(--accent);border-radius:99px;transition:width .3s;width:0%"></div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- Conexão Logzz -->
@@ -559,34 +537,11 @@ a{color:var(--accent);text-decoration:none}
                 <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
               </div>
             </div>
-            <div class="conn-card">
-              <div class="conn-header">
-                <div class="conn-agent">
-                  <div class="conn-dot" id="connDotSarah"></div>
-                  <div><div class="conn-name">Sara</div><div class="conn-state" id="connStateSarah">Verificando...</div></div>
-                </div>
-                <button class="btn-reconnect" onclick="reconnectAgent('sarah')">Reconectar</button>
-              </div>
-              <div class="qr-container" id="qrSarah">
-                <img id="qrImgSarah" src="" alt="QR Code">
-                <div class="qr-hint">Abra o WhatsApp → Dispositivos Conectados → Escanear QR</div>
-              </div>
-            </div>
-            <div style="margin-top:10px;padding:12px 14px;background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px;color:var(--accent)">
-              <a href="/scan/sarah" target="_blank" style="font-weight:700">📱 Escanear QR da Sara</a>
-            </div>
           </div>
 
           <!-- Conversa Logzz -->
           <div class="tab-pane" id="logzz-tab-conversa">
-            <div style="display:flex;gap:6px;margin-bottom:12px">
-              <button class="conv-agent-btn active" data-agent="logzz" onclick="convSwitchAgent('logzz',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--logzz);color:#fff;border:none">Roberto</button>
-              <button class="conv-agent-btn" data-agent="sarah" onclick="convSwitchAgent('sarah',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Sara</button>
-            </div>
             <div id="convListLogzz" class="chat-list">
-              <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
-            </div>
-            <div id="convListSarah" class="chat-list" style="display:none">
               <div class="loading"><div class="spinner"></div> Carregando conversas...</div>
             </div>
           </div>
@@ -1374,14 +1329,13 @@ function toast(msg, duration = 2500) {
   setTimeout(() => el.classList.remove('show'), duration);
 }
 
-// ----- Seletores Roberto / Sara -----
+// ----- Seletor Logzz (só Roberto agora) -----
 function mktSwitchAgent(agent, btn) {
   document.querySelectorAll('.mkt-agent-btn').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
   btn.style.background = 'var(--logzz)'; btn.style.color = '#fff'; btn.style.border = 'none';
-  document.getElementById('mktSectionRoberto').style.display = agent === 'roberto' ? '' : 'none';
-  document.getElementById('mktSectionSara').style.display = agent === 'sara' ? '' : 'none';
+  document.getElementById('mktSectionRoberto').style.display = '';
 }
 
 function convSwitchAgent(agent, btn) {
@@ -1389,9 +1343,20 @@ function convSwitchAgent(agent, btn) {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
   btn.style.background = 'var(--logzz)'; btn.style.color = '#fff'; btn.style.border = 'none';
-  document.getElementById('convListLogzz').style.display = agent === 'logzz' ? '' : 'none';
-  document.getElementById('convListSarah').style.display = agent === 'sarah' ? '' : 'none';
-  loadConversas(agent === 'logzz' ? 'logzz' : 'sarah');
+  document.getElementById('convListLogzz').style.display = '';
+  loadConversas('logzz');
+}
+
+function convInfoSwitchAgent(agent, btn) {
+  document.querySelectorAll('.conv-agent-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  const isRafael = agent === 'rafael';
+  btn.style.background = isRafael ? 'var(--rafael)' : 'var(--gestor)';
+  btn.style.color = '#fff'; btn.style.border = 'none';
+  document.getElementById('convListRafael').style.display = isRafael ? '' : 'none';
+  document.getElementById('convListSarah').style.display = isRafael ? 'none' : '';
+  loadConversas(agent);
 }
 
 // ============================================================
