@@ -9,175 +9,138 @@ const { sendTelegram } = require('../gestor');
 const AGENT_ID = 'sarah';
 const _pending = new Set();
 const _pendingMedia = new Map();
-const _midiaEnviada = new Map();
 
-const LINKS = {
-  un1:  'https://entrega.logzz.com.br/pay/memq405we/progressiva-vegetal-havana-1x198',
-  un2:  'https://entrega.logzz.com.br/pay/memq405we/progressiva-vegetal-havana-2x298',
-  rmk1: 'https://entrega.logzz.com.br/pay/memq405we/progressiva-vegetal-havana-1x170',
-  rmk2: 'https://entrega.logzz.com.br/pay/memq405we/02-un-progressiva-vegetal-havana-2x225',
-};
+const LINK_CHECKOUT = 'https://kiwify.app/HJyLHa4';
 
-const MEDIA = {
-  apresentacao: [
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1Kg26blELJKHdVOe93XX83UYsCpb9IJcL' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1eNEC-FaZHdc7NH12f4R4sdxiewHkdCy-' },
-  ],
-  // Pool completo rotativo — remarketing nunca repete a mesma mídia para o mesmo cliente
-  pool: [
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1Kg26blELJKHdVOe93XX83UYsCpb9IJcL' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1eNEC-FaZHdc7NH12f4R4sdxiewHkdCy-' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=14XxHksUD7KhqeJYpvUa3wNfMs9gCGTH8' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=101MhXHg9VV_qN-8qnmE_y_G2OhogkOpA' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1gMMPgTSTMlY9PWpvYsIZTrgj_byNpyl1' },
-    { type: 'image', url: 'https://drive.google.com/uc?export=download&id=1hAyp_GvbVxa2cs93wMu56Keq8snOuDc2' },
-    { type: 'video', url: 'https://drive.google.com/uc?export=download&id=1j78t97nIn4SnxFRzRST-4PJH8YWvJsL8' },
-    { type: 'video', url: 'https://drive.google.com/uc?export=download&id=1E2AZq9yNUuX1uNGHt4KvS1J_0sWs0h__' },
-    { type: 'video', url: 'https://drive.google.com/uc?export=download&id=1_hKsaELDukeglcwH6W3zCj6IN1mo1ycw' },
-    { type: 'video', url: 'https://drive.google.com/uc?export=download&id=1kCD7QUM8uf9UXptpGvrpu75Y02Tx0lAi' },
-  ],
-};
-
+// Mensagens de remarketing — a cada 2 dias, ângulo diferente
+// Baseado em Eugene Schwartz (níveis de consciência) + Gary Halbert + SPIN
 const MSGS_REMARKETING = [
-  (nome) => `Oi${nome}! 🌟 Ainda pensando na Progressiva Vegetal?\n\nSem formol, sem cheiro, dura até 3 meses e você paga só na entrega! 💚\n\nConsegui um desconto especial pra você hoje:\n✨ 1 un — R$170 → ${LINKS.rmk1}\n✨ 2 un — R$225 → ${LINKS.rmk2}`,
-  (nome) => `${nome ? nome + ', q' : 'Q'}ue tal transformar seu cabelo essa semana? 😍\n\nA Progressiva Vegetal Havana é 100% sem formol, segura, e faz em casa com resultado de salão!\n\n→ 1 un R$170 ou 2 un R$225 (frete grátis, paga na entrega)\n${LINKS.rmk1}`,
-  (nome) => `Oi${nome}! Você sabia que a Progressiva Vegetal não arde os olhos, não tem cheiro e não cai o cabelo? 💆‍♀️\n\nÉ 100% vegetal e compatível com qualquer química!\n\nDesconto ativo hoje:\n1 un → R$170: ${LINKS.rmk1}\n2 un → R$225: ${LINKS.rmk2}`,
-  (nome) => `${nome || 'Olá'}! 🍃 Resultado de salão em casa, sem formol e sem risco.\n\nA Progressiva Vegetal Havana já transformou milhares de cabelos! Cabelo liso até 3 meses, hidratado e forte.\n\nEsta semana com desconto:\n→ R$170 (1 un) ou R$225 (2 un)\nPaga só na entrega 🚚`,
-  (nome) => `Oi${nome}! Cabelo crespo ou com frizz? A Progressiva Vegetal resolve! 🌿\n\nSem formol, sem odor, sem contraindicação — compatível com luzes, botox e todas as químicas.\n\nDesconto especial:\n1 un: R$170 → ${LINKS.rmk1}\n2 un: R$225 → ${LINKS.rmk2}`,
+  (nome) => `${nome ? `${nome}, ` : ''}deixa eu te fazer uma pergunta direta 👇\n\nSe eu te dissesse que tem gente faturando R$50, R$100, R$200 por dia *sem câmera, sem equipamento e sem experiência*... você acreditaria?\n\nProvavelmente não. E eu entendo — já ouvi muita promessa vazia também.\n\nPor isso o Miron colocou uma garantia que nenhum curso tem: *se você não faturar pelo menos R$50 no primeiro dia aplicando, ele te devolve 100% do valor.*\n\nNão tem risco. Só tem oportunidade.\n\n${LINK_CHECKOUT}`,
+
+  (nome) => `${nome ? `Oi ${nome}! ` : 'Oi! '}😊 Sabe qual é a maior mentira que te contaram sobre ganhar dinheiro online?\n\nQue você precisa de câmera profissional, estúdio, seguidores... 📷\n\nA realidade: com IA, qualquer pessoa transforma fotos comuns em fotos profissionais de R$20 a R$50 cada.\n\nO Fotógrafo Online te ensina exatamente como cobrar isso e onde encontrar os primeiros clientes — ainda no primeiro dia.\n\nR$47. Garantia total. Sem desculpa pra não tentar.\n\n${LINK_CHECKOUT}`,
+
+  (nome) => `${nome ? `${nome}, ` : ''}quero te contar o que está acontecendo com quem aplicou o método do Fotógrafo Online 👇\n\nUm aluno fez R$120 no primeiro dia vendendo fotos de família com IA.\nOutra aluna cobra R$35 por foto de perfil profissional e já tem lista de espera.\n\nO diferencial? Eles não tinham câmera. Não tinham experiência. Só seguiram o método.\n\nVocê tem 48h pra pagar R$47 e tentar. Se não funcionar, o dinheiro volta — sem perguntas.\n\n${LINK_CHECKOUT}`,
+
+  (nome) => `${nome ? `${nome}, ` : ''}última vez que eu falo sobre isso, prometo 😊\n\nPensa comigo: R$47 é o valor de um lanche. Uma passagem. Um delivery.\n\nEm troca você recebe um método que te permite faturar R$50 no *primeiro dia* — com garantia disso por escrito.\n\nSe não acontecer: 100% de reembolso.\nSe acontecer: você tem uma nova fonte de renda usando IA.\n\nNão tem cenário ruim aqui.\n\n${LINK_CHECKOUT}`,
+
+  (nome) => `${nome ? `Oi ${nome}! ` : 'Oi! '}🌟 A IA mudou tudo no mercado de fotografia.\n\nArtistas tradicionais estão perdendo espaço. Mas quem aprendeu a usar IA *está ganhando mais*.\n\nO Fotógrafo Online ensina você a estar no lado certo dessa mudança — cobrando R$20 a R$50 por foto sem precisar de câmera, equipamento ou estúdio.\n\nR$47 com garantia de resultado. É agora ou vai continuar assistindo essa oportunidade de longe?\n\n${LINK_CHECKOUT}`,
 ];
 
 function buildSystemPrompt(instrucaoManual = '', remarketingCtx = '') {
-  return `Você é Sarah, consultora de vendas da Progressiva Vegetal Havana. Trabalha com entrega Logzz — pagamento APENAS na entrega (COD), frete GRÁTIS. Nunca cobra nada antecipado.
+  return `Você é Sarah, consultora de vendas do curso *Fotógrafo Online*, criado pelo Miron — especialista em renda com IA. Seu trabalho é converter leads em alunos com uma abordagem persuasiva, humana e consultiva.
 
-## PRODUTO — Progressiva Vegetal Havana 500ml
-Tratamento de alinhamento capilar profissional SEM FORMOL. Desenvolvida com blend de aminoácidos, colágeno, queratina, óleo de argan e trigo. Alisa, reduz frizz e hidrata profundamente os fios.
+## O PRODUTO — Fotógrafo Online
 
-✅ Sem formol — sem ardência nos olhos, sem fumaça tóxica, sem odor
-✅ 100% vegetal e segura para a saúde
-✅ Compatível com TODAS as químicas (luzes, botox, selagem, formol, etc.)
-✅ Resultado de salão feito em casa
-✅ Dura 2 a 3 meses
-✅ Rende até 10 aplicações (500ml)
-✅ Para todos os tipos e cores de cabelo
-✅ Recomendado para maiores de 12 anos
+Mini curso digital que ensina qualquer pessoa a criar fotos profissionais com IA e cobrar R$20 a R$50 por foto, gerando renda a partir do primeiro dia.
 
-Modo de uso: Lave com shampoo antirresíduos → Aplique mecha por mecha (cabelo úmido) → Aguarde 40–60 min → Enxágue, seque com secador, finalize com prancha em mechas finas.
+**O que o aluno aprende:**
+- Criar fotos de família, viagem, ensaios e perfis profissionais com IA — sem câmera
+- Transformar fotos comuns em recordações incríveis
+- Cobrar certo e onde encontrar os primeiros clientes
+- Escalar para R$100–R$300/dia com consistência
 
-Dica extra: Se for tingir o cabelo, faça primeiro a progressiva e aguarde 3 dias para usar a tintura.
+**Bônus incluídos:** +200 prompts prontos | Scripts de venda | Guia de precificação | Grupo exclusivo | Atualizações vitalícias
 
-## PREÇOS
-1 unidade — R$198 → link: ${LINKS.un1}
-2 unidades — R$298 → link: ${LINKS.un2}
-Frete: GRÁTIS | Pagamento: na entrega — dinheiro, pix ou cartão (o entregador leva maquininha)
+**Preço:** R$47 à vista — ou 11x de R$5,22 sem juros
+**Link:** ${LINK_CHECKOUT}
 
-## CIDADES ATENDIDAS (verificar sempre)
-Minas Gerais: Belo Horizonte, Ibirité, Sabará, Santa Luzia, Betim, Contagem, Divinópolis, Carmo do Cajuru, Pará de Minas, Nova Serrana, Itaúna, Citrolândia, Igaratinga
-Paraná: Almirante Tamandaré, Araucária, Colombo, Curitiba, Fazenda Rio Grande, Pinhais, Piraquara, São José dos Pinhais, Quatro Barras, Campina Grande do Sul, Campo Largo, Rio Branco do Sul, Itaperuçu
-Goiás/DF: Aparecida de Goiânia, Goiânia, Trindade, Senador Canedo, Goianira, Anápolis, Aragoiânia, Caturaí, Guapó, Inhumas, Nerópolis, Terezópolis de Goiás, Hidrolândia, Gama, Taguatinga, Abadia de Goiás, Ceilândia, Samambaia, Águas Lindas de Goiás, Santa Maria, Novo Gama, Vicente Pires, Cidade Ocidental, Valparaíso de Goiás, Luziânia, Brasília, Guará, Arniqueira, Goianápolis, Bonfinópolis, Recanto das Emas
-São Paulo: Arujá, Barueri, Carapicuíba, Cotia, Diadema, Embu das Artes, Ferraz de Vasconcelos, Guarulhos, Itapevi, Itaquaquecetuba, Jandira, Mogi das Cruzes, Osasco, Poá, Santo André, São Bernardo do Campo, São Caetano do Sul, São Paulo, Suzano, Taboão da Serra, Caieiras, Cajamar, Campo Limpo Paulista, Francisco Morato, Franco da Rocha, Jundiaí, Jacareí, São José dos Campos, Taubaté, Caçapava, Santos, São Vicente, Cubatão, Praia Grande, Ribeirão Pires, Rio Grande da Serra, Mauá, Americana, Campinas, Hortolândia, Monte Mor, Nova Odessa, Paulínia, Santa Bárbara d'Oeste, Sumaré, Valinhos, Vinhedo
-Rio de Janeiro: Duque de Caxias, Nilópolis, Nova Iguaçu, Rio de Janeiro, São João de Meriti, Mesquita, Queimados, Belford Roxo, Niterói
-Rio Grande do Sul: Alvorada, Porto Alegre, Cachoeirinha, Canoas, Eldorado do Sul, Esteio, São Leopoldo, Sapucaia do Sul, Gravataí, Guaíba, Novo Hamburgo, Campo Bom, Estância Velha, Sapiranga, Viamão, Caxias do Sul, Portão, São Sebastião do Caí, Carlos Barbosa, Garibaldi, Bento Gonçalves, Farroupilha, Bom Princípio
-Ceará: Caucaia, Eusébio, Fortaleza, Itaitinga, Maracanaú, Maranguape, Pacatuba
-Bahia: Lauro de Freitas, Salvador
-Maranhão/Piauí: Teresina, Timon, Raposa, São José de Ribamar, São Luís, Paço do Lumiar
-Espírito Santo: Cariacica, Serra, Vila Velha, Vitória, Viana, Guarapari
-Rio Grande do Norte: Parnamirim, Extremoz, Macaíba, Natal, São Gonçalo do Amarante, Mossoró, Ceará-Mirim
-Pernambuco: Abreu e Lima, Igarassu, Jaboatão dos Guararapes, Olinda, Paulista, Recife, Cabo de Santo Agostinho, Camaragibe, São Lourenço da Mata
-Paraíba: João Pessoa, Santa Rita, Cabedelo, Bayeux
-Outros: Manaus, Campo Grande, Ananindeua, Belém, Marituba
-Santa Catarina: Balneário Camboriú, Barra Velha, Camboriú, Itajaí, Itapema, Navegantes, Penha, Jaraguá do Sul, Joinville, Blumenau
+**Garantia inquebrável:** Se o aluno aplicar a estratégia e não faturar pelo menos R$50 no primeiro dia, o Miron devolve 100% do valor — sem burocracia, sem perguntas.
 
-## REGRA DO LINK — NUNCA VIOLAR
-1. NUNCA inclua o link sem antes perguntar: "Posso te enviar o link para você escolher o dia da entrega?"
-2. Envie SOMENTE após o cliente dizer sim/pode/manda/claro/ok
-3. Ao enviar o link, inclua a tag [LINK_ENVIADO] no final da mensagem
-4. Após enviar o link, se o cliente perguntar sobre agendamento ou entrega → [TRANSFERIR_HUMANO]
-5. Se o cliente confirmar que fez o agendamento → agradeça e use [PAUSAR_AGENTE]
+---
+
+## PERFIL DO LEAD (Eugene Schwartz — Nível de Consciência)
+
+A maioria dos leads está no nível 3–4: sente a dor (precisa de renda extra) mas não conhece bem a solução. Nunca vá direto ao link na primeira mensagem. Construa a conversa.
+
+---
 
 ## FLUXO DE ATENDIMENTO
 
-REGRA FUNDAMENTAL: Faça UMA pergunta por mensagem. Seja direta — o cliente não gosta de interrogatório.
+### Etapa 1 — ABERTURA
+Cumprimente, apresente-se como Sarah do Fotógrafo Online e pergunte o nome.
+Exemplo: "Oi! Aqui é a Sarah do Fotógrafo Online 📸 Com quem estou falando?"
 
-### Etapa 1 — ABERTURA (1ª mensagem)
-Cumprimente, apresente-se como Sarah da Progressiva Vegetal Havana e pergunte o nome.
-Exemplo: "Olá! Aqui é a Sarah, da Progressiva Vegetal Havana 🌿 Com quem estou falando?"
+### Etapa 2 — SPIN SELLING (diagnóstico consultivo)
+Faça UMA pergunta por mensagem. Descubra a situação e a dor do lead antes de apresentar o produto.
 
-### Etapa 2 — APRESENTAÇÃO (após saber o nome)
-Explique o produto em 2–3 linhas focando nos diferenciais: sem formol, vegetal, segura.
-Use [ENVIAR_FOTO] para mandar as fotos de antes/depois.
-Em seguida pergunte a cidade: "Qual é a sua cidade para eu confirmar a entrega?"
+**S — Situação** (entender o contexto):
+"Você está buscando uma renda extra ou quer substituir seu trabalho atual?"
 
-### Etapa 3 — CIDADE
-- Cidade ATENDIDA → confirme e apresente os kits: "Temos entrega aí! 1 unidade por R$198 ou 2 unidades por R$298 — frete grátis nos dois. Qual prefere?"
-- Cidade NÃO ATENDIDA → "Ainda não chegamos aí, mas estamos expandindo! Posso te avisar quando tiver."
+**P — Problema** (identificar a dor):
+"O que você já tentou pra gerar renda online? Conseguiu resultado ou travou em algum ponto?"
+
+**I — Implicação** (ampliar a consequência):
+"E como isso afeta sua rotina hoje — você sente que está perdendo tempo enquanto outras pessoas já estão faturando com IA?"
+
+**N — Necessidade de solução** (plantar a visão):
+"Se eu te mostrasse um método que qualquer pessoa consegue aplicar no primeiro dia — mesmo sem câmera ou experiência — e ainda com garantia de R$50 no primeiro dia ou dinheiro de volta, isso faria sentido pra você?"
+
+### Etapa 3 — APRESENTAÇÃO (após entender a dor)
+Conecte o produto diretamente à dor revelada pelo SPIN. Foque em:
+- Sem câmera, sem equipamento, sem experiência técnica
+- Faturamento real no primeiro dia
+- Garantia total elimina o risco
 
 ### Etapa 4 — FECHAR
-Quando o cliente escolher: "Posso te enviar o link para você escolher o dia da entrega?"
+"Posso te enviar o link agora? São R$47 e se você não faturar R$50 no primeiro dia aplicando, o Miron te devolve 100% — sem perguntas."
 
 ### Etapa 5 — LINK
-Após SIM → envie o link correto + [LINK_ENVIADO]
+Após confirmação → envie o link + use a tag [LINK_ENVIADO]
 
-## REGRA DE PREÇO
-Se o cliente perguntar o valor ANTES da apresentação, responda imediatamente:
-"1 unidade R$198 ou 2 unidades R$298. Frete grátis, paga na entrega. Qual é a sua cidade?"
+---
 
-## OBJEÇÕES COMUNS
-- "Tem formol?" → "Não! É 100% vegetal, sem formol, sem cheiro, sem ardência. Completamente segura! 🌿"
-- "Vai cair o cabelo?" → "Não! Pelo contrário — a queratina e o colágeno fortalecem os fios, impedindo a queda 💚"
-- "Posso usar com luzes?" → "Sim! É compatível com todas as químicas — luzes, botox, selagem, qualquer uma!"
-- "Quanto dura?" → "De 2 a 3 meses, dependendo dos cuidados. E rende até 10 aplicações!"
+## OBJEÇÕES E RESPOSTAS (Gary Halbert + Dan Kennedy style)
 
-## SPIN SELLING — MANEJO DE OBJEÇÕES DE SAÍDA
+**"Não tenho câmera"**
+→ "Perfeito — você não vai precisar. A IA gera as fotos. Você só precisa do método e de alguém pra vender. O curso ensina tudo isso."
 
-ATIVE SOMENTE quando o cliente sinalizar que quer sair da conversa:
-Sinais: "vou pensar", "depois", "agora não", "tô sem dinheiro", "tô ocupada", "talvez", "não sei", qualquer desculpa para adiar ou encerrar.
+**"Não tenho experiência com IA"**
+→ "Melhor assim 😄 O curso foi feito pra quem está começando do zero. É passo a passo, sem tecnicidade."
 
-NUNCA use se o cliente recusou de forma definitiva. Use UMA pergunta por mensagem. Tom de conversa — nunca interrogatório.
+**"R$47 tá meio caro"**
+→ "É o preço de um delivery. E com a garantia: se você não faturar R$50 no primeiro dia aplicando, recebe os R$47 de volta. O risco é zero."
 
-### Sequência SPIN para Progressiva Vegetal Havana:
+**"Já tentei várias coisas e não funcionou"**
+→ "Entendo — e por isso o Miron colocou a garantia. Não é fé cega. É método com resultado garantido no primeiro dia ou dinheiro de volta."
 
-**S — Situação** (entender a rotina capilar):
-"Você costuma alisar o cabelo com chapinha ou escova com frequência?"
+**"Vou pensar"**
+→ Ative o SPIN: "Claro! Só me conta uma coisa — o que exatamente você precisa pensar? É o valor, a dúvida se funciona, ou outra coisa?" [Descubra a objeção real e trate]
 
-**P — Problema** (identificar a dor com o cabelo):
-"E o frizz — volta rápido depois que você alisa ou o cabelo fica ressecado?"
+**"Não tenho tempo"**
+→ "O curso é curto e direto. Você pode aplicar em poucas horas. A questão é: você quer continuar sem tempo E sem renda extra, ou quer fazer algo diferente agora?"
 
-**I — Implicação** (ampliar a consequência de não resolver):
-"Todo dia usando calor no cabelo acaba danificando muito os fios com o tempo né? Sem falar no tempo que leva alisar todo dia..."
+---
 
-**N — Necessidade de solução** (fazer a cliente visualizar o resultado):
-"Imagina acordar com o cabelo já liso, sem precisar usar chapinha todo dia — quanto tempo e estresse você ia economizar? 😊"
+## REGRAS INVIOLÁVEIS
 
-### Regras:
-1. Faça S → P → I → N, uma por mensagem, respeitando as respostas da cliente
-2. Adapte a pergunta ao que a cliente já disse (não repita informações coletadas)
-3. Após N, se a cliente aceitar → siga o fluxo normal de fechamento
-4. Se mesmo após o SPIN a cliente recusar → respeite: "Tudo bem! Se mudar de ideia é só chamar 🌿" e use [PAUSAR_AGENTE]
+1. NUNCA envie o link sem antes perguntar: "Posso te enviar o link agora?"
+2. Envie SOMENTE após o lead dizer sim. Use [LINK_ENVIADO] no final
+3. UMA pergunta por mensagem — nunca interrogatório
+4. Se o lead confirmar que comprou → agradeça, dê boas-vindas e use [PAUSAR_AGENTE]
+5. Se pedir suporte técnico ou reclamação → [TRANSFERIR_HUMANO]
+6. Máximo 4 linhas por mensagem — direto e impactante
 
-## TOM
-- Sarah: feminina, empolgada, persuasiva e profissional
-- Máximo 3–4 linhas por mensagem
-- Use o nome do cliente sempre que souber
-- Destaque o SEM FORMOL como principal diferencial
-- Linguagem informal e acolhedora
-- COD elimina objeção financeira: reforce "paga só na entrega, sem risco!" sempre que sentir hesitação
-${remarketingCtx ? `\n## CONTEXTO DE REMARKETING — CRÍTICO\nVocê enviou esta mensagem de remarketing para este cliente:\n"${remarketingCtx}"\nHonre EXATAMENTE qualquer desconto ou condição mencionada. Continue a venda a partir dessa oferta.` : ''}${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoManual}` : ''}`;
+---
+
+## TOM E ESTILO
+
+Sarah é: confiante, calorosa, honesta e extremamente persuasiva.
+Usa linguagem informal mas profissional. Sempre usa o nome do lead.
+Nunca pressiona, mas nunca deixa o lead "escapar" sem entender a objeção real.
+Referência de copy: Gary Halbert (urgência), Eugene Schwartz (consciência), SPIN Selling (diagnóstico).
+${remarketingCtx ? `\n## CONTEXTO DE REMARKETING\nVocê enviou esta mensagem de remarketing para este lead:\n"${remarketingCtx}"\nContinue a partir desse contexto. Honre tudo que foi prometido.` : ''}${instrucaoManual ? `\n## INSTRUÇÃO DO DONO (PRIORIDADE MÁXIMA)\n${instrucaoManual}` : ''}`;
 }
 
 function extractTags(text) {
   const tags = [];
-  if (text.includes('[ENVIAR_FOTO]')) tags.push('ENVIAR_FOTO');
-  if (text.includes('[ENVIAR_PROVA]')) tags.push('ENVIAR_PROVA');
-  if (text.includes('[LINK_ENVIADO]')) tags.push('LINK_ENVIADO');
-  if (text.includes('[TRANSFERIR_HUMANO]')) tags.push('TRANSFERIR_HUMANO');
-  if (text.includes('[PAUSAR_AGENTE]')) tags.push('PAUSAR_AGENTE');
+  if (text.includes('[LINK_ENVIADO]'))       tags.push('LINK_ENVIADO');
+  if (text.includes('[TRANSFERIR_HUMANO]'))  tags.push('TRANSFERIR_HUMANO');
+  if (text.includes('[PAUSAR_AGENTE]'))      tags.push('PAUSAR_AGENTE');
   return tags;
 }
 
 function removeTags(text) {
   return text
-    .replace(/\[ENVIAR_FOTO\]/gi, '')
-    .replace(/\[ENVIAR_PROVA\]/gi, '')
     .replace(/\[LINK_ENVIADO\]/gi, '')
     .replace(/\[TRANSFERIR_HUMANO\]/gi, '')
     .replace(/\[PAUSAR_AGENTE\]/gi, '')
@@ -189,18 +152,6 @@ function getConvState(phone) {
   return db.state.conversations.sarah?.get(phone) || null;
 }
 
-// Retorna próxima mídia do pool que ainda não foi enviada para o cliente
-function getNextPoolMedia(conv) {
-  const sent = conv.rmkSentIndices || [];
-  const nextIdx = MEDIA.pool.findIndex((_, i) => !sent.includes(i));
-  if (nextIdx === -1) {
-    // Todas enviadas — reinicia o ciclo
-    conv.rmkSentIndices = [];
-    return { media: MEDIA.pool[0], idx: 0 };
-  }
-  return { media: MEDIA.pool[nextIdx], idx: nextIdx };
-}
-
 async function processMessage(event, payload) {
   const { phone, body: rawBody, pushName, _originalJid } = payload;
   if (!phone) return;
@@ -210,10 +161,7 @@ async function processMessage(event, payload) {
   if (!body && payload.audio?.audioUrl) {
     try {
       const transcricao = await transcribeAudio(payload.audio.audioUrl);
-      if (transcricao) {
-        body = transcricao;
-        console.log(`[SARAH] Áudio transcrito de ${phone}: "${transcricao.slice(0, 80)}"`);
-      }
+      if (transcricao) body = transcricao;
     } catch (e) {
       console.error(`[SARAH] Erro transcrição áudio:`, e.message);
     }
@@ -224,9 +172,7 @@ async function processMessage(event, payload) {
 
   addMsg(AGENT_ID, phone, 'user', body || '[mídia]', pushName);
   const convState = getConvState(phone);
-  if (convState) {
-    convState.ultimaMensagemUsuario = Date.now();
-  }
+  if (convState) convState.ultimaMensagemUsuario = Date.now();
 
   if (payload.image) {
     const list = _pendingMedia.get(phone) || [];
@@ -275,7 +221,7 @@ async function processMessage(event, payload) {
         const hasVideo = mediaList.some(m => m.kind === 'video');
         const textoAtual = historico[lastUserIdx].content;
         const textoFinal = (textoAtual === '[mídia]' || !textoAtual)
-          ? (hasVideo ? '[O cliente enviou um vídeo]' : '[O cliente enviou esta imagem]')
+          ? (hasVideo ? '[O lead enviou um vídeo]' : '[O lead enviou esta imagem]')
           : textoAtual;
         blocks.push({ type: 'text', text: textoFinal });
         historico[lastUserIdx] = { role: 'user', content: blocks };
@@ -301,54 +247,27 @@ async function processMessage(event, payload) {
       await baileys.sendText(sessionId, phone, textoLimpo, _originalJid);
       addMsg(AGENT_ID, phone, 'assistant', textoLimpo);
 
-      const temLink = textoLimpo.includes('entrega.logzz.com.br') || tags.includes('LINK_ENVIADO');
+      const temLink = textoLimpo.includes('kiwify') || tags.includes('LINK_ENVIADO');
       if (temLink) {
         const cs = getConvState(phone);
         if (cs) {
           cs.linkEnviadoEm = Date.now();
-          cs.followUpEnviado = false;
+          cs.followUpCount = 0;
+          cs.ultimoRemarketingEm = 0;
           cs.remarketingEnviado = false;
-          console.log(`[SARAH] linkEnviadoEm registrado para ${phone}`);
-        }
-      }
-    }
-
-    if (tags.includes('ENVIAR_FOTO')) {
-      const enviadas = _midiaEnviada.get(phone) || new Set();
-      await new Promise(r => setTimeout(r, 800));
-      for (const m of MEDIA.apresentacao) {
-        if (enviadas.has(m.url)) continue;
-        await baileys.sendMedia(sessionId, phone, m.type, m.url, '', _originalJid);
-        enviadas.add(m.url);
-        await new Promise(r => setTimeout(r, 800));
-      }
-      _midiaEnviada.set(phone, enviadas);
-    }
-
-    if (tags.includes('ENVIAR_PROVA')) {
-      const enviadas = _midiaEnviada.get(phone) || new Set();
-      // Pega próxima mídia do pool não enviada ainda
-      const cs = getConvState(phone);
-      if (cs) {
-        const { media, idx } = getNextPoolMedia(cs);
-        if (!enviadas.has(media.url)) {
-          await new Promise(r => setTimeout(r, 1000));
-          await baileys.sendMedia(sessionId, phone, media.type, media.url, '', _originalJid);
-          enviadas.add(media.url);
-          cs.rmkSentIndices = [...(cs.rmkSentIndices || []), idx];
-          _midiaEnviada.set(phone, enviadas);
+          console.log(`[SARAH] Link enviado para ${phone} — follow-up em 2 dias`);
         }
       }
     }
 
     if (tags.includes('TRANSFERIR_HUMANO')) {
       pausePhone(AGENT_ID, phone);
-      sendTelegram(`👤 *Sarah — Transferir para humano*\nCliente: ${pushName || phone}\nMsg: ${body?.slice(0, 120)}`).catch(() => {});
+      sendTelegram(`👤 *Sarah — Transferir para humano*\nLead: ${pushName || phone}\nMsg: ${body?.slice(0, 120)}`).catch(() => {});
     }
 
   } catch (error) {
     console.error(`[SARAH-AGENTE] Erro ao processar ${phone}:`, error.message);
-    sendTelegram(`⚠️ *Sarah — Erro*\nCliente: ${phone}\nErro: ${error.message}`).catch(() => {});
+    sendTelegram(`⚠️ *Sarah — Erro*\nLead: ${phone}\nErro: ${error.message}`).catch(() => {});
   } finally {
     _pending.delete(phone);
     _pendingMedia.delete(phone);
@@ -364,68 +283,54 @@ async function checkFollowUps() {
   if (baileys.getState(sessionId) !== 'connected') return;
 
   const agora = Date.now();
-  const DUAS_HORAS = 2 * 60 * 60 * 1000;
-  const VINTE_QUATRO_HORAS = 24 * 60 * 60 * 1000;
-  const TRINTA_MINUTOS = 30 * 60 * 1000;
+  const DOIS_DIAS = 2 * 24 * 60 * 60 * 1000;
+  const UMA_HORA = 60 * 60 * 1000;
 
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
     if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
-    if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < TRINTA_MINUTOS) continue;
+
+    // Não disparar se o lead respondeu recentemente (< 1h)
+    if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < UMA_HORA) continue;
 
     const elapsed = agora - conv.linkEnviadoEm;
-    if (isNaN(elapsed)) continue;
+    if (isNaN(elapsed) || elapsed < DOIS_DIAS) continue;
 
-    // Follow-up 2h
-    if (!conv.followUpEnviado && elapsed >= DUAS_HORAS) {
-      try {
-        const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const msg = `Oi${nome}! 😊 Conseguiu abrir o link e escolher o dia da entrega? Se tiver alguma dúvida sobre a Progressiva Vegetal é só falar!`;
-        await baileys.sendText(sessionId, phone, msg);
-        addMsg(AGENT_ID, phone, 'assistant', msg);
-        conv.followUpEnviado = true;
-        console.log(`[SARAH] Follow-up 2h → ${phone}`);
-      } catch (e) {
-        console.error(`[SARAH] Erro follow-up ${phone}:`, e.message);
-      }
-    }
+    const ultimoRmk = conv.ultimoRemarketingEm || 0;
+    const passouDoisDiasDesdeUltimo = (agora - ultimoRmk) >= DOIS_DIAS;
+    if (!passouDoisDiasDesdeUltimo) continue;
 
-    // Remarketing diário — envia mídia ainda não enviada + texto persuasivo rotativo
-    if (conv.followUpEnviado && elapsed >= VINTE_QUATRO_HORAS) {
-      const ultimoRmk = conv.ultimoRemarketingEm || 0;
-      const passou24hDesdeUltimoRmk = (agora - ultimoRmk) >= VINTE_QUATRO_HORAS;
-      if (!passou24hDesdeUltimoRmk) continue;
+    const rmkCount = conv.followUpCount || 0;
+    if (rmkCount >= MSGS_REMARKETING.length) continue; // esgotou o ciclo
 
-      try {
-        const nome = conv.pushName ? ` ${conv.pushName}` : '';
-        const rmkCount = conv.rmkCount || 0;
-        const msgFn = MSGS_REMARKETING[rmkCount % MSGS_REMARKETING.length];
-        const msg = msgFn(nome);
+    try {
+      const nome = conv.pushName ? ` ${conv.pushName}` : '';
+      const msgFn = MSGS_REMARKETING[rmkCount % MSGS_REMARKETING.length];
+      const msg = msgFn(nome);
 
-        // Pegar próxima mídia do pool
-        const { media, idx } = getNextPoolMedia(conv);
+      // Salva contexto para a IA continuar coerente se o lead responder
+      const cs = convMap.get(phone);
+      if (cs) cs.remarketingContexto = msg;
 
-        await baileys.sendMedia(sessionId, phone, media.type, media.url, msg);
-        addMsg(AGENT_ID, phone, 'assistant', msg);
+      await baileys.sendText(sessionId, phone, msg);
+      addMsg(AGENT_ID, phone, 'assistant', msg);
 
-        conv.rmkSentIndices = [...(conv.rmkSentIndices || []), idx];
-        conv.rmkCount = rmkCount + 1;
-        conv.ultimoRemarketingEm = agora;
-        console.log(`[SARAH] Remarketing diário #${rmkCount + 1} → ${phone} (mídia idx ${idx})`);
-      } catch (e) {
-        console.error(`[SARAH] Erro remarketing ${phone}:`, e.message);
-      }
+      conv.followUpCount = rmkCount + 1;
+      conv.ultimoRemarketingEm = agora;
+      console.log(`[SARAH] Follow-up #${rmkCount + 1} (2 dias) → ${phone}`);
+    } catch (e) {
+      console.error(`[SARAH] Erro follow-up ${phone}:`, e.message);
     }
   }
 }
 
 async function init() {
   const sessionId = CONFIG.sessionIds.sarah;
-  console.log('[SARAH-AGENTE] Inicializando Sarah — Progressiva Vegetal Havana...');
+  console.log('[SARAH-AGENTE] Inicializando Sarah — Fotógrafo Online...');
   setInterval(checkFollowUps, 5 * 60 * 1000);
   await baileys.connect(sessionId, processMessage);
-  console.log('[SARAH-AGENTE] Sarah pronta');
+  console.log('[SARAH-AGENTE] Sarah pronta — Fotógrafo Online');
 }
 
 module.exports = { init, processMessage, AGENT_ID };
