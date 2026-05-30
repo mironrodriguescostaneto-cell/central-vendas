@@ -1808,7 +1808,7 @@ async function atkLoadConversas(agentId) {
           <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
         </div>
         <div class="chat-meta">
-          <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)';}">${c.score}</div>
+          <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)'}">${c.score}</div>
         </div>
       </div>
     `).join('');
