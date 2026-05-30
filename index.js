@@ -10,6 +10,7 @@ require('dotenv').config();
 const express = require('express');
 const { CONFIG } = require('./src/config');
 const db = require('./src/database');
+const dbAtk = require('./src/database-atk');
 const routes = require('./src/routes');
 const gestor = require('./src/gestor');
 
@@ -33,9 +34,11 @@ app.use('/', routes);
 
 // ----- Inicialização -----
 async function main() {
-  // 1. Carregar banco de dados
+  // 1. Carregar bancos de dados (CVN + ATK)
   await db.loadDB();
-  console.log('[MAIN] Banco de dados carregado');
+  console.log('[MAIN] Banco CVN carregado');
+  await dbAtk.load();
+  console.log('[MAIN] Banco ATK carregado — pedro:', dbAtk.state.conversations.pedro.size, 'conversas | rodrigo:', dbAtk.state.conversations.rodrigo.size, 'conversas');
 
   // 2. Inicializar monitor de erros do Gestor
   gestor.initErrorMonitor();
@@ -44,22 +47,34 @@ async function main() {
   // 3. Inicializar agentes WhatsApp (em paralelo, sem bloquear startup)
   setTimeout(async () => {
     try {
-      console.log('[MAIN] Iniciando agentes WhatsApp...');
-      const infoAgent = require('./src/agents/info-produtos');
+      console.log('[MAIN] Iniciando agentes CVN...');
+      const infoAgent  = require('./src/agents/info-produtos');
       const logzzAgent = require('./src/agents/logzz');
-      const rafaelAgent = require('./src/agents/rafael');
+      const rafaelAgent= require('./src/agents/rafael');
       const sarahAgent = require('./src/agents/sarah');
       await Promise.allSettled([
-        infoAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente info:', e.message)),
-        logzzAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente logzz:', e.message)),
-        rafaelAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente rafael:', e.message)),
-        sarahAgent.init().catch(e => console.error('[MAIN] Erro ao iniciar agente sarah:', e.message)),
+        infoAgent.init().catch(e  => console.error('[MAIN] Erro agente info:', e.message)),
+        logzzAgent.init().catch(e => console.error('[MAIN] Erro agente logzz:', e.message)),
+        rafaelAgent.init().catch(e=> console.error('[MAIN] Erro agente rafael:', e.message)),
+        sarahAgent.init().catch(e => console.error('[MAIN] Erro agente sarah:', e.message)),
       ]);
-      console.log('[MAIN] Agentes iniciados');
+      console.log('[MAIN] Agentes CVN iniciados');
     } catch (e) {
-      console.error('[MAIN] Erro ao inicializar agentes:', e.message);
+      console.error('[MAIN] Erro ao inicializar agentes CVN:', e.message);
     }
   }, 2000);
+
+  // 3b. Inicializar agentes ATK (Pedro e Rodrigo) — 4s depois para não competir com CVN
+  setTimeout(async () => {
+    try {
+      console.log('[MAIN] Iniciando agentes ATK (Pedro + Rodrigo)...');
+      const atkInit = require('./src/agents-atk-init');
+      await atkInit.init();
+      console.log('[MAIN] Agentes ATK iniciados');
+    } catch (e) {
+      console.error('[MAIN] Erro ao inicializar agentes ATK:', e.message);
+    }
+  }, 4000);
 
   // 4. Health check periódico (a cada 5 min)
   setInterval(async () => {
@@ -85,8 +100,8 @@ async function main() {
 async function shutdown(signal) {
   console.log(`\n[MAIN] ${signal} recebido. Salvando dados e encerrando...`);
   try {
-    await db.saveDB();
-    console.log('[MAIN] Dados salvos');
+    await Promise.allSettled([db.saveDB(), dbAtk.save()]);
+    console.log('[MAIN] Dados CVN + ATK salvos');
   } catch (e) {
     console.error('[MAIN] Erro ao salvar dados:', e.message);
   }

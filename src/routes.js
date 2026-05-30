@@ -914,6 +914,163 @@ router.get('/financas', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard_financas.html'));
 });
 
+// ═══════════════════════════════════════════════════════════
+// ROTAS ATK — Atacadão (Pedro e Rodrigo)
+// Prefixo /api/atk/* para evitar conflito com rotas CVN
+// ═══════════════════════════════════════════════════════════
+
+// Webhook Baileys — Pedro
+router.post('/atk/webhook/pedro', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const agentsAtk = require('./agents-atk');
+    await agentsAtk.handleIncomingMessage('pedro', req.body);
+  } catch (e) { console.error('[ATK/WEBHOOK/PEDRO]', e.message); }
+});
+
+// Webhook Baileys — Rodrigo
+router.post('/atk/webhook/rodrigo', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const agentsAtk = require('./agents-atk');
+    await agentsAtk.handleIncomingMessage('rodrigo', req.body);
+  } catch (e) { console.error('[ATK/WEBHOOK/RODRIGO]', e.message); }
+});
+
+// Chat com Aslam (Super Jarvis ATK)
+router.post('/api/atk/aslam', auth, async (req, res) => {
+  try {
+    const { message, mediaUrl } = req.body;
+    if (!message && !mediaUrl) return res.status(400).json({ error: 'message obrigatório' });
+    const gestorAtk = require('./gestor-atk');
+    const resposta = await gestorAtk.handleAslamChat(message || '', mediaUrl || null);
+    res.json({ resposta });
+  } catch (e) {
+    console.error('[ATK/ASLAM]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Status dos agentes ATK
+router.get('/api/atk/status', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const baileys = require('./baileys');
+    const status = {};
+    for (const id of ['pedro', 'rodrigo']) {
+      status[id] = {
+        state: baileys.getState(id) || 'disconnected',
+        conversas: dbAtk.state.conversations[id].size,
+        pausados: dbAtk.state.pausedManual[id].size,
+        metrics: dbAtk.state.metrics[id],
+        preco: dbAtk.getAgentPrice(id),
+        piso: dbAtk.getAgentPiso(id),
+        produto: dbAtk.getAgentProductName(id),
+        instructions: dbAtk.state.instructions[id] || [],
+      };
+    }
+    res.json(status);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Conversas ATK de um agente
+router.get('/api/atk/conversas/:agentId', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const { agentId } = req.params;
+    if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
+    const convs = [];
+    dbAtk.state.conversations[agentId].forEach((conv, numero) => {
+      if (!conv.msgs || conv.msgs.length === 0) return;
+      const score = dbAtk.scoreClient(agentId, numero);
+      convs.push({
+        numero, pushName: conv.pushName || '', totalMsgs: conv.msgs.length,
+        ultimaMensagem: conv.ultimaMensagem, pausado: dbAtk.isManuallyPaused(numero),
+        score: score.score, temperatura: score.temperatura,
+        ultimoTexto: (conv.msgs.at(-1)?.content || conv.msgs.at(-1)?.text || '').slice(0, 80),
+      });
+    });
+    convs.sort((a, b) => b.score - a.score || (b.ultimaMensagem || 0) - (a.ultimaMensagem || 0));
+    res.json(convs);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ler conversa ATK específica
+router.get('/api/atk/conversas/:agentId/:numero', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const { agentId, numero } = req.params;
+    const conv = dbAtk.getConversation(agentId, numero);
+    res.json({ numero, msgs: conv?.msgs || [], pausado: dbAtk.isManuallyPaused(numero) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Pausar/liberar cliente ATK
+router.post('/api/atk/conversas/:agentId/:numero/pause', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  dbAtk.pauseManual(req.params.numero, req.params.agentId);
+  dbAtk.addEvent(`Dashboard pausou ${req.params.numero} (${req.params.agentId})`);
+  dbAtk.save();
+  res.json({ ok: true });
+});
+
+router.post('/api/atk/conversas/:agentId/:numero/resume', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  dbAtk.resumeManual(req.params.numero);
+  dbAtk.addEvent(`Dashboard liberou ${req.params.numero}`);
+  dbAtk.save();
+  res.json({ ok: true });
+});
+
+// Vendas/CRM ATK
+router.get('/api/atk/vendas', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const periodo = req.query.periodo || 'mes';
+    const report = dbAtk.getSalesReport(periodo);
+    res.json(report);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Pedidos ATK
+router.get('/api/atk/pedidos', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  res.json(dbAtk.getPedidosAtk());
+});
+
+// CRM ATK (lista clientes)
+router.get('/api/atk/crm', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    res.json(dbAtk.getCustomerList());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Caixa ATK
+router.get('/api/atk/caixa', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  res.json({ aberto: dbAtk.getCaixaAberto(), historico: dbAtk.getCaixaHistorico(30) });
+});
+
+// Eventos ATK (log de atividade)
+router.get('/api/atk/eventos', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  res.json(dbAtk.state.events.slice(-100).reverse());
+});
+
+// QR code ATK (Pedro ou Rodrigo)
+router.get('/api/atk/agents/:agentId/qr', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const baileys = require('./baileys');
+    const { agentId } = req.params;
+    if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
+    const state = baileys.getState(agentId);
+    const qr = baileys.getQR ? baileys.getQR(agentId) : null;
+    res.json({ agentId, state, qr: qr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}` : null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ----- Dashboard (servir o HTML) -----
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));

@@ -291,6 +291,76 @@ const GESTOR_TOOLS = [
       required: ['agente', 'mensagem'],
     },
   },
+  // ── ATK (Atacadão) ──────────────────────────────────────
+  {
+    name: 'status_atk',
+    description: 'Ver status dos agentes Atacadão (Pedro e Rodrigo): conversas, pausados, métricas',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'conversas_atk',
+    description: 'Listar conversas ativas de Pedro ou Rodrigo com temperatura do lead',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['pedro', 'rodrigo'] },
+        limite: { type: 'number', description: 'Quantidade (default 20)' },
+      },
+      required: ['agente'],
+    },
+  },
+  {
+    name: 'pausar_atk',
+    description: 'Pausar atendimento automático de um cliente Atacadão',
+    input_schema: {
+      type: 'object',
+      properties: {
+        numero: { type: 'string', description: 'Número do cliente (ex: 5562...)' },
+        agente: { type: 'string', enum: ['pedro', 'rodrigo', 'todos'] },
+      },
+      required: ['numero'],
+    },
+  },
+  {
+    name: 'liberar_atk',
+    description: 'Liberar/retomar atendimento de cliente ATK pausado',
+    input_schema: {
+      type: 'object',
+      properties: { numero: { type: 'string' } },
+      required: ['numero'],
+    },
+  },
+  {
+    name: 'enviar_atk',
+    description: 'Enviar mensagem para cliente via Pedro ou Rodrigo (Atacadão)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agente: { type: 'string', enum: ['pedro', 'rodrigo'] },
+        numero: { type: 'string' },
+        mensagem: { type: 'string' },
+      },
+      required: ['agente', 'numero', 'mensagem'],
+    },
+  },
+  {
+    name: 'vendas_atk',
+    description: 'Ver relatório de vendas do Atacadão: faturamento, lucro, por agente',
+    input_schema: {
+      type: 'object',
+      properties: { periodo: { type: 'string', enum: ['hoje', 'semana', 'mes', 'ano'] } },
+      required: ['periodo'],
+    },
+  },
+  {
+    name: 'comando_atk',
+    description: 'Executar comando Aslam ATK: treinar agentes, remarketing, campanhas, mudar preço, análise de cliente. Use para comandos complexos do Atacadão.',
+    input_schema: {
+      type: 'object',
+      properties: { comando: { type: 'string', description: 'Comando para o Aslam ATK (ex: "treinar pedro: não dar desconto", "remarketing do rodrigo", "muda preço pedro para R$380")' } },
+      required: ['comando'],
+    },
+  },
 ];
 
 // ----- Execução de ferramentas -----
@@ -518,6 +588,83 @@ async function executeTool(name, input) {
       return resumo;
     }
 
+    // ── ATK (Atacadão) ─────────────────────────────────────
+    case 'status_atk': {
+      const dbAtk = require('./database-atk');
+      const baileys = require('./baileys');
+      const lines = [];
+      for (const id of ['pedro', 'rodrigo']) {
+        const convs = dbAtk.state.conversations[id].size;
+        const pausados = dbAtk.state.pausedManual[id].size;
+        const metrics = dbAtk.state.metrics[id];
+        const bState = baileys.getState(id) || 'disconnected';
+        const preco = dbAtk.getAgentPrice(id);
+        lines.push(`*${id.charAt(0).toUpperCase()+id.slice(1)}* (${bState}): ${convs} conversas | ${pausados} pausados | ${metrics.vendas} vendas | R$${preco}`);
+      }
+      const sales = dbAtk.getSalesStats();
+      lines.push(`\n📊 Hoje: ${sales.hoje.total} vendas — R$${sales.hoje.valor}`);
+      lines.push(`📊 Mês: ${sales.mes.total} vendas — R$${sales.mes.valor}`);
+      return lines.join('\n');
+    }
+
+    case 'conversas_atk': {
+      const dbAtk = require('./database-atk');
+      const agente = input.agente;
+      const limite = input.limite || 20;
+      const convs = [];
+      dbAtk.state.conversations[agente].forEach((conv, numero) => {
+        if (!conv.msgs || conv.msgs.length === 0) return;
+        const pausado = dbAtk.isManuallyPaused(numero);
+        const score = dbAtk.scoreClient(agente, numero);
+        const lastMsg = (conv.msgs.at(-1)?.content || conv.msgs.at(-1)?.text || '').slice(0, 60);
+        convs.push({ numero, pushName: conv.pushName || '', score: score.score, temp: score.temperatura, pausado, lastMsg, ts: conv.ultimaMensagem || 0 });
+      });
+      convs.sort((a, b) => b.score - a.score || b.ts - a.ts);
+      const top = convs.slice(0, limite);
+      if (!top.length) return `Nenhuma conversa encontrada para ${agente}`;
+      return top.map(c => `${c.pushName || c.numero} | ${c.temp} (${c.score}) | ${c.pausado ? '⏸ pausado' : '▶️'} | "${c.lastMsg}"`).join('\n');
+    }
+
+    case 'pausar_atk': {
+      const dbAtk = require('./database-atk');
+      dbAtk.pauseManual(input.numero, input.agente === 'todos' ? null : input.agente);
+      dbAtk.addEvent(`Jarvis pausou ${input.numero}`);
+      dbAtk.save();
+      return `✅ ${input.numero} pausado no ${input.agente || 'todos os agentes'} ATK.`;
+    }
+
+    case 'liberar_atk': {
+      const dbAtk = require('./database-atk');
+      dbAtk.resumeManual(input.numero);
+      dbAtk.addEvent(`Jarvis liberou ${input.numero}`);
+      dbAtk.save();
+      return `✅ ${input.numero} liberado — agentes ATK podem atender normalmente.`;
+    }
+
+    case 'enviar_atk': {
+      const { sendText: sendTextAtk } = require('./services-atk');
+      await sendTextAtk(input.agente, input.numero, input.mensagem, { bypassPause: true });
+      const dbAtk = require('./database-atk');
+      const conv = dbAtk.getConversation(input.agente, input.numero);
+      if (conv) conv.msgs.push({ role: 'assistant', content: input.mensagem, timestamp: Date.now() });
+      dbAtk.save();
+      return `✅ Mensagem enviada por ${input.agente} para ${input.numero}: "${input.mensagem.slice(0, 80)}"`;
+    }
+
+    case 'vendas_atk': {
+      const dbAtk = require('./database-atk');
+      const report = dbAtk.getSalesReport(input.periodo);
+      const lines = [`*Vendas ATK — ${input.periodo}*`, `Total: ${report.totalVendas} vendas`, `Faturamento: R$${report.totalValor}`, `Custo: R$${report.totalCusto}`, `Lucro: R$${report.totalLucro}`, `Margem: ${report.margem}%`];
+      for (const a of report.porAgente) lines.push(`• ${a.nome}: ${a.qtd}x — R$${a.faturamento}`);
+      return lines.join('\n');
+    }
+
+    case 'comando_atk': {
+      const gestorAtk = require('./gestor-atk');
+      const resultado = await gestorAtk.handleAslamChat(input.comando);
+      return resultado || 'Comando ATK executado.';
+    }
+
     default:
       return `Ferramenta desconhecida: ${name}`;
   }
@@ -643,13 +790,19 @@ ${KNOWLEDGE_BASE}
 - Gastos sem necessidade: delivery frequente, assinaturas esquecidas, compras por impulso, roupas sem necessidade
 - Benchmarks saudáveis: Moradia ≤30%, Alimentação ≤15%, Poupança ≥20%
 
-## CONTEXTO DO SISTEMA
-- Sistema: Central Vendas (Node.js 20 + Express + Baileys + Claude)
-- Agente Info-Produtos: vende cursos digitais Kiwify via WhatsApp
-- Agente Logzz: vende produtos físicos COD (pago na entrega)
-- Gestor: você mesmo — controla tudo
+## CONTEXTO DO SISTEMA — SISTEMA UNIFICADO
+- **Central Vendas (CVN):** Agentes logzz (Roberto), rafael (TVO Fotos IA), sarah, info-produtos (Sofia)
+- **Atacadão (ATK):** Agentes pedro (Uni TV V10 R$360), rodrigo (Furadeira 48V R$160)
+- Gestor: você (Super Jarvis) — controla TODOS os 6 agentes
 - Deploy: Railway via GitHub push automático
-- Stack: Node.js, Express, @whiskeysockets/baileys v7, @anthropic-ai/sdk, ioredis
+- Stack: Node.js 20, Express, Baileys v7, Anthropic Claude, Gemini, ioredis
+
+## ATACADÃO — REGRAS CRÍTICAS (nunca violar)
+- Pagamento Pedro/Rodrigo: SOMENTE na entrega — NUNCA PIX antecipado
+- Frete: km × 2, mínimo R$15, máximo 30km
+- Horário entregas: Seg-Sex 10:00-16:30 | Sáb 09:00-13:00 | Dom FECHADO
+- Sem link de cartão (golpe histórico) — entregador leva maquininha
+- Para comandos complexos ATK (treinar, remarketing, preço): use ferramenta \`comando_atk\`
 `;
 }
 
