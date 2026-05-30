@@ -1620,7 +1620,6 @@ async function handleIncomingMessage(agentId, body) {
     if (!agent) return;
 
     if (!body) return;
-    console.log(`[FLOW:${agentId}] MSG RECEBIDA phone=${body.phone} fromMe=${body.isFromMe} texto="${(body.body||'').slice(0,30)}"`);
     if (body.isFromMe) {
       // Miron mandou mensagem pelo WhatsApp do agente — suprimir aviso de finalização
       const num = body.phone;
@@ -1940,7 +1939,6 @@ async function handleIncomingMessage(agentId, body) {
 
     // Client responded - no longer awaiting date
     db.state.awaitingDate.delete(rateKey);
-    console.log(`[FLOW:${agentId}] DEBOUNCE OK — chamando IA para ${numero}`);
 
     // Detecção de opt-out explícito — marcar para parar follow-up automático
     if (/para\s+de\s+me\s+(chamar|mandar|enviar)|n[aã]o\s+quero\s+mais\s+(mensagem|contato)|me\s+tira\s+da\s+lista|n[aã]o\s+me\s+chame|me\s+remove|cancela\s+tudo|para\s+de\s+me\s+incomodar/i.test(mensagem)) {
@@ -2194,10 +2192,8 @@ async function handleIncomingMessage(agentId, body) {
 
     // Usa retry com backoff (3 tentativas, 1s/2s/4s)
     const contextSize = 20;
-    console.log(`[FLOW:${agentId}] CHAMANDO IA para ${numero} (${conv.msgs.length} msgs no histórico)`);
     let resposta = await callClaudeWithRetry(systemPrompt, conv.msgs.slice(-contextSize), { maxTokens: 600 });
 
-    console.log(`[FLOW:${agentId}] IA retornou para ${numero}: "${(resposta||'NULL').slice(0,60)}"`);
     if (!resposta) {
       console.error(`[AI] ${agent.name}: FALHA TOTAL DA IA para ${numero} após 3 tentativas — Gemini e Anthropic indisponíveis`);
       // Alerta operacional para Miron
@@ -2311,7 +2307,6 @@ async function handleIncomingMessage(agentId, body) {
     }
 
     // Process tags (send media, notifications, text) — returns final text sent to client
-    console.log(`[FLOW:${agentId}] ENVIANDO para ${numero}: "${respostaFinal.slice(0,60)}"`);
     const _textoEnviado = await processTags(agentId, numero, respostaFinal, mensagem);
 
     // Save to history AFTER processTags — garante que o CRM reflete exatamente o que foi enviado,
@@ -2326,7 +2321,7 @@ async function handleIncomingMessage(agentId, body) {
     // Extract knowledge asynchronously
     extractKnowledge(agentId, mensagem, respostaFinal).catch(() => {});
   } catch (e) {
-    console.error(`[FLOW:${agentId}] CRASH em handleIncomingMessage:`, e.message, e.stack?.split('\n')[1]?.trim());
+    console.error(`Erro ${agentId}:`, e.message);
   } finally {
     // Liberar lock de processamento independente de sucesso/erro
     if (_procLockKey && db.state.processingLock) db.state.processingLock.delete(_procLockKey);
