@@ -617,6 +617,18 @@ a{color:var(--accent);text-decoration:none}
         <div class="section-title" id="atkConvTitle" style="display:none">Conversas</div>
         <div id="atkConvList" class="chat-list"></div>
 
+        <!-- CRM ATK -->
+        <div class="section-title">CRM — Clientes Atacadão</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="crm-filter active" data-filter="todos" onclick="atkCrmFilter('todos',this)" style="flex:1;padding:7px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none;min-width:60px">Todos</button>
+          <button class="crm-filter" data-filter="muito_quente" onclick="atkCrmFilter('muito_quente',this)" style="flex:1;padding:7px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--danger);border:1px solid var(--border);min-width:60px">🔥 Quentes</button>
+          <button class="crm-filter" data-filter="quente" onclick="atkCrmFilter('quente',this)" style="flex:1;padding:7px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--warning);border:1px solid var(--border);min-width:60px">🌡 Mornos</button>
+          <button class="crm-filter" data-filter="comprou" onclick="atkCrmFilter('comprou',this)" style="flex:1;padding:7px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--success);border:1px solid var(--border);min-width:60px">✅ Compraram</button>
+        </div>
+        <div id="atkCrmList" class="chat-list">
+          <div class="loading"><div class="spinner"></div> Carregando CRM...</div>
+        </div>
+
         <!-- Liberar todos -->
         <div class="section-title">Ações em Massa</div>
         <div class="card">
@@ -853,7 +865,7 @@ function showPage(page) {
 
   if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); loadSarahVendas(); }
   if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
-  if (page === 'atk') { loadAtkStatus(); }
+  if (page === 'atk') { loadAtkStatus(); loadAtkCrm(); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
@@ -1712,6 +1724,91 @@ async function sarahCheckConexao() {
     const el = document.getElementById('sarahConexaoStatus');
     if (el) el.textContent = s.state === 'connected' ? '✅ Conectada' : s.state === 'connecting' ? '⏳ Conectando...' : '❌ Desconectada';
   } catch {}
+}
+
+// ═══════════ ATK CRM ═══════════
+
+let _atkCrmData = [];
+let _atkCrmFiltro = 'todos';
+
+async function loadAtkCrm() {
+  try {
+    const data = await api('/api/atk/crm');
+    _atkCrmData = data || [];
+    renderAtkCrm();
+  } catch (e) {
+    document.getElementById('atkCrmList').innerHTML = `<div class="empty-state"><div class="empty-text">Erro ao carregar CRM</div></div>`;
+  }
+}
+
+function atkCrmFilter(filtro, btn) {
+  _atkCrmFiltro = filtro;
+  document.querySelectorAll('.crm-filter').forEach(b => {
+    b.style.background = 'var(--card)';
+    b.style.color = b.dataset.filter === 'muito_quente' ? 'var(--danger)' :
+                    b.dataset.filter === 'quente' ? 'var(--warning)' :
+                    b.dataset.filter === 'comprou' ? 'var(--success)' : 'var(--text-muted)';
+    b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--accent)';
+  btn.style.color = '#fff';
+  btn.style.border = 'none';
+  renderAtkCrm();
+}
+
+function renderAtkCrm() {
+  const list = document.getElementById('atkCrmList');
+  if (!list) return;
+
+  let dados = _atkCrmData;
+  if (_atkCrmFiltro === 'muito_quente') dados = dados.filter(c => c.temperatura === 'muito_quente' || c.temperatura === 'quente');
+  else if (_atkCrmFiltro === 'quente') dados = dados.filter(c => c.temperatura === 'morno');
+  else if (_atkCrmFiltro === 'comprou') dados = dados.filter(c => c.status === 'comprou');
+
+  if (dados.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Nenhum cliente encontrado</div></div>';
+    return;
+  }
+
+  const tempBadge = t => ({
+    muito_quente: '<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:#fee2e2;color:#dc2626;font-weight:700">🔥 Muito Quente</span>',
+    quente:       '<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:#fef3c7;color:#92400e;font-weight:700">🌡 Quente</span>',
+    morno:        '<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:#fef9c3;color:#854d0e;font-weight:700">🌤 Morno</span>',
+    frio:         '<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:#f1f5f9;color:var(--text-muted);font-weight:700">❄️ Frio</span>',
+  })[t] || '';
+
+  const statusBadge = s => ({
+    comprou:    '<span style="font-size:10px;padding:2px 6px;border-radius:99px;background:#dcfce7;color:#166534;font-weight:700">✅ Comprou</span>',
+    negociando: '<span style="font-size:10px;padding:2px 6px;border-radius:99px;background:#dbeafe;color:#1e40af;font-weight:700">💬 Negociando</span>',
+    lead:       '<span style="font-size:10px;padding:2px 6px;border-radius:99px;background:#f3f4f6;color:var(--text-muted);font-weight:700">👤 Lead</span>',
+    perdido:    '<span style="font-size:10px;padding:2px 6px;border-radius:99px;background:#fee2e2;color:#991b1b;font-weight:700">❌ Perdido</span>',
+  })[s] || '';
+
+  list.innerHTML = dados.slice(0, 100).map(c => `
+    <div class="chat-item" onclick="atkOpenConversaChat('${c.agente}','${c.numero}','${esc(c.pushName||c.numero)}')">
+      <div class="chat-avatar" style="background:${c.agente==='pedro'?'linear-gradient(135deg,#f97316,#ea580c)':'linear-gradient(135deg,#8b5cf6,#7c3aed)'}">
+        ${esc((c.pushName||c.numero).charAt(0).toUpperCase())}
+      </div>
+      <div class="chat-info">
+        <div class="chat-name">
+          <span>${esc(c.pushName||c.numero)}</span>
+          <span style="font-size:10px;color:var(--text-muted)">${c.agente==='pedro'?'Pedro':'Rodrigo'} · Score ${c.score}</span>
+        </div>
+        <div class="chat-preview">${esc((c.ultimaMensagem||'').slice(0,60))}</div>
+        <div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">
+          ${tempBadge(c.temperatura)}${statusBadge(c.status)}
+          ${c.pausado ? '<span style="font-size:10px;padding:2px 6px;border-radius:99px;background:#fef3c7;color:#92400e;font-weight:700">⏸ Pausado</span>' : ''}
+        </div>
+      </div>
+      <div class="chat-meta">
+        <span class="chat-time">${formatTs(c.ultimaMensagemTimestamp)}</span>
+        <span style="font-size:10px;color:var(--text-muted)">${c.totalMsgs} msgs</span>
+      </div>
+    </div>`).join('');
+}
+
+function atkOpenConversaChat(agentId, numero, nome) {
+  openChatWindow(agentId, numero, nome);
 }
 
 // ═══════════ SARAH VENDAS ═══════════
