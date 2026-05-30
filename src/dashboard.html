@@ -617,10 +617,11 @@ a{color:var(--accent);text-decoration:none}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-secondary" style="flex:1" onclick="atkLoadConversas('pedro')">💬 Conversas</button>
-            <button class="btn-secondary" style="flex:1" onclick="atkShowQr('pedro')">📱 QR Code</button>
+            <button class="btn-secondary" style="flex:1" onclick="atkReconectar('pedro')">📱 Conectar QR</button>
           </div>
           <div id="atkQrPedro" style="display:none;text-align:center;margin-top:12px">
-            <img id="atkQrImgPedro" src="" style="width:200px;height:200px;border-radius:12px">
+            <div id="atkQrMsgPedro" style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Gerando QR...</div>
+            <img id="atkQrImgPedro" src="" style="width:220px;height:220px;border-radius:12px;display:none">
             <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Escaneie com WhatsApp do Pedro</div>
           </div>
         </div>
@@ -642,10 +643,11 @@ a{color:var(--accent);text-decoration:none}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-secondary" style="flex:1" onclick="atkLoadConversas('rodrigo')">💬 Conversas</button>
-            <button class="btn-secondary" style="flex:1" onclick="atkShowQr('rodrigo')">📱 QR Code</button>
+            <button class="btn-secondary" style="flex:1" onclick="atkReconectar('rodrigo')">📱 Conectar QR</button>
           </div>
           <div id="atkQrRodrigo" style="display:none;text-align:center;margin-top:12px">
-            <img id="atkQrImgRodrigo" src="" style="width:200px;height:200px;border-radius:12px">
+            <div id="atkQrMsgRodrigo" style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Gerando QR...</div>
+            <img id="atkQrImgRodrigo" src="" style="width:220px;height:220px;border-radius:12px;display:none">
             <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Escaneie com WhatsApp do Rodrigo</div>
           </div>
         </div>
@@ -1838,18 +1840,30 @@ async function atkOpenConv(agentId, phone, name) {
   } catch (e) { document.getElementById('chatWinBody').innerHTML = `<div style="padding:16px;color:var(--danger)">${esc(e.message)}</div>`; }
 }
 
-async function atkShowQr(agentId) {
+async function atkReconectar(agentId) {
   const cap = agentId.charAt(0).toUpperCase() + agentId.slice(1);
   const qrDiv = document.getElementById(`atkQr${cap}`);
   const qrImg = document.getElementById(`atkQrImg${cap}`);
-  if (!qrDiv || !qrImg) return;
-  qrDiv.style.display = qrDiv.style.display === 'none' ? 'block' : 'none';
-  if (qrDiv.style.display === 'block') {
-    try {
-      const data = await api(`/api/atk/agents/${agentId}/qr`);
-      if (data.state === 'connected') { qrDiv.innerHTML = '<div style="padding:16px;color:var(--success);font-weight:700">✅ Conectado!</div>'; return; }
-      if (data.qr) { qrImg.src = data.qr; } else { qrDiv.innerHTML = `<div style="padding:16px;color:var(--text-muted)">${stateLabel(data.state)} — aguarde ou reconecte</div>`; }
-    } catch (e) { qrDiv.innerHTML = `<div style="padding:16px;color:var(--danger)">${esc(e.message)}</div>`; }
+  const qrMsg = document.getElementById(`atkQrMsg${cap}`);
+  if (!qrDiv) return;
+  qrDiv.style.display = 'block';
+  if (qrImg) qrImg.style.display = 'none';
+  if (qrMsg) qrMsg.textContent = '⏳ Gerando QR Code...';
+  try {
+    const data = await api(`/api/atk/agents/${agentId}/reconnect`, 'POST');
+    if (data.connected || data.state === 'connected') {
+      qrDiv.innerHTML = '<div style="padding:16px;color:var(--success);font-weight:700;font-size:15px">✅ Conectado com sucesso!</div>';
+      loadAtkStatus();
+      return;
+    }
+    if (data.qr) {
+      if (qrMsg) qrMsg.textContent = `Escaneie com o WhatsApp do ${cap}`;
+      if (qrImg) { qrImg.src = data.qr; qrImg.style.display = 'block'; }
+    } else {
+      if (qrMsg) qrMsg.textContent = `Estado: ${stateLabel(data.state)} — aguarde alguns segundos e tente novamente`;
+    }
+  } catch (e) {
+    if (qrMsg) qrMsg.textContent = `Erro: ${esc(e.message)}`;
   }
 }
 

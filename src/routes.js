@@ -1061,13 +1061,66 @@ router.get('/api/atk/eventos', auth, (req, res) => {
 // QR code ATK (Pedro ou Rodrigo)
 router.get('/api/atk/agents/:agentId/qr', auth, (req, res) => {
   try {
-    const dbAtk = require('./database-atk');
     const baileys = require('./baileys');
     const { agentId } = req.params;
     if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
     const state = baileys.getState(agentId);
-    const qr = baileys.getQR ? baileys.getQR(agentId) : null;
-    res.json({ agentId, state, qr: qr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}` : null });
+    const qr = baileys.getQRCode(agentId);
+    let qrUrl = null;
+    if (qr) {
+      try {
+        const QRCode = require('qrcode');
+        QRCode.toDataURL(qr, { width: 280, margin: 2 }).then(dataUrl => {
+          res.json({ agentId, state, qr: dataUrl });
+        }).catch(() => {
+          res.json({ agentId, state, qr: `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}` });
+        });
+        return;
+      } catch {}
+    }
+    res.json({ agentId, state, qr: null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Reconectar agente ATK (gera novo QR)
+router.post('/api/atk/agents/:agentId/reconnect', auth, async (req, res) => {
+  const { agentId } = req.params;
+  if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
+  try {
+    const baileys = require('./baileys');
+    const agentsAtkInit = require('./agents-atk-init');
+    await baileys.forceLogout(agentId);
+    // Re-inicializa a sessão para gerar novo QR
+    const dbAtk = require('./database-atk');
+    const agentsAtk = require('./agents-atk');
+    const handler = (type, data) => {
+      try {
+        const conv = dbAtk.getConversation(agentId, data.phone);
+        if (conv && data._originalJid) conv._originalJid = data._originalJid;
+        if (type === 'received') agentsAtk.handleIncomingMessage(agentId, data);
+        else if (type === 'sent') agentsAtk.handleSentMessage(agentId, data);
+      } catch (e) { console.error(`[ATK:${agentId}] Handler error:`, e.message); }
+    };
+    await baileys.connect(agentId, handler);
+    // Aguardar QR até 8s
+    let qr = null;
+    for (let i = 0; i < 16; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      qr = baileys.getQRCode(agentId);
+      if (qr) break;
+      if (baileys.getState(agentId) === 'connected') break;
+    }
+    const state = baileys.getState(agentId);
+    if (state === 'connected') return res.json({ agentId, state, qr: null, connected: true });
+    if (qr) {
+      try {
+        const QRCode = require('qrcode');
+        const dataUrl = await QRCode.toDataURL(qr, { width: 280, margin: 2 });
+        return res.json({ agentId, state, qr: dataUrl });
+      } catch {}
+      return res.json({ agentId, state, qr: `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}` });
+    }
+    res.json({ agentId, state, qr: null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
