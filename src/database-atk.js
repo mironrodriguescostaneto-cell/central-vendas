@@ -81,6 +81,9 @@ const state = {
   schedules: new Map(),
   botSending: { pedro: new Set(), rodrigo: new Set() },
   lastResponse: new Map(),
+  debounceTimers: new Map(),
+  processingLock: new Map(),
+  awaitingDate: new Set(),
 };
 
 // --- LID helpers ---
