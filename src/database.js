@@ -40,6 +40,9 @@ const state = {
   connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected', sarah: 'disconnected' },
   qrCodes: { info: null, logzz: null, rafael: null, sarah: null },
 
+  // Compradores confirmados pela Kiwify — phone normalizado (com 55)
+  sarahPurchases: new Set(),
+
   // Finanças familiares
   financas: {
     transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
@@ -74,6 +77,7 @@ function serialize() {
       rafael: Array.from(state.paused.rafael),
       sarah: Array.from(state.paused.sarah),
     },
+    sarahPurchases: Array.from(state.sarahPurchases),
   };
 }
 
@@ -109,6 +113,7 @@ function deserialize(data) {
     if (data.paused.rafael) state.paused.rafael = new Set(data.paused.rafael);
     if (data.paused.sarah) state.paused.sarah = new Set(data.paused.sarah);
   }
+  if (data.sarahPurchases) state.sarahPurchases = new Set(data.sarahPurchases);
 }
 
 // ----- Redis -----

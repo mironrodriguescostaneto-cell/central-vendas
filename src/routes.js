@@ -1162,4 +1162,70 @@ router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
+// ═══════════════════════════════════════════════════════════
+// WEBHOOK KIWIFY — Compra confirmada da Sarah (Fotógrafo Online)
+// Configurar no painel Kiwify: POST /webhook/kiwify/sarah
+// ═══════════════════════════════════════════════════════════
+
+function normalizePhone(raw) {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return null;
+  // Já tem 55 (Brasil) na frente
+  if (digits.startsWith('55') && digits.length >= 12) return digits;
+  // Sem código de país — assume Brasil
+  if (digits.length >= 10) return '55' + digits;
+  return null;
+}
+
+router.post('/webhook/kiwify/sarah', async (req, res) => {
+  res.sendStatus(200); // responde rápido para Kiwify não retentar
+  try {
+    const body = req.body || {};
+    console.log('[KIWIFY] Webhook recebido:', JSON.stringify(body).slice(0, 300));
+
+    // Kiwify envia diferentes formatos — cobrir todos
+    const customer = body.Customer || body.customer || body.data?.customer || body.payload?.customer || {};
+    const status   = (body.order_status || body.status || body.data?.status || body.event || '').toLowerCase();
+
+    // Só processar se for aprovado/pago
+    const isApproved = ['paid', 'approved', 'order_approved', 'order.approved', 'active', 'complete'].some(s => status.includes(s));
+    if (!isApproved) {
+      console.log('[KIWIFY] Ignorado — status:', status);
+      return;
+    }
+
+    // Extrair telefone do cliente
+    const rawPhone = customer.mobile || customer.phone || customer.Mobile || customer.Phone ||
+                     body.customer_phone || body.mobile || '';
+    const phone = normalizePhone(rawPhone);
+
+    const name  = customer.name || customer.Name || body.customer_name || 'Cliente';
+    const email = customer.email || customer.Email || body.customer_email || '';
+
+    console.log(`[KIWIFY] Compra aprovada — nome: ${name} | email: ${email} | phone raw: "${rawPhone}" | normalizado: ${phone}`);
+
+    if (!phone) {
+      console.warn('[KIWIFY] Telefone não encontrado no payload — não é possível pausar a Sarah');
+      return;
+    }
+
+    // Registrar compra no banco
+    db.state.sarahPurchases.add(phone);
+    db.saveDB().catch(() => {});
+
+    // Pausar cliente na Sarah se tiver conversa ativa
+    const sarahConv = db.state.conversations.sarah?.get(phone);
+    if (sarahConv) {
+      db.pausePhone('sarah', phone);
+      // Limpar timers de follow-up (sarah.js lê o flag comprado antes de disparar)
+      console.log(`[KIWIFY] Cliente ${phone} (${name}) comprou — pausado na Sarah`);
+    } else {
+      console.log(`[KIWIFY] Compra registrada para ${phone} (sem conversa ativa na Sarah)`);
+    }
+  } catch (e) {
+    console.error('[KIWIFY] Erro ao processar webhook:', e.message);
+  }
+});
+
 module.exports = router;

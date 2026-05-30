@@ -294,6 +294,12 @@ async function checkFollowUps() {
     if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
 
+    // Já comprou via Kiwify — pausa definitiva e não envia mais follow-up
+    if (db.state.sarahPurchases?.has(phone)) {
+      pausePhone(AGENT_ID, phone);
+      continue;
+    }
+
     // Não disparar se o lead respondeu recentemente (< 30min)
     if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < TRINTA_MIN) continue;
 
