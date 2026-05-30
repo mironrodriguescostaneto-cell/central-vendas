@@ -1058,6 +1058,39 @@ router.get('/api/atk/eventos', auth, (req, res) => {
   res.json(dbAtk.state.events.slice(-100).reverse());
 });
 
+// Debug ATK: últimas mensagens recebidas + estado interno
+router.get('/api/atk/debug', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  const baileys = require('./baileys');
+  res.json({
+    pedro: {
+      baileys_state: baileys.getState('pedro'),
+      conversas: dbAtk.state.conversations.pedro.size,
+      pausados_manual: dbAtk.state.pausedManual.pedro.size,
+      pausados_auto: dbAtk.state.paused.pedro.size,
+      metrics: dbAtk.state.metrics.pedro,
+      price: dbAtk.getAgentPrice('pedro'),
+    },
+    rodrigo: {
+      baileys_state: baileys.getState('rodrigo'),
+      conversas: dbAtk.state.conversations.rodrigo.size,
+      pausados_manual: dbAtk.state.pausedManual.rodrigo.size,
+      pausados_auto: dbAtk.state.paused.rodrigo.size,
+      metrics: dbAtk.state.metrics.rodrigo,
+      price: dbAtk.getAgentPrice('rodrigo'),
+    },
+    ultimas_msgs_recebidas: dbAtk.state._debugIncoming || [],
+    processingLock_size: dbAtk.state.processingLock?.size || 0,
+    env: {
+      GEMINI_KEY: !!(process.env.GEMINI_API_KEY),
+      ANTHROPIC_KEY: !!(process.env.ANTHROPIC_API_KEY),
+      ATK_REDIS_URL: !!(process.env.ATK_REDIS_URL),
+      PEDRO_NUMERO: process.env.PEDRO_NUMERO || 'NAO CONFIGURADO',
+      RODRIGO_NUMERO: process.env.RODRIGO_NUMERO || 'NAO CONFIGURADO',
+    },
+  });
+});
+
 // QR code ATK (Pedro ou Rodrigo)
 router.get('/api/atk/agents/:agentId/qr', auth, (req, res) => {
   try {
