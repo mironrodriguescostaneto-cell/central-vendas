@@ -261,7 +261,7 @@ a{color:var(--accent);text-decoration:none}
     <div class="page active" id="pagePainel">
       <div class="page-scroll">
         <div class="page-content">
-          <div class="section-title">Status dos Agentes</div>
+          <div class="section-title">Central Vendas</div>
           <div class="agent-status-row" id="agentStatusRow">
             <div class="agent-status-mini">
               <div class="dot disconnected" id="dotInfo"></div>
@@ -271,6 +271,24 @@ a{color:var(--accent);text-decoration:none}
               <div class="dot disconnected" id="dotLogzz"></div>
               <div><div class="label">Logzz</div><div class="sub" id="stateLogzz">Desconectado</div></div>
             </div>
+          </div>
+
+          <div class="section-title">Atacadão 🛒</div>
+          <div class="agent-status-row">
+            <div class="agent-status-mini" onclick="showPage('atk')" style="cursor:pointer">
+              <div class="dot disconnected" id="dotPedro"></div>
+              <div><div class="label">Pedro</div><div class="sub" id="statePedro">Verificando...</div></div>
+            </div>
+            <div class="agent-status-mini" onclick="showPage('atk')" style="cursor:pointer">
+              <div class="dot disconnected" id="dotRodrigo"></div>
+              <div><div class="label">Rodrigo</div><div class="sub" id="stateRodrigo">Verificando...</div></div>
+            </div>
+          </div>
+          <div class="stats-grid" style="margin-top:8px">
+            <div class="stat-card" onclick="showPage('atk')" style="cursor:pointer"><div class="stat-val" id="atkConvPedro">–</div><div class="stat-lbl">Convs Pedro</div></div>
+            <div class="stat-card" onclick="showPage('atk')" style="cursor:pointer"><div class="stat-val" id="atkConvRodrigo">–</div><div class="stat-lbl">Convs Rodrigo</div></div>
+            <div class="stat-card" onclick="showPage('atk')" style="cursor:pointer"><div class="stat-val" id="atkVendas">–</div><div class="stat-lbl">Vendas ATK</div></div>
+            <div class="stat-card" onclick="showPage('atk')" style="cursor:pointer"><div class="stat-val" id="atkPausados">–</div><div class="stat-lbl">Pausados</div></div>
           </div>
 
           <div class="section-title">Resumo</div>
@@ -576,6 +594,79 @@ a{color:var(--accent);text-decoration:none}
       </div>
     </div>
 
+    <!-- PAGE: ATACADÃO -->
+    <div class="page" id="pageAtk">
+      <div class="page-scroll"><div class="page-content">
+
+        <div class="section-title">Agentes Atacadão</div>
+
+        <!-- Pedro -->
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Pedro — Uni TV V10</div>
+              <div class="card-subtitle" id="atkPedroInfo">Verificando...</div>
+            </div>
+            <div class="dot disconnected" id="dotPedroAtk" style="width:12px;height:12px"></div>
+          </div>
+          <div class="stats-grid" style="margin-bottom:12px">
+            <div class="stat-card"><div class="stat-val" id="atkPedroConvs">–</div><div class="stat-lbl">Conversas</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkPedroPausados">–</div><div class="stat-lbl">Pausados</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkPedroVendas">–</div><div class="stat-lbl">Vendas</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkPedroPreco">–</div><div class="stat-lbl">Preço</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-secondary" style="flex:1" onclick="atkLoadConversas('pedro')">💬 Conversas</button>
+            <button class="btn-secondary" style="flex:1" onclick="atkShowQr('pedro')">📱 QR Code</button>
+          </div>
+          <div id="atkQrPedro" style="display:none;text-align:center;margin-top:12px">
+            <img id="atkQrImgPedro" src="" style="width:200px;height:200px;border-radius:12px">
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Escaneie com WhatsApp do Pedro</div>
+          </div>
+        </div>
+
+        <!-- Rodrigo -->
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Rodrigo — Furadeira 48V</div>
+              <div class="card-subtitle" id="atkRodrigoInfo">Verificando...</div>
+            </div>
+            <div class="dot disconnected" id="dotRodrigoAtk" style="width:12px;height:12px"></div>
+          </div>
+          <div class="stats-grid" style="margin-bottom:12px">
+            <div class="stat-card"><div class="stat-val" id="atkRodrigoConvs">–</div><div class="stat-lbl">Conversas</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkRodrigoPausados">–</div><div class="stat-lbl">Pausados</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkRodrigoVendas">–</div><div class="stat-lbl">Vendas</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkRodrigoPreco">–</div><div class="stat-lbl">Preço</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-secondary" style="flex:1" onclick="atkLoadConversas('rodrigo')">💬 Conversas</button>
+            <button class="btn-secondary" style="flex:1" onclick="atkShowQr('rodrigo')">📱 QR Code</button>
+          </div>
+          <div id="atkQrRodrigo" style="display:none;text-align:center;margin-top:12px">
+            <img id="atkQrImgRodrigo" src="" style="width:200px;height:200px;border-radius:12px">
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Escaneie com WhatsApp do Rodrigo</div>
+          </div>
+        </div>
+
+        <!-- Conversas ATK -->
+        <div class="section-title" id="atkConvTitle" style="display:none">Conversas</div>
+        <div id="atkConvList" class="chat-list"></div>
+
+        <!-- Liberar todos -->
+        <div class="section-title">Ações em Massa</div>
+        <div class="card">
+          <div style="display:flex;gap:8px;flex-direction:column">
+            <button class="btn-primary" onclick="atkLiberarTodos('pedro')">▶ Liberar todos do Pedro</button>
+            <button class="btn-primary" onclick="atkLiberarTodos('rodrigo')">▶ Liberar todos do Rodrigo</button>
+            <button class="btn-secondary" onclick="showPage('gestor')">🤖 Abrir Super Jarvis</button>
+          </div>
+        </div>
+
+      </div></div>
+    </div>
+
     <!-- PAGE: GESTOR -->
 
     <div class="page" id="pageGestor">
@@ -635,6 +726,10 @@ a{color:var(--accent);text-decoration:none}
       <span class="nav-label">Logzz</span>
     </button>
 
+    <button class="nav-item" id="nav-atk" onclick="showPage('atk')">
+      <div class="nav-icon">🛒</div>
+      <span class="nav-label">Atacadão</span>
+    </button>
     <button class="nav-item" id="nav-gestor" onclick="showPage('gestor')">
       <div class="nav-icon">🧠</div>
       <span class="nav-label">Jarvis</span>
@@ -786,8 +881,8 @@ function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`pagePainel`);
-  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', gestor: 'pageGestor' };
-  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', gestor: 'Gestor Jarvis' };
+  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', atk: 'pageAtk', gestor: 'pageGestor' };
+  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', atk: 'Atacadão', gestor: 'Super Jarvis' };
   document.getElementById(pageMap[page])?.classList.add('active');
   document.getElementById(`nav-${page}`)?.classList.add('active');
   document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
@@ -795,6 +890,7 @@ function showPage(page) {
 
   if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); }
   if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
+  if (page === 'atk') { loadAtkStatus(); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
@@ -832,6 +928,7 @@ function startPolling() {
     if (currentPage === 'info') loadConversas('rafael');
     if (currentPage === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); }
     if (currentPage === 'rafael') loadConversas('rafael');
+    if (currentPage === 'atk') loadAtkStatus();
   }, 5000);
   agentStatusPoll = setInterval(loadAgentStatus, 8000);
   loadAgentStatus();
@@ -852,6 +949,25 @@ async function loadPainelData() {
       api('/api/pedidos'),
       api('/api/links-oferta'),
     ]);
+    // Carregar status ATK em paralelo (sem bloquear se falhar)
+    api('/api/atk/status').then(atkData => {
+      for (const id of ['pedro', 'rodrigo']) {
+        const s = atkData[id] || {};
+        const cap = id.charAt(0).toUpperCase() + id.slice(1);
+        const dotEl = document.getElementById(`dot${cap}`);
+        const stEl  = document.getElementById(`state${cap}`);
+        if (dotEl) dotEl.className = `dot ${s.state || 'disconnected'}`;
+        if (stEl)  stEl.textContent = stateLabel(s.state);
+      }
+      const pC = document.getElementById('atkConvPedro');
+      const rC = document.getElementById('atkConvRodrigo');
+      const pP = document.getElementById('atkPausados');
+      const pV = document.getElementById('atkVendas');
+      if (pC) pC.textContent = atkData.pedro?.conversas || 0;
+      if (rC) rC.textContent = atkData.rodrigo?.conversas || 0;
+      if (pP) pP.textContent = (atkData.pedro?.pausados||0)+(atkData.rodrigo?.pausados||0);
+      if (pV) pV.textContent = (atkData.pedro?.metrics?.vendas||0)+(atkData.rodrigo?.metrics?.vendas||0);
+    }).catch(() => {});
 
     // Stats
     document.getElementById('statConvInfo').textContent = convsRafael.length || 0;
@@ -1620,6 +1736,135 @@ async function sarahCheckConexao() {
     const el = document.getElementById('sarahConexaoStatus');
     if (el) el.textContent = s.state === 'connected' ? '✅ Conectada' : s.state === 'connecting' ? '⏳ Conectando...' : '❌ Desconectada';
   } catch {}
+}
+
+// ═══════════ ATACADÃO ═══════════
+
+async function loadAtkStatus() {
+  try {
+    const data = await api('/api/atk/status');
+    for (const id of ['pedro', 'rodrigo']) {
+      const s = data[id] || {};
+      const cap = id.charAt(0).toUpperCase() + id.slice(1);
+      const state = s.state || 'disconnected';
+      const pausados = s.pausados || 0;
+      const convs = s.conversas || 0;
+      const vendas = s.metrics?.vendas || 0;
+      const preco = s.preco || '–';
+
+      // Painel dots
+      const dotP = document.getElementById(`dot${cap}`);
+      const stateP = document.getElementById(`state${cap}`);
+      if (dotP) dotP.className = `dot ${state}`;
+      if (stateP) stateP.textContent = stateLabel(state);
+
+      // Painel stats ATK
+      document.getElementById(`atkConv${cap}`)?.setAttribute && (document.getElementById(`atkConv${cap}`).textContent = convs);
+      if (id === 'pedro') {
+        const el = document.getElementById('atkPausados');
+        if (el) el.textContent = (data.pedro?.pausados||0) + (data.rodrigo?.pausados||0);
+        const elV = document.getElementById('atkVendas');
+        if (elV) elV.textContent = (data.pedro?.metrics?.vendas||0) + (data.rodrigo?.metrics?.vendas||0);
+      }
+
+      // Página ATK
+      const dotAtk = document.getElementById(`dot${cap}Atk`);
+      if (dotAtk) dotAtk.className = `dot ${state}`;
+      const infoEl = document.getElementById(`atk${cap}Info`);
+      if (infoEl) infoEl.textContent = `${s.produto || id} · R$${preco} · ${stateLabel(state)}`;
+      const cEl = document.getElementById(`atk${cap}Convs`);
+      if (cEl) cEl.textContent = convs;
+      const pEl = document.getElementById(`atk${cap}Pausados`);
+      if (pEl) pEl.textContent = pausados;
+      const vEl = document.getElementById(`atk${cap}Vendas`);
+      if (vEl) vEl.textContent = vendas;
+      const prEl = document.getElementById(`atk${cap}Preco`);
+      if (prEl) prEl.textContent = `R$${preco}`;
+    }
+
+    // Painel conv counters
+    const pC = document.getElementById('atkConvPedro');
+    const rC = document.getElementById('atkConvRodrigo');
+    if (pC) pC.textContent = data.pedro?.conversas || 0;
+    if (rC) rC.textContent = data.rodrigo?.conversas || 0;
+
+  } catch (e) { console.warn('[ATK status]', e.message); }
+}
+
+async function atkLoadConversas(agentId) {
+  const titleEl = document.getElementById('atkConvTitle');
+  const listEl = document.getElementById('atkConvList');
+  if (!listEl) return;
+  if (titleEl) { titleEl.style.display = 'block'; titleEl.textContent = `Conversas — ${agentId.charAt(0).toUpperCase()+agentId.slice(1)}`; }
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div> Carregando...</div>';
+  try {
+    const convs = await api(`/api/atk/conversas/${agentId}`);
+    if (!convs.length) { listEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma conversa</div></div>'; return; }
+    listEl.innerHTML = convs.slice(0,30).map(c => `
+      <div class="chat-item" onclick="atkOpenConv('${agentId}','${esc(c.numero)}','${esc(c.pushName||c.numero)}')">
+        <div class="chat-avatar">${(c.pushName||c.numero||'?')[0].toUpperCase()}</div>
+        <div class="chat-body">
+          <div class="chat-name">${esc(c.pushName||c.numero)} ${c.pausado?'<span style="color:var(--warning)">⏸</span>':''}</div>
+          <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
+        </div>
+        <div class="chat-meta">
+          <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)';}">${c.score}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { listEl.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${esc(e.message)}</div></div>`; }
+}
+
+async function atkOpenConv(agentId, phone, name) {
+  chatWindowAgent = agentId;
+  chatWindowPhone = phone;
+  document.getElementById('chatWinName').textContent = name;
+  document.getElementById('chatWindow').classList.add('open');
+  document.getElementById('btnPauseChat').style.display = '';
+  document.getElementById('btnResumeChat').style.display = 'none';
+  document.getElementById('chatWinBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const data = await api(`/api/atk/conversas/${agentId}/${encodeURIComponent(phone)}`);
+    chatWindowPaused = data.pausado;
+    updatePauseButtons();
+    const msgs = data.msgs || [];
+    document.getElementById('chatWinBody').innerHTML = msgs.map(m => `
+      <div class="msg-bubble ${m.role}">
+        ${esc(m.content||m.text||'')}
+        <div class="msg-time">${formatTs(m.timestamp||m.ts)}</div>
+      </div>
+    `).join('');
+    document.getElementById('chatWinBody').scrollTop = 999999;
+  } catch (e) { document.getElementById('chatWinBody').innerHTML = `<div style="padding:16px;color:var(--danger)">${esc(e.message)}</div>`; }
+}
+
+async function atkShowQr(agentId) {
+  const cap = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+  const qrDiv = document.getElementById(`atkQr${cap}`);
+  const qrImg = document.getElementById(`atkQrImg${cap}`);
+  if (!qrDiv || !qrImg) return;
+  qrDiv.style.display = qrDiv.style.display === 'none' ? 'block' : 'none';
+  if (qrDiv.style.display === 'block') {
+    try {
+      const data = await api(`/api/atk/agents/${agentId}/qr`);
+      if (data.state === 'connected') { qrDiv.innerHTML = '<div style="padding:16px;color:var(--success);font-weight:700">✅ Conectado!</div>'; return; }
+      if (data.qr) { qrImg.src = data.qr; } else { qrDiv.innerHTML = `<div style="padding:16px;color:var(--text-muted)">${stateLabel(data.state)} — aguarde ou reconecte</div>`; }
+    } catch (e) { qrDiv.innerHTML = `<div style="padding:16px;color:var(--danger)">${esc(e.message)}</div>`; }
+  }
+}
+
+async function atkLiberarTodos(agentId) {
+  if (!confirm(`Liberar TODOS os clientes pausados do ${agentId.charAt(0).toUpperCase()+agentId.slice(1)}?`)) return;
+  try {
+    const convs = await api(`/api/atk/conversas/${agentId}`);
+    const pausados = convs.filter(c => c.pausado);
+    let ok = 0;
+    for (const c of pausados) {
+      try { await api(`/api/atk/conversas/${agentId}/${encodeURIComponent(c.numero)}/resume`, {method:'POST'}); ok++; } catch {}
+    }
+    showToast(`✅ ${ok} clientes liberados`);
+    loadAtkStatus();
+  } catch (e) { showToast(`Erro: ${e.message}`); }
 }
 </script>
 </body>
