@@ -43,6 +43,9 @@ const state = {
   // Compradores confirmados pela Kiwify — phone normalizado (com 55)
   sarahPurchases: new Set(),
 
+  // Vendas confirmadas da Sarah (Fotógrafo Online via Kiwify)
+  sarahSales: [], // [{id, name, email, phone, valor, orderId, ts}]
+
   // Finanças familiares
   financas: {
     transacoes: [], // [{id, tipo, valor, categoria, descricao, quem, data, mes, ts}]
@@ -78,6 +81,7 @@ function serialize() {
       sarah: Array.from(state.paused.sarah),
     },
     sarahPurchases: Array.from(state.sarahPurchases),
+    sarahSales: state.sarahSales,
   };
 }
 
@@ -114,6 +118,7 @@ function deserialize(data) {
     if (data.paused.sarah) state.paused.sarah = new Set(data.paused.sarah);
   }
   if (data.sarahPurchases) state.sarahPurchases = new Set(data.sarahPurchases);
+  if (data.sarahSales) state.sarahSales = data.sarahSales;
 }
 
 // ----- Redis -----

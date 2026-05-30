@@ -291,6 +291,12 @@ a{color:var(--accent);text-decoration:none}
             <div class="stat-card" onclick="showPage('atk')" style="cursor:pointer"><div class="stat-val" id="atkPausados">–</div><div class="stat-lbl">Pausados</div></div>
           </div>
 
+          <div class="section-title">Sarah — Fotógrafo Online</div>
+          <div class="stats-grid">
+            <div class="stat-card" onclick="showPage('info')" style="cursor:pointer"><div class="stat-val" id="sarahVendasCount" style="color:var(--success)">–</div><div class="stat-lbl">Vendas Curso</div></div>
+            <div class="stat-card" onclick="showPage('info')" style="cursor:pointer"><div class="stat-val" id="sarahVendasTotal" style="color:var(--success)">–</div><div class="stat-lbl">Faturamento</div></div>
+          </div>
+
           <div class="section-title">Resumo</div>
           <div class="stats-grid" id="statsGrid">
             <div class="stat-card"><div class="stat-val" id="statConvInfo">–</div><div class="stat-lbl">Conversas Info</div></div>
@@ -348,19 +354,19 @@ a{color:var(--accent);text-decoration:none}
               <div class="card-header">
                 <div><div class="card-title">Agente Sarah</div><div class="card-subtitle">Fotógrafo Online — curso digital R$47</div></div>
               </div>
-              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px">
-                <div style="font-weight:700;margin-bottom:4px">Produto</div>
-                <div style="color:var(--text-muted)">Fotógrafo Online — R$47 à vista ou 11x R$5,22</div>
-              </div>
-              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px;margin-top:8px">
-                <div style="font-weight:700;margin-bottom:4px">Garantia</div>
-                <div style="color:var(--text-muted)">R$50 no 1º dia ou 100% de reembolso</div>
+              <div class="stats-grid" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-val" id="sarahVendasCountInfo" style="color:var(--success)">–</div><div class="stat-lbl">Vendas</div></div>
+                <div class="stat-card"><div class="stat-val" id="sarahVendasTotalInfo" style="color:var(--success)">–</div><div class="stat-lbl">Faturamento</div></div>
               </div>
             </div>
             <div class="card">
               <div class="card-title" style="margin-bottom:10px">Instrução Manual</div>
               <textarea class="form-input" id="instrucaoSarah" rows="4" placeholder="Instrução especial para a Sarah..."></textarea>
               <button class="btn-primary" style="margin-top:10px" onclick="salvarInstrucao('sarah')">Salvar Instrução</button>
+            </div>
+            <div class="section-title">Vendas Confirmadas (Kiwify)</div>
+            <div id="sarahVendasList">
+              <div class="loading"><div class="spinner"></div> Carregando...</div>
             </div>
           </div>
 
@@ -845,7 +851,7 @@ function showPage(page) {
   document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
   currentPage = page;
 
-  if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); }
+  if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); loadSarahVendas(); }
   if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
   if (page === 'atk') { loadAtkStatus(); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
@@ -931,6 +937,9 @@ async function loadPainelData() {
     document.getElementById('statConvLogzz').textContent = convsLogzz.length || 0;
     document.getElementById('statPedidos').textContent = pedidos.length || 0;
     document.getElementById('statLinks').textContent = links.length || 0;
+
+    // Vendas Sarah
+    loadSarahVendas();
 
     // Agent status mini — 'info' slot mostra o agente Rafael
     const agentSlots = [{ slot: 'info', agent: 'rafael' }, { slot: 'logzz', agent: 'logzz' }];
@@ -1703,6 +1712,48 @@ async function sarahCheckConexao() {
     const el = document.getElementById('sarahConexaoStatus');
     if (el) el.textContent = s.state === 'connected' ? '✅ Conectada' : s.state === 'connecting' ? '⏳ Conectando...' : '❌ Desconectada';
   } catch {}
+}
+
+// ═══════════ SARAH VENDAS ═══════════
+
+async function loadSarahVendas() {
+  try {
+    const data = await api('/api/sarah/vendas');
+    const count = data.count || 0;
+    const total = parseFloat(data.total || 0);
+
+    // Painel
+    const countEl = document.getElementById('sarahVendasCount');
+    const totalEl = document.getElementById('sarahVendasTotal');
+    if (countEl) countEl.textContent = count;
+    if (totalEl) totalEl.textContent = `R$${total.toFixed(0)}`;
+
+    // Aba Sarah
+    const countInfoEl = document.getElementById('sarahVendasCountInfo');
+    const totalInfoEl = document.getElementById('sarahVendasTotalInfo');
+    if (countInfoEl) countInfoEl.textContent = count;
+    if (totalInfoEl) totalInfoEl.textContent = `R$${total.toFixed(0)}`;
+
+    // Lista de vendas
+    const listEl = document.getElementById('sarahVendasList');
+    if (listEl) {
+      if (!data.vendas || data.vendas.length === 0) {
+        listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🎓</div><div class="empty-text">Nenhuma venda confirmada ainda</div></div>';
+      } else {
+        listEl.innerHTML = data.vendas.map(v => `
+          <div class="pedido-item">
+            <div class="pedido-header">
+              <span class="pedido-id">#${(v.orderId||v.id||'').slice(0,8)}</span>
+              <span class="pedido-status entregue">R$${parseFloat(v.valor).toFixed(2)}</span>
+            </div>
+            <div class="pedido-nome">${esc(v.name || '–')}</div>
+            <div class="pedido-info">${esc(v.email || '')}${v.phone ? ' · ' + v.phone : ''} · ${formatTs(v.ts)}</div>
+          </div>`).join('');
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao carregar vendas Sarah:', e);
+  }
 }
 
 // ═══════════ ATACADÃO ═══════════

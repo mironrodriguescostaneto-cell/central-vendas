@@ -1187,6 +1187,12 @@ router.get('/api/kiwify/debug', auth, (req, res) => {
   });
 });
 
+router.get('/api/sarah/vendas', auth, (req, res) => {
+  const vendas = db.state.sarahSales || [];
+  const total = vendas.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
+  res.json({ vendas, total: total.toFixed(2), count: vendas.length });
+});
+
 router.post('/webhook/kiwify/sarah', async (req, res) => {
   res.sendStatus(200); // responde rápido para Kiwify não retentar
   try {
@@ -1220,18 +1226,35 @@ router.post('/webhook/kiwify/sarah', async (req, res) => {
       return;
     }
 
-    // Registrar compra no banco
+    // Registrar compra e venda no banco
     db.state.sarahPurchases.add(phone);
+
+    const orderId = body.order_id || body.id || '';
+    const jaRegistrada = db.state.sarahSales.some(s => s.orderId === orderId && orderId);
+    if (!jaRegistrada) {
+      const valorCentavos = body.Commissions?.charge_amount || body.amount || 4700;
+      db.state.sarahSales.unshift({
+        id: `sarah-${Date.now()}`,
+        name,
+        email,
+        phone: phone || '',
+        valor: (valorCentavos / 100).toFixed(2),
+        orderId,
+        ts: Date.now(),
+      });
+      // Manter só as 500 vendas mais recentes
+      if (db.state.sarahSales.length > 500) db.state.sarahSales = db.state.sarahSales.slice(0, 500);
+    }
+
     db.saveDB().catch(() => {});
 
     // Pausar cliente na Sarah se tiver conversa ativa
     const sarahConv = db.state.conversations.sarah?.get(phone);
     if (sarahConv) {
       db.pausePhone('sarah', phone);
-      // Limpar timers de follow-up (sarah.js lê o flag comprado antes de disparar)
       console.log(`[KIWIFY] Cliente ${phone} (${name}) comprou — pausado na Sarah`);
     } else {
-      console.log(`[KIWIFY] Compra registrada para ${phone} (sem conversa ativa na Sarah)`);
+      console.log(`[KIWIFY] Compra registrada para ${phone || '(sem tel)'} (${name})`);
     }
   } catch (e) {
     console.error('[KIWIFY] Erro ao processar webhook:', e.message);
