@@ -18,9 +18,9 @@ const DB_FILE    = path.join(BASE_DIR, 'atacadao_db.json');
 const BACKUP_FILE= path.join(BASE_DIR, 'atacadao_db.backup.json');
 const REDIS_KEY  = 'atacadao:db';
 
-// --- Redis (conexão própria, mesma URL da Central) ---
+// --- Redis ATK (usa ATK_REDIS_URL se definido, senão REDIS_URL da Central) ---
 let redis = null;
-const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || process.env.REDIS_PUBLIC_URL;
+const REDIS_URL = process.env.ATK_REDIS_URL || process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || process.env.REDIS_PUBLIC_URL;
 
 if (REDIS_URL) {
   try {
