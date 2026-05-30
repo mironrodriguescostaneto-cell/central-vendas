@@ -1196,7 +1196,7 @@ router.post('/webhook/kiwify/sarah', async (req, res) => {
 
     // Kiwify envia diferentes formatos — cobrir todos
     const customer = body.Customer || body.customer || body.data?.customer || body.payload?.customer || {};
-    const status   = (body.order_status || body.status || body.data?.status || body.event || '').toLowerCase();
+    const status   = (body.order_status || body.webhook_event_type || body.status || body.data?.status || body.event || '').toLowerCase();
 
     // Só processar se for aprovado/pago
     const isApproved = ['paid', 'approved', 'order_approved', 'order.approved', 'active', 'complete'].some(s => status.includes(s));
