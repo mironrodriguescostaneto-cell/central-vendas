@@ -1032,6 +1032,20 @@ router.get('/api/atk/vendas', auth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Lista de vendas individuais ATK (mês atual)
+router.get('/api/atk/vendas/lista', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const brasiliaDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const inicioMes = new Date(brasiliaDate.substring(0, 7) + '-01T00:00:00-03:00').getTime();
+    const vendas = (dbAtk.state.sales || [])
+      .filter(v => (v.createdAt || 0) >= inicioMes)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 200);
+    res.json({ vendas, total: vendas.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Pedidos ATK
 router.get('/api/atk/pedidos', auth, (req, res) => {
   const dbAtk = require('./database-atk');
@@ -1050,6 +1064,83 @@ router.get('/api/atk/crm', auth, (req, res) => {
 router.get('/api/atk/caixa', auth, (req, res) => {
   const dbAtk = require('./database-atk');
   res.json({ aberto: dbAtk.getCaixaAberto(), historico: dbAtk.getCaixaHistorico(30) });
+});
+
+router.post('/api/atk/caixa/abrir', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    if (dbAtk.getCaixaAberto()) return res.status(400).json({ error: 'Já tem caixa aberto' });
+    const { valorAbertura = 0, observacao = '' } = req.body || {};
+    const caixa = dbAtk.abrirCaixa(parseFloat(valorAbertura) || 0, observacao);
+    dbAtk.save();
+    res.json(caixa);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/atk/caixa/fechar', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    if (!dbAtk.getCaixaAberto()) return res.status(400).json({ error: 'Nenhum caixa aberto' });
+    const { valorFechamento, observacao = '' } = req.body || {};
+    const caixa = dbAtk.fecharCaixa(parseFloat(valorFechamento) || 0, observacao);
+    dbAtk.save();
+    res.json(caixa);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/atk/caixa/movimento', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    if (!dbAtk.getCaixaAberto()) return res.status(400).json({ error: 'Nenhum caixa aberto' });
+    const { tipo, valor, descricao } = req.body || {};
+    if (!tipo || !valor) return res.status(400).json({ error: 'tipo e valor obrigatórios' });
+    dbAtk.addMovimentoCaixa(tipo, parseFloat(valor), descricao || '');
+    dbAtk.save();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lançar venda ATK
+router.post('/api/atk/vendas', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const { agentId, productId, numero, valorFinal, tipo = 'manual', observacao = '' } = req.body || {};
+    if (!agentId || !productId || !valorFinal) return res.status(400).json({ error: 'agentId, productId e valorFinal obrigatórios' });
+
+    const produto = dbAtk.state.products.find(p => p.id === productId);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const sale = dbAtk.addSale({
+      agentId, productId, productName: produto.nome,
+      numero: numero || '', valorFinal: parseFloat(valorFinal),
+      valorCusto: produto.precoCusto || 0,
+      lucro: parseFloat(valorFinal) - (produto.precoCusto || 0),
+      tipo, observacao, status: 'confirmada',
+    });
+
+    // Adicionar ao caixa se estiver aberto
+    if (dbAtk.getCaixaAberto()) {
+      dbAtk.addMovimentoCaixa('venda', parseFloat(valorFinal), `${produto.nome} - ${agentId} - ${tipo}`);
+    }
+
+    dbAtk.save();
+    res.json(sale);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Cancelar venda ATK
+router.post('/api/atk/vendas/:id/cancelar', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const sale = dbAtk.getSale(req.params.id);
+    if (!sale) return res.status(404).json({ error: 'Venda não encontrada' });
+    dbAtk.cancelSale(req.params.id);
+    if (dbAtk.getCaixaAberto() && sale.valorFinal) {
+      dbAtk.addMovimentoCaixa('saida', sale.valorFinal, `CANCELAMENTO: ${sale.productName} - ${sale.tipo}`);
+    }
+    dbAtk.save();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Eventos ATK (log de atividade)
