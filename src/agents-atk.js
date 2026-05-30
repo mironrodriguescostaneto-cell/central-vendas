@@ -936,7 +936,7 @@ Produto para separar: [produto]`;
     db.addEvent(`lara_pedido: ${agentId} ${numero}`);
 
     // Salvar pedido no banco para dashboard de logistica
-    db.addPedido({
+    db.addPedidoAtk({
       tipo: "entrega",
       cliente: orderData.nome || orderData.cliente || "",
       numero,
