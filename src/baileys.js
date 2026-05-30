@@ -47,10 +47,6 @@ function getAuthDir(sessionId) {
 }
 
 // ----- Redis auth persistence -----
-function getRedis() {
-  try { return require('./database').state; } catch { return null; }
-}
-
 function getRedisClient() {
   try {
     const IORedis = require('ioredis');
@@ -528,7 +524,6 @@ async function requestPairingCodeFor(sessionId, phone) {
 
 function getQRCode(sessionId) { return getSession(sessionId).qrCode; }
 function getState(sessionId) { return getSession(sessionId).connectionState; }
-function getSocket(sessionId) { return getSession(sessionId).sock; }
 
 function getAllStatus() {
   const result = {};
@@ -592,7 +587,6 @@ module.exports = {
   sendMedia,
   getQRCode,
   getState,
-  getSocket,
   getAllStatus,
   forceLogout,
   reconnect,

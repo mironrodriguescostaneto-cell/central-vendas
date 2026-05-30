@@ -4,24 +4,6 @@ const https = require('https');
 const http = require('http');
 const { CONFIG } = require('./config');
 
-// ----- Circuit Breaker simples -----
-const breakers = {};
-function getBreaker(key) {
-  if (!breakers[key]) breakers[key] = { failures: 0, openUntil: 0 };
-  return breakers[key];
-}
-function isOpen(key) {
-  const b = getBreaker(key);
-  if (b.openUntil > Date.now()) return true;
-  return false;
-}
-function recordFailure(key) {
-  const b = getBreaker(key);
-  b.failures++;
-  if (b.failures >= 5) { b.openUntil = Date.now() + 30000; b.failures = 0; }
-}
-function recordSuccess(key) { getBreaker(key).failures = 0; }
-
 // ----- HTTP helper -----
 function httpRequest(url, options = {}, body = null) {
   return new Promise((resolve, reject) => {
@@ -104,32 +86,6 @@ async function callClaudeText(systemPrompt, messages, opts = {}) {
   return text;
 }
 
-// ----- Z-API (fallback WhatsApp) -----
-async function sendZapi(agentId, phone, message) {
-  const agentCfg = CONFIG.agents[agentId];
-  if (!agentCfg?.zapi?.instance) throw new Error(`Z-API não configurado para ${agentId}`);
-
-  if (isOpen(`zapi-${agentId}`)) throw new Error('Z-API circuit breaker aberto');
-
-  const { instance, token, clientToken } = agentCfg.zapi;
-  const url = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
-
-  try {
-    const res = await httpRequest(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Token': clientToken,
-      },
-    }, { phone, message });
-    recordSuccess(`zapi-${agentId}`);
-    return res;
-  } catch (e) {
-    recordFailure(`zapi-${agentId}`);
-    throw e;
-  }
-}
-
 // ----- Groq Whisper — transcrição de áudio -----
 async function transcribeAudio(audioUrl) {
   if (!CONFIG.groqKey) return null;
@@ -165,22 +121,10 @@ async function transcribeAudio(audioUrl) {
   }
 }
 
-// ----- Sanitizador de resposta -----
-function sanitizeResponse(text) {
-  if (!text) return '';
-  // Remove tags internas que não devem ir para o cliente
-  return text
-    .replace(/\[INSTRUCAO_INTERNA:[^\]]*\]/gi, '')
-    .replace(/\[SYSTEM:[^\]]*\]/gi, '')
-    .trim();
-}
-
 module.exports = {
   callGemini,
   callClaude,
   callClaudeText,
   transcribeAudio,
-  sendZapi,
-  sanitizeResponse,
   httpRequest,
 };

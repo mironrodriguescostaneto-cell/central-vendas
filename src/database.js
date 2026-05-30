@@ -215,10 +215,6 @@ function clearPauses(agentId) {
 }
 
 // ----- LID Mapping -----
-function isLidFormat(jid) {
-  return jid && jid.endsWith('@lid');
-}
-
 function mapLidToPhone(lid) {
   return state.lidPhoneMap.get(lid) || null;
 }
@@ -287,7 +283,6 @@ function getInstrucao(agentId) { return state.instrucoes[agentId] || ''; }
 
 // ----- Status de conexão -----
 function setConnectionStatus(agentId, status) { state.connectionStatus[agentId] = status; }
-function getConnectionStatus(agentId) { return state.connectionStatus[agentId] || 'disconnected'; }
 function setQrCode(agentId, qr) { state.qrCodes[agentId] = qr; }
 function getQrCode(agentId) { return state.qrCodes[agentId]; }
 
@@ -302,7 +297,6 @@ module.exports = {
   pausePhone,
   resumePhone,
   clearPauses,
-  isLidFormat,
   mapLidToPhone,
   registerLid,
   addPedido,
@@ -318,7 +312,6 @@ module.exports = {
   setInstrucao,
   getInstrucao,
   setConnectionStatus,
-  getConnectionStatus,
   setQrCode,
   getQrCode,
 };
