@@ -283,23 +283,23 @@ async function checkFollowUps() {
   if (baileys.getState(sessionId) !== 'connected') return;
 
   const agora = Date.now();
-  const DOIS_DIAS = 2 * 24 * 60 * 60 * 1000;
-  const UMA_HORA = 60 * 60 * 1000;
+  const DUAS_HORAS = 2 * 60 * 60 * 1000;
+  const TRINTA_MIN = 30 * 60 * 1000;
 
   for (const [phone, conv] of convMap.entries()) {
     if (isPaused(AGENT_ID, phone)) continue;
     if (_pending.has(phone)) continue;
     if (!conv.linkEnviadoEm) continue;
 
-    // Não disparar se o lead respondeu recentemente (< 1h)
-    if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < UMA_HORA) continue;
+    // Não disparar se o lead respondeu recentemente (< 30min)
+    if (conv.ultimaMensagemUsuario && (agora - conv.ultimaMensagemUsuario) < TRINTA_MIN) continue;
 
     const elapsed = agora - conv.linkEnviadoEm;
-    if (isNaN(elapsed) || elapsed < DOIS_DIAS) continue;
+    if (isNaN(elapsed) || elapsed < DUAS_HORAS) continue;
 
     const ultimoRmk = conv.ultimoRemarketingEm || 0;
-    const passouDoisDiasDesdeUltimo = (agora - ultimoRmk) >= DOIS_DIAS;
-    if (!passouDoisDiasDesdeUltimo) continue;
+    const passouDuasHorasDesdeUltimo = (agora - ultimoRmk) >= DUAS_HORAS;
+    if (!passouDuasHorasDesdeUltimo) continue;
 
     const rmkCount = conv.followUpCount || 0;
     if (rmkCount >= MSGS_REMARKETING.length) continue; // esgotou o ciclo
