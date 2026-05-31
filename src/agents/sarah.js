@@ -19,7 +19,7 @@ const IMG_PROVA_PIX = 'https://drive.google.com/uc?export=download&id=1UhfeVzsYi
 const MSGS_REMARKETING = [
   {
     img: IMG_PROVA_PIX,
-    text: (nome) => `${nome ? `${nome}, ` : ''}olha esse print 👆\n\nEsse é o extrato de hoje. Mais de R$100 em PIX em um único dia — usando exatamente o método do Fotógrafo Online.\n\nQuem fez isso não era fotógrafo. Era uma pessoa comum que aprendeu a transformar fotos com IA e cobrar R$20, R$30, R$50 por foto.\n\nSem câmera. Sem experiência. Só o método.\n\nR$47 com garantia: se não faturar R$50 no primeiro dia aplicando, o Miron devolve tudo — sem perguntas.\n\n${LINK_CHECKOUT}`,
+    text: (nome) => `${nome ? `${nome}, ` : ''}olha esse print 👆\n\nEsse é o extrato de ontem. Mais de R$100 em PIX em um único dia — usando exatamente o método do Fotógrafo Online.\n\nQuem fez isso não era fotógrafo. Era uma pessoa comum que aprendeu a transformar fotos com IA e cobrar R$20, R$30, R$50 por foto.\n\nSem câmera. Sem experiência. Só o método.\n\nR$47 com garantia: se não faturar R$50 no primeiro dia aplicando, o Miron devolve tudo — sem perguntas.\n\n${LINK_CHECKOUT}`,
   },
 
   (nome) => `${nome ? `${nome}, ` : ''}deixa eu te fazer uma pergunta direta 👇\n\nSe eu te dissesse que tem gente faturando R$50, R$100, R$200 por dia *sem câmera, sem equipamento e sem experiência*... você acreditaria?\n\nProvavelmente não. E eu entendo — já ouvi muita promessa vazia também.\n\nPor isso o Miron colocou uma garantia que nenhum curso tem: *se você não faturar pelo menos R$50 no primeiro dia aplicando, ele te devolve 100% do valor.*\n\nNão tem risco. Só tem oportunidade.\n\n${LINK_CHECKOUT}`,
