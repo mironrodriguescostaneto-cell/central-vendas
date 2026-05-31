@@ -1022,6 +1022,29 @@ router.post('/api/atk/conversas/:agentId/:numero/resume', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Enviar mensagem manual ATK
+router.post('/api/atk/conversas/:agentId/:numero/send', auth, async (req, res) => {
+  const { agentId, numero } = req.params;
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Texto ausente' });
+  if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
+  try {
+    const dbAtk = require('./database-atk');
+    await baileys.sendText(agentId, numero, text);
+    const conv = dbAtk.getConversation(agentId, numero);
+    if (conv) {
+      conv.msgs.push({ role: 'assistant', content: text, timestamp: Date.now() });
+      conv.ultimaMensagem = Date.now();
+      dbAtk.save();
+    }
+    dbAtk.addEvent(`Dashboard enviou mensagem para ${numero} (${agentId})`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(`[ATK/SEND] ${agentId} → ${numero}: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Vendas/CRM ATK
 router.get('/api/atk/vendas', auth, (req, res) => {
   try {

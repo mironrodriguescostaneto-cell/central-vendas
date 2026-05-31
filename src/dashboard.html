@@ -873,6 +873,7 @@ let pollInterval = null;
 let agentStatusPoll = null;
 let chatPollInterval = null;
 let lastSeenTs = {};
+let atkCurrentAgent = '';
 let titleFlashInterval = null;
 const _origTitle = document.title;
 
@@ -887,10 +888,15 @@ function stopTitleFlash() {
   document.title = _origTitle;
 }
 
+function isAtkAgent(id) { return ['pedro', 'rodrigo'].includes(id); }
+
 async function refreshChatMessages() {
   if (!chatWindowAgent || !chatWindowPhone) return;
   try {
-    const data = await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`);
+    const url = isAtkAgent(chatWindowAgent)
+      ? `/api/atk/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`
+      : `/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`;
+    const data = await api(url);
     const msgs = data.msgs || [];
     const body = document.getElementById('chatWinBody');
     const prevCount = body.querySelectorAll('.msg-bubble').length;
@@ -900,8 +906,8 @@ async function refreshChatMessages() {
     const wasAtBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
     body.innerHTML = msgs.map(m => `
       <div class="msg-bubble ${m.role}">
-        ${esc(m.text)}
-        <div class="msg-time">${formatTs(m.ts)}</div>
+        ${esc(m.content||m.text||'')}
+        <div class="msg-time">${formatTs(m.timestamp||m.ts)}</div>
       </div>
     `).join('');
     if (wasAtBottom) body.scrollTop = body.scrollHeight;
@@ -1010,7 +1016,7 @@ function startPolling() {
     if (currentPage === 'info') loadConversas('rafael');
     if (currentPage === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); }
     if (currentPage === 'rafael') loadConversas('rafael');
-    if (currentPage === 'atk') loadAtkStatus();
+    if (currentPage === 'atk') { loadAtkStatus(); if (atkCurrentAgent) atkRefreshConversas(atkCurrentAgent); }
   }, 5000);
   agentStatusPoll = setInterval(loadAgentStatus, 8000);
   loadAgentStatus();
@@ -1201,7 +1207,10 @@ function closeChatWindow() {
 async function loadChatMessages() {
   if (!chatWindowAgent || !chatWindowPhone) return;
   try {
-    const data = await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`);
+    const url = isAtkAgent(chatWindowAgent)
+      ? `/api/atk/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`
+      : `/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}`;
+    const data = await api(url);
     chatWindowPaused = data.pausado;
     updatePauseButtons();
     const body = document.getElementById('chatWinBody');
@@ -1209,8 +1218,8 @@ async function loadChatMessages() {
     if (!msgs.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Sem mensagens</div></div>'; return; }
     body.innerHTML = msgs.map(m => `
       <div class="msg-bubble ${m.role}">
-        ${esc(m.text)}
-        <div class="msg-time">${formatTs(m.ts)}</div>
+        ${esc(m.content||m.text||'')}
+        <div class="msg-time">${formatTs(m.timestamp||m.ts)}</div>
       </div>
     `).join('');
     body.scrollTop = body.scrollHeight;
@@ -1224,21 +1233,29 @@ function updatePauseButtons() {
 
 async function pauseChat() {
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/pause`, 'POST');
+    const url = isAtkAgent(chatWindowAgent)
+      ? `/api/atk/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/pause`
+      : `/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/pause`;
+    await api(url, 'POST');
     chatWindowPaused = true;
     updatePauseButtons();
     toast('Conversa pausada');
-    loadConversas(chatWindowAgent);
+    if (isAtkAgent(chatWindowAgent)) atkLoadConversas(chatWindowAgent);
+    else loadConversas(chatWindowAgent);
   } catch (e) { toast(`Erro: ${e.message}`); }
 }
 
 async function resumeChat() {
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/resume`, 'POST');
+    const url = isAtkAgent(chatWindowAgent)
+      ? `/api/atk/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/resume`
+      : `/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/resume`;
+    await api(url, 'POST');
     chatWindowPaused = false;
     updatePauseButtons();
     toast('Conversa iniciada');
-    loadConversas(chatWindowAgent);
+    if (isAtkAgent(chatWindowAgent)) atkLoadConversas(chatWindowAgent);
+    else loadConversas(chatWindowAgent);
   } catch (e) { toast(`Erro: ${e.message}`); }
 }
 
@@ -1250,7 +1267,10 @@ async function sendManualMsg() {
   input.disabled = true;
   if (btn) btn.disabled = true;
   try {
-    await api(`/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/send`, 'POST', { text });
+    const sendUrl = isAtkAgent(chatWindowAgent)
+      ? `/api/atk/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/send`
+      : `/api/conversas/${chatWindowAgent}/${encodeURIComponent(chatWindowPhone)}/send`;
+    await api(sendUrl, 'POST', { text });
     input.value = '';
     await loadChatMessages();
   } catch (e) {
@@ -2268,7 +2288,24 @@ async function loadAtkStatus() {
   } catch (e) { console.warn('[ATK status]', e.message); }
 }
 
+function atkRenderConvList(agentId, convs, listEl) {
+  if (!convs.length) { listEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma conversa</div></div>'; return; }
+  listEl.innerHTML = convs.slice(0, 30).map(c => `
+    <div class="chat-item" onclick="atkOpenConv('${agentId}','${esc(c.numero)}','${esc(c.pushName||c.numero)}')">
+      <div class="chat-avatar">${(c.pushName||c.numero||'?')[0].toUpperCase()}</div>
+      <div class="chat-body">
+        <div class="chat-name">${esc(c.pushName||c.numero)} ${c.pausado?'<span style="color:var(--warning)">⏸</span>':''}</div>
+        <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
+      </div>
+      <div class="chat-meta">
+        <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)'}">${c.score}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 async function atkLoadConversas(agentId) {
+  atkCurrentAgent = agentId;
   const titleEl = document.getElementById('atkConvTitle');
   const listEl = document.getElementById('atkConvList');
   if (!listEl) return;
@@ -2276,41 +2313,41 @@ async function atkLoadConversas(agentId) {
   listEl.innerHTML = '<div class="loading"><div class="spinner"></div> Carregando...</div>';
   try {
     const convs = await api(`/api/atk/conversas/${agentId}`);
-    if (!convs.length) { listEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma conversa</div></div>'; return; }
-    listEl.innerHTML = convs.slice(0,30).map(c => `
-      <div class="chat-item" onclick="atkOpenConv('${agentId}','${esc(c.numero)}','${esc(c.pushName||c.numero)}')">
-        <div class="chat-avatar">${(c.pushName||c.numero||'?')[0].toUpperCase()}</div>
-        <div class="chat-body">
-          <div class="chat-name">${esc(c.pushName||c.numero)} ${c.pausado?'<span style="color:var(--warning)">⏸</span>':''}</div>
-          <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
-        </div>
-        <div class="chat-meta">
-          <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)'}">${c.score}</div>
-        </div>
-      </div>
-    `).join('');
+    atkRenderConvList(agentId, convs, listEl);
   } catch (e) { listEl.innerHTML = `<div class="empty-state"><div class="empty-text">Erro: ${esc(e.message)}</div></div>`; }
+}
+
+async function atkRefreshConversas(agentId) {
+  const listEl = document.getElementById('atkConvList');
+  if (!listEl) return;
+  try {
+    const convs = await api(`/api/atk/conversas/${agentId}`);
+    atkRenderConvList(agentId, convs, listEl);
+  } catch {}
 }
 
 async function atkOpenConv(agentId, phone, name) {
   chatWindowAgent = agentId;
   chatWindowPhone = phone;
+  lastSeenTs[agentId + phone] = Date.now();
+  stopTitleFlash();
   document.getElementById('chatWinName').textContent = name;
   document.getElementById('chatWindow').classList.add('open');
-  document.getElementById('btnPauseChat').style.display = '';
-  document.getElementById('btnResumeChat').style.display = 'none';
   document.getElementById('chatWinBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  clearInterval(chatPollInterval);
+  chatPollInterval = setInterval(refreshChatMessages, 3000);
   try {
     const data = await api(`/api/atk/conversas/${agentId}/${encodeURIComponent(phone)}`);
     chatWindowPaused = data.pausado;
     updatePauseButtons();
     const msgs = data.msgs || [];
-    document.getElementById('chatWinBody').innerHTML = msgs.map(m => `
-      <div class="msg-bubble ${m.role}">
-        ${esc(m.content||m.text||'')}
-        <div class="msg-time">${formatTs(m.timestamp||m.ts)}</div>
-      </div>
-    `).join('');
+    document.getElementById('chatWinBody').innerHTML = msgs.length
+      ? msgs.map(m => `
+          <div class="msg-bubble ${m.role}">
+            ${esc(m.content||m.text||'')}
+            <div class="msg-time">${formatTs(m.timestamp||m.ts)}</div>
+          </div>`).join('')
+      : '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-text">Sem mensagens</div></div>';
     document.getElementById('chatWinBody').scrollTop = 999999;
   } catch (e) { document.getElementById('chatWinBody').innerHTML = `<div style="padding:16px;color:var(--danger)">${esc(e.message)}</div>`; }
 }
