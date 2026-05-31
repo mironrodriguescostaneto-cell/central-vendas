@@ -1032,6 +1032,45 @@ router.get('/api/atk/vendas', auth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Produtos ATK
+router.get('/api/atk/produtos', auth, (req, res) => {
+  const dbAtk = require('./database-atk');
+  res.json(dbAtk.getAllProducts());
+});
+
+router.post('/api/atk/produtos', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const { nome, precoCusto, precoVenda } = req.body || {};
+    if (!nome || precoVenda === undefined) return res.status(400).json({ error: 'nome e precoVenda obrigatórios' });
+    const p = dbAtk.addProduct({ nome, precoCusto: parseFloat(precoCusto) || 0, precoVenda: parseFloat(precoVenda) });
+    res.json(p);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.patch('/api/atk/produtos/:id', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const { nome, precoCusto, precoVenda, ativo } = req.body || {};
+    const updates = {};
+    if (nome !== undefined) updates.nome = nome;
+    if (precoCusto !== undefined) updates.precoCusto = parseFloat(precoCusto);
+    if (precoVenda !== undefined) updates.precoVenda = parseFloat(precoVenda);
+    if (ativo !== undefined) updates.ativo = ativo;
+    const p = dbAtk.updateProduct(req.params.id, updates);
+    if (!p) return res.status(404).json({ error: 'Produto não encontrado' });
+    res.json(p);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/api/atk/produtos/:id', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    dbAtk.deleteProduct(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Lista de vendas individuais ATK (mês atual)
 router.get('/api/atk/vendas/lista', auth, (req, res) => {
   try {
@@ -1104,23 +1143,31 @@ router.post('/api/atk/caixa/movimento', auth, (req, res) => {
 router.post('/api/atk/vendas', auth, (req, res) => {
   try {
     const dbAtk = require('./database-atk');
-    const { agentId, productId, numero, valorFinal, tipo = 'manual', observacao = '' } = req.body || {};
+    const { agentId, productId, numero, valorFinal, quantidade = 1, desconto = 0, tipo = 'manual', observacao = '' } = req.body || {};
     if (!agentId || !productId || !valorFinal) return res.status(400).json({ error: 'agentId, productId e valorFinal obrigatórios' });
 
     const produto = dbAtk.state.products.find(p => p.id === productId);
     if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
 
+    const qtd = parseInt(quantidade) || 1;
+    const valorUnit = parseFloat(valorFinal);
+    const totalBruto = valorUnit * qtd;
+    const totalDesc = totalBruto - parseFloat(desconto || 0);
+    const custoPorUnit = produto.precoCusto || 0;
+    const lucroTotal = totalDesc - (custoPorUnit * qtd);
+
     const sale = dbAtk.addSale({
       agentId, productId, productName: produto.nome,
-      numero: numero || '', valorFinal: parseFloat(valorFinal),
-      valorCusto: produto.precoCusto || 0,
-      lucro: parseFloat(valorFinal) - (produto.precoCusto || 0),
+      numero: numero || '', valorFinal: totalDesc,
+      valorCusto: custoPorUnit * qtd,
+      lucro: lucroTotal,
+      quantidade: qtd, desconto: parseFloat(desconto || 0),
       tipo, observacao, status: 'confirmada',
     });
 
     // Adicionar ao caixa se estiver aberto
     if (dbAtk.getCaixaAberto()) {
-      dbAtk.addMovimentoCaixa('venda', parseFloat(valorFinal), `${produto.nome} - ${agentId} - ${tipo}`);
+      dbAtk.addMovimentoCaixa('venda', totalDesc, `${produto.nome}${qtd > 1 ? ` x${qtd}` : ''} - ${agentId} - ${tipo}`);
     }
 
     dbAtk.save();

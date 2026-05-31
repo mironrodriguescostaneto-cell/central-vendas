@@ -561,7 +561,7 @@ a{color:var(--accent);text-decoration:none}
 
         <div class="tabs" id="tabsAtk">
           <button class="tab-btn active" onclick="showTab('atk','agentes')">Agentes</button>
-          <button class="tab-btn" onclick="showTab('atk','vendas');loadAtkVendas()">Vendas</button>
+          <button class="tab-btn" onclick="showTab('atk','vendas');loadAtkProdutos();loadAtkVendas()">Vendas</button>
           <button class="tab-btn" onclick="showTab('atk','caixa');loadAtkCaixa()">Caixa</button>
           <button class="tab-btn" onclick="showTab('atk','crm');loadAtkCrm()">CRM</button>
         </div>
@@ -654,10 +654,29 @@ a{color:var(--accent);text-decoration:none}
             <div class="card-title" style="margin-bottom:10px">Lançar Venda</div>
             <div class="form-group">
               <label class="form-label">Produto</label>
-              <select class="form-input" id="atkVendaProduto" style="font-size:14px">
-                <option value="unitv">Uni TV V10 — R$360</option>
-                <option value="furadeira">Kit Furadeira 48V — R$160</option>
+              <select class="form-input" id="atkVendaProduto" style="font-size:14px" onchange="atkVendaCalc()">
+                <option value="unitv">Uni TV V10</option>
+                <option value="furadeira">Kit Furadeira 48V</option>
               </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="form-group">
+                <label class="form-label">Quantidade</label>
+                <input class="form-input" type="number" id="atkVendaQtd" value="1" min="1" oninput="atkVendaCalc()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Valor unitário (R$)</label>
+                <input class="form-input" type="number" id="atkVendaValorUnit" placeholder="360" step="0.01" oninput="atkVendaCalc()">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Desconto (R$)</label>
+              <input class="form-input" type="number" id="atkVendaDesconto" value="0" min="0" step="0.01" oninput="atkVendaCalc()">
+            </div>
+            <!-- Resumo calculado -->
+            <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div><div style="font-size:11px;color:var(--text-muted);font-weight:600">VALOR TOTAL</div><div style="font-size:20px;font-weight:800;color:var(--success)" id="atkVendaTotal">R$–</div></div>
+              <div><div style="font-size:11px;color:var(--text-muted);font-weight:600">LUCRO</div><div style="font-size:20px;font-weight:800;color:var(--accent)" id="atkVendaLucro">R$–</div></div>
             </div>
             <div class="form-group">
               <label class="form-label">Agente</label>
@@ -668,14 +687,28 @@ a{color:var(--accent);text-decoration:none}
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">Valor Final (R$)</label>
-              <input class="form-input" type="number" id="atkVendaValor" placeholder="360" step="0.01">
-            </div>
-            <div class="form-group">
               <label class="form-label">Telefone do cliente (opcional)</label>
               <input class="form-input" type="text" id="atkVendaNumero" placeholder="5562999999999">
             </div>
             <button class="btn-primary" onclick="atkLancarVenda()">💰 Lançar Venda</button>
+          </div>
+
+          <!-- Cadastrar produto -->
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:10px">Produtos Cadastrados</div>
+            <div id="atkProdutosList" style="margin-bottom:12px"></div>
+            <details>
+              <summary style="font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;margin-bottom:10px">+ Cadastrar novo produto</summary>
+              <div style="margin-top:10px">
+                <div class="form-group"><label class="form-label">Nome do produto</label><input class="form-input" id="novoProdNome" placeholder="Ex: Cabo HDMI"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div class="form-group"><label class="form-label">Preço de venda (R$)</label><input class="form-input" type="number" id="novoProdVenda" placeholder="50" step="0.01"></div>
+                  <div class="form-group"><label class="form-label">Preço de custo (R$)</label><input class="form-input" type="number" id="novoProdCusto" placeholder="30" step="0.01"></div>
+                </div>
+                <div style="font-size:12px;color:var(--accent);margin-bottom:10px" id="novoProdLucroInfo"></div>
+                <button class="btn-primary" onclick="atkCadastrarProduto()">Cadastrar Produto</button>
+              </div>
+            </details>
           </div>
           <!-- Lista de vendas -->
           <div class="section-title">Vendas do Mês</div>
@@ -1802,6 +1835,84 @@ async function sarahCheckConexao() {
 
 // ═══════════ ATK VENDAS ═══════════
 
+// Catálogo de produtos em memória
+let _atkProdutos = [
+  { id: 'unitv', nome: 'Uni TV V10', precoCusto: 250, precoVenda: 360 },
+  { id: 'furadeira', nome: 'Kit Furadeira 48V', precoCusto: 110, precoVenda: 160 },
+];
+
+async function loadAtkProdutos() {
+  try {
+    _atkProdutos = await api('/api/atk/produtos');
+    // Atualizar select
+    const sel = document.getElementById('atkVendaProduto');
+    if (sel) {
+      sel.innerHTML = _atkProdutos.filter(p => p.ativo !== false).map(p =>
+        `<option value="${p.id}">${esc(p.nome)} — R$${p.precoVenda}</option>`
+      ).join('');
+    }
+    // Listar produtos
+    const lista = document.getElementById('atkProdutosList');
+    if (lista) {
+      lista.innerHTML = _atkProdutos.map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600;font-size:13px">${esc(p.nome)}</div>
+            <div style="font-size:12px;color:var(--text-muted)">Custo R$${p.precoCusto} · Venda R$${p.precoVenda} · Lucro R$${(p.precoVenda - p.precoCusto).toFixed(0)}</div>
+          </div>
+          ${p.ativo !== false ? `<button onclick="atkToggleProduto('${p.id}',false)" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#fee2e2;color:#dc2626;border:none;cursor:pointer">Desativar</button>` :
+            `<button onclick="atkToggleProduto('${p.id}',true)" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#dcfce7;color:#166534;border:none;cursor:pointer">Ativar</button>`}
+        </div>`).join('');
+    }
+    atkVendaCalc();
+  } catch (e) { console.error('Erro produtos ATK:', e); }
+}
+
+function atkVendaCalc() {
+  const prodId = document.getElementById('atkVendaProduto')?.value;
+  const prod = _atkProdutos.find(p => p.id === prodId);
+  const qtd = parseInt(document.getElementById('atkVendaQtd')?.value) || 1;
+  const desc = parseFloat(document.getElementById('atkVendaDesconto')?.value) || 0;
+
+  // Preencher valor unitário sugerido se estiver vazio ou mudou produto
+  const valorUnitEl = document.getElementById('atkVendaValorUnit');
+  if (valorUnitEl && prod && !valorUnitEl.dataset.edited) {
+    valorUnitEl.value = prod.precoVenda;
+  }
+
+  const valorUnit = parseFloat(valorUnitEl?.value) || (prod?.precoVenda || 0);
+  const total = (valorUnit * qtd) - desc;
+  const custo = (prod?.precoCusto || 0) * qtd;
+  const lucro = total - custo;
+
+  const totalEl = document.getElementById('atkVendaTotal');
+  const lucroEl = document.getElementById('atkVendaLucro');
+  if (totalEl) totalEl.textContent = `R$${total.toFixed(0)}`;
+  if (lucroEl) { lucroEl.textContent = `R$${lucro.toFixed(0)}`; lucroEl.style.color = lucro >= 0 ? 'var(--accent)' : 'var(--danger)'; }
+}
+
+async function atkCadastrarProduto() {
+  const nome = document.getElementById('novoProdNome').value.trim();
+  const venda = parseFloat(document.getElementById('novoProdVenda').value);
+  const custo = parseFloat(document.getElementById('novoProdCusto').value) || 0;
+  if (!nome || !venda) { toast('Informe nome e preço de venda'); return; }
+  try {
+    await api('/api/atk/produtos', 'POST', { nome, precoVenda: venda, precoCusto: custo });
+    toast('✅ Produto cadastrado!');
+    document.getElementById('novoProdNome').value = '';
+    document.getElementById('novoProdVenda').value = '';
+    document.getElementById('novoProdCusto').value = '';
+    loadAtkProdutos();
+  } catch (e) { toast('Erro: ' + e.message); }
+}
+
+async function atkToggleProduto(id, ativo) {
+  try {
+    await api(`/api/atk/produtos/${id}`, 'PATCH', { ativo });
+    loadAtkProdutos();
+  } catch (e) { toast('Erro: ' + e.message); }
+}
+
 async function loadAtkVendas() {
   try {
     const data = await api('/api/atk/vendas?periodo=mes');
@@ -1844,16 +1955,22 @@ async function loadAtkVendas() {
 }
 
 async function atkLancarVenda() {
-  const produto = document.getElementById('atkVendaProduto').value;
-  const agente  = document.getElementById('atkVendaAgente').value;
-  const valor   = document.getElementById('atkVendaValor').value;
-  const numero  = document.getElementById('atkVendaNumero').value;
-  if (!valor) { toast('Informe o valor da venda'); return; }
+  const produto  = document.getElementById('atkVendaProduto').value;
+  const agente   = document.getElementById('atkVendaAgente').value;
+  const valorUnit= parseFloat(document.getElementById('atkVendaValorUnit').value);
+  const qtd      = parseInt(document.getElementById('atkVendaQtd').value) || 1;
+  const desconto = parseFloat(document.getElementById('atkVendaDesconto').value) || 0;
+  const numero   = document.getElementById('atkVendaNumero').value;
+  if (!valorUnit) { toast('Informe o valor unitário'); return; }
   try {
-    await api('/api/atk/vendas', 'POST', { agentId: agente, productId: produto, valorFinal: parseFloat(valor), numero, tipo: 'manual' });
+    await api('/api/atk/vendas', 'POST', { agentId: agente, productId: produto, valorFinal: valorUnit, quantidade: qtd, desconto, numero, tipo: 'manual' });
     toast('✅ Venda lançada!');
-    document.getElementById('atkVendaValor').value = '';
+    document.getElementById('atkVendaQtd').value = '1';
+    document.getElementById('atkVendaValorUnit').value = '';
+    document.getElementById('atkVendaDesconto').value = '0';
     document.getElementById('atkVendaNumero').value = '';
+    document.getElementById('atkVendaValorUnit').dataset.edited = '';
+    atkVendaCalc();
     loadAtkVendas();
     loadAtkCaixa();
   } catch (e) { toast('Erro: ' + e.message); }
