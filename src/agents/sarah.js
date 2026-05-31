@@ -11,10 +11,17 @@ const _pending = new Set();
 const _pendingMedia = new Map();
 
 const LINK_CHECKOUT = 'https://kiwify.app/HJyLHa4';
+const IMG_PROVA_PIX = 'https://drive.google.com/uc?export=download&id=1UhfeVzsYipL-8yuXOU8sMrYcyGSDgsMO';
 
 // Mensagens de remarketing — a cada 2 dias, ângulo diferente
 // Baseado em Eugene Schwartz (níveis de consciência) + Gary Halbert + SPIN
+// Entradas com { img, text } enviam imagem antes do texto
 const MSGS_REMARKETING = [
+  {
+    img: IMG_PROVA_PIX,
+    text: (nome) => `${nome ? `${nome}, ` : ''}olha esse print 👆\n\nEsse é o extrato de hoje. Mais de R$100 em PIX em um único dia — usando exatamente o método do Fotógrafo Online.\n\nQuem fez isso não era fotógrafo. Era uma pessoa comum que aprendeu a transformar fotos com IA e cobrar R$20, R$30, R$50 por foto.\n\nSem câmera. Sem experiência. Só o método.\n\nR$47 com garantia: se não faturar R$50 no primeiro dia aplicando, o Miron devolve tudo — sem perguntas.\n\n${LINK_CHECKOUT}`,
+  },
+
   (nome) => `${nome ? `${nome}, ` : ''}deixa eu te fazer uma pergunta direta 👇\n\nSe eu te dissesse que tem gente faturando R$50, R$100, R$200 por dia *sem câmera, sem equipamento e sem experiência*... você acreditaria?\n\nProvavelmente não. E eu entendo — já ouvi muita promessa vazia também.\n\nPor isso o Miron colocou uma garantia que nenhum curso tem: *se você não faturar pelo menos R$50 no primeiro dia aplicando, ele te devolve 100% do valor.*\n\nNão tem risco. Só tem oportunidade.\n\n${LINK_CHECKOUT}`,
 
   (nome) => `${nome ? `Oi ${nome}! ` : 'Oi! '}😊 Sabe qual é a maior mentira que te contaram sobre ganhar dinheiro online?\n\nQue você precisa de câmera profissional, estúdio, seguidores... 📷\n\nA realidade: com IA, qualquer pessoa transforma fotos comuns em fotos profissionais de R$20 a R$50 cada.\n\nO Fotógrafo Online te ensina exatamente como cobrar isso e onde encontrar os primeiros clientes — ainda no primeiro dia.\n\nR$47. Garantia total. Sem desculpa pra não tentar.\n\n${LINK_CHECKOUT}`,
@@ -315,8 +322,21 @@ async function checkFollowUps() {
 
     try {
       const nome = conv.pushName ? ` ${conv.pushName}` : '';
-      const msgFn = MSGS_REMARKETING[rmkCount % MSGS_REMARKETING.length];
-      const msg = msgFn(nome);
+      const entry = MSGS_REMARKETING[rmkCount % MSGS_REMARKETING.length];
+      const hasImg = typeof entry === 'object' && entry.img;
+      const msg = hasImg ? entry.text(nome) : entry(nome);
+
+      if (hasImg) {
+        try {
+          await Promise.race([
+            baileys.sendMedia(sessionId, phone, 'image', entry.img, '', null),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 10s')), 10000)),
+          ]);
+          await new Promise(r => setTimeout(r, 1200));
+        } catch (imgErr) {
+          console.error(`[SARAH] Imagem remarketing não enviada:`, imgErr.message);
+        }
+      }
 
       // Salva contexto para a IA continuar coerente se o lead responder
       const cs = convMap.get(phone);
@@ -327,7 +347,7 @@ async function checkFollowUps() {
 
       conv.followUpCount = rmkCount + 1;
       conv.ultimoRemarketingEm = agora;
-      console.log(`[SARAH] Follow-up #${rmkCount + 1} (2 dias) → ${phone}`);
+      console.log(`[SARAH] Follow-up #${rmkCount + 1}${hasImg ? ' 📸' : ''} → ${phone}`);
     } catch (e) {
       console.error(`[SARAH] Erro follow-up ${phone}:`, e.message);
     }
