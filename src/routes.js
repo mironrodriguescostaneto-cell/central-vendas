@@ -1026,7 +1026,7 @@ router.get('/api/atk/conversas/:agentId', auth, (req, res) => {
         ultimoTexto: (conv.msgs.at(-1)?.content || conv.msgs.at(-1)?.text || '').slice(0, 80),
       });
     });
-    convs.sort((a, b) => b.score - a.score || (b.ultimaMensagem || 0) - (a.ultimaMensagem || 0));
+    convs.sort((a, b) => (b.ultimaMensagem || 0) - (a.ultimaMensagem || 0) || b.score - a.score);
     res.json(convs);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

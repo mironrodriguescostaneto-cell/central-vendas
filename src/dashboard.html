@@ -2515,12 +2515,15 @@ async function loadAtkStatus() {
     if (pC) pC.textContent = data.pedro?.conversas || 0;
     if (rC) rC.textContent = data.rodrigo?.conversas || 0;
 
+    // Refresh silencioso da lista de conversas se houver agente selecionado
+    if (atkCurrentAgent) atkRefreshConversas(atkCurrentAgent);
+
   } catch (e) { console.warn('[ATK status]', e.message); }
 }
 
 function atkRenderConvList(agentId, convs, listEl) {
   if (!convs.length) { listEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma conversa</div></div>'; return; }
-  listEl.innerHTML = convs.slice(0, 30).map(c => `
+  listEl.innerHTML = convs.slice(0, 100).map(c => `
     <div class="chat-item" onclick="atkOpenConv('${agentId}','${esc(c.numero)}','${esc(c.pushName||c.numero)}')">
       <div class="chat-avatar">${(c.pushName||c.numero||'?')[0].toUpperCase()}</div>
       <div class="chat-body">
@@ -2528,6 +2531,7 @@ function atkRenderConvList(agentId, convs, listEl) {
         <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
       </div>
       <div class="chat-meta">
+        <div class="chat-time" style="font-size:10px;color:var(--text-muted)">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : ''}</div>
         <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)'}">${c.score}</div>
       </div>
     </div>
