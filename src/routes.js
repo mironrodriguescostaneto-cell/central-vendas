@@ -667,7 +667,14 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   function resolveJid(numero) {
     if (isAtk) {
       const dbAtk = require('./database-atk');
-      return dbAtk.resolveLid ? dbAtk.resolveLid(numero) : null;
+      // 1. Pegar _originalJid salvo na conversa (fonte mais confiável)
+      const conv = dbAtk.state.conversations[agente]?.get(numero);
+      if (conv?._originalJid) return conv._originalJid;
+      // 2. Se o numero já tem @ (é JID completo), usar direto
+      if (numero.includes('@')) return numero;
+      // 3. Se parece LID (sem prefixo 55 e ≥12 dígitos), usar @lid
+      if (!numero.startsWith('55') && numero.length >= 12) return `${numero}@lid`;
+      return null;
     }
     const lidJid = db.state.phoneLidMap?.get(numero);
     if (lidJid) return lidJid;
