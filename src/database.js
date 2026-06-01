@@ -55,6 +55,7 @@ const state = {
     contasFixas: [],  // [{id, descricao, valor, dia, categoria, ativa, criadoEm}]
     receitasFixas: [],// [{id, descricao, valor, dia, ativa, criadoEm}]
     situacao: null,   // {saldoConta, dividaParcelada, mesesParcelamento, cartoes, atualizadoEm}
+    ciclosCartao: {}, // { 'neon': { status:'aberta'|'fechada'|'paga', valorFechado, idsNoFechamento, fechadoEm, pagoEm } }
   },
 };
 
@@ -104,6 +105,7 @@ function deserialize(data) {
     if (data.financas.contasFixas) state.financas.contasFixas = data.financas.contasFixas;
     if (data.financas.receitasFixas) state.financas.receitasFixas = data.financas.receitasFixas;
     if (data.financas.situacao) state.financas.situacao = data.financas.situacao;
+    if (data.financas.ciclosCartao) state.financas.ciclosCartao = data.financas.ciclosCartao;
   }
   if (data.conversations) {
     if (data.conversations.info) state.conversations.info = new Map(data.conversations.info);

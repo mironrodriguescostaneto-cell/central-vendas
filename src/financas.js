@@ -791,7 +791,10 @@ function parseMensagemDividasAReceber(texto) {
 function addDivida(db, divida) {
   if (!db.state.financas.dividas) db.state.financas.dividas = [];
   const id = `DIV-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-  const novo = { id, descricao: divida.descricao, valor: parseFloat(divida.valor), vencimento: divida.vencimento || null, pago: false, criadoEm: Date.now() };
+  // Se a fatura do cartão desta dívida está fechada, vai para o próximo ciclo
+  const cartaoDetectado = divida.cartao || normalizarCartao(divida.descricao || '');
+  const cicloFechado = cartaoDetectado && getCiclo(db, cartaoDetectado).status === 'fechada';
+  const novo = { id, descricao: divida.descricao, valor: parseFloat(divida.valor), vencimento: divida.vencimento || null, pago: false, criadoEm: Date.now(), ...(cartaoDetectado ? { cartao: cartaoDetectado } : {}), ...(cicloFechado ? { cicloProximo: true } : {}) };
   db.state.financas.dividas.push(novo);
   db.saveDB().catch(() => {});
   return novo;
@@ -839,6 +842,83 @@ function deleteAReceber(db, id) {
   if (!db.state.financas.aReceber) return;
   db.state.financas.aReceber = db.state.financas.aReceber.filter(r => r.id !== id);
   db.saveDB().catch(() => {});
+}
+
+// ----- Ciclo de fatura do cartão -----
+function normalizarCartao(texto) {
+  const low = texto.toLowerCase();
+  if (low.includes('neon')) return 'neon';
+  if (low.includes('nubank')) return 'nubank';
+  if (low.includes('inter')) return 'inter';
+  if (low.includes('c6')) return 'c6';
+  return null;
+}
+
+function getCiclo(db, cartao) {
+  if (!db.state.financas.ciclosCartao) db.state.financas.ciclosCartao = {};
+  return db.state.financas.ciclosCartao[cartao] || { status: 'aberta', valorFechado: 0, idsNoFechamento: [], fechadoEm: null, pagoEm: null };
+}
+
+function fecharFatura(db, cartao) {
+  if (!db.state.financas.ciclosCartao) db.state.financas.ciclosCartao = {};
+  const dividas = getDividas(db, true);
+  // Dívidas do ciclo atual desse cartão = não têm cicloProximo e descrição contém o cartão
+  const doCartao = dividas.filter(d =>
+    !d.cicloProximo && (d.cartao === cartao || d.descricao.toLowerCase().includes(cartao))
+  );
+  const valorTotal = doCartao.reduce((s, d) => s + d.valor, 0);
+  const ids = doCartao.map(d => d.id);
+  // Marca cada dívida como pertencente ao fechamento
+  for (const d of doCartao) d.cicloFechado = true;
+  db.state.financas.ciclosCartao[cartao] = {
+    status: 'fechada',
+    valorFechado: valorTotal,
+    idsNoFechamento: ids,
+    fechadoEm: Date.now(),
+    pagoEm: null,
+  };
+  db.saveDB().catch(() => {});
+  return { cartao, valorTotal, quantidadeItens: doCartao.length };
+}
+
+function pagarFatura(db, cartao) {
+  if (!db.state.financas.ciclosCartao) return null;
+  const ciclo = db.state.financas.ciclosCartao[cartao];
+  if (!ciclo || ciclo.status !== 'fechada') return null;
+  // Marca todas as dívidas do fechamento como pagas
+  for (const id of ciclo.idsNoFechamento) {
+    const div = (db.state.financas.dividas || []).find(d => d.id === id);
+    if (div) { div.pago = true; div.pagouEm = Date.now(); }
+  }
+  // Promove dívidas do próximo ciclo para atual
+  for (const d of (db.state.financas.dividas || [])) {
+    if (d.cicloProximo && (d.cartao === cartao || d.descricao.toLowerCase().includes(cartao))) {
+      delete d.cicloProximo;
+    }
+  }
+  const valorPago = ciclo.valorFechado;
+  ciclo.status = 'paga';
+  ciclo.pagoEm = Date.now();
+  db.saveDB().catch(() => {});
+  return { cartao, valorPago };
+}
+
+function statusFatura(db, cartao) {
+  const ciclo = getCiclo(db, cartao);
+  const divAtivas = getDividas(db, true).filter(d =>
+    !d.cicloProximo && (d.cartao === cartao || d.descricao.toLowerCase().includes(cartao))
+  );
+  const divProximas = getDividas(db, true).filter(d =>
+    d.cicloProximo && (d.cartao === cartao || d.descricao.toLowerCase().includes(cartao))
+  );
+  return {
+    status: ciclo.status,
+    valorFechado: ciclo.valorFechado,
+    valorAtual: divAtivas.reduce((s, d) => s + d.valor, 0),
+    valorProximo: divProximas.reduce((s, d) => s + d.valor, 0),
+    itensProximos: divProximas.length,
+    fechadoEm: ciclo.fechadoEm,
+  };
 }
 
 // ----- Balanço de dívidas -----
@@ -1104,6 +1184,54 @@ async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup, 
     return;
   }
 
+  // ----- FATURA FECHOU -----
+  const faturaFechouMatch = textLower.match(/fatura.*?(neon|nubank|inter|c6).*?fechou|fechou.*?fatura.*?(neon|nubank|inter|c6)|(neon|nubank|inter|c6).*?fechou/);
+  if (faturaFechouMatch) {
+    const cartao = normalizarCartao(textLower);
+    if (cartao) {
+      const resultado = fecharFatura(db, cartao);
+      const st = statusFatura(db, cartao);
+      let msg = `🔒 *Fatura ${capitalize(cartao)} fechada!*\n\n`;
+      msg += `💳 Total fechado: *R$${resultado.valorTotal.toFixed(2)}* (${resultado.quantidadeItens} item${resultado.quantidadeItens !== 1 ? 'ns' : ''})\n\n`;
+      if (st.valorProximo > 0) {
+        msg += `📦 Próximo ciclo já tem: R$${st.valorProximo.toFixed(2)} (${st.itensProximos} compra${st.itensProximos !== 1 ? 's' : ''})\n\n`;
+      }
+      msg += `✅ Novas compras do ${capitalize(cartao)} vão para o próximo ciclo automaticamente.\n`;
+      msg += `Quando pagar, diga: *paguei a fatura do ${cartao}*`;
+      await sendTelegramGroup(msg);
+      return;
+    }
+  }
+
+  // ----- PAGOU A FATURA -----
+  const faturaPageMatch = textLower.match(/paguei.*?fatura.*?(neon|nubank|inter|c6)|paguei.*?(neon|nubank|inter|c6).*?fatura|fatura.*?(neon|nubank|inter|c6).*?pag/);
+  if (faturaPageMatch) {
+    const cartao = normalizarCartao(textLower);
+    if (cartao) {
+      const resultado = pagarFatura(db, cartao);
+      if (!resultado) {
+        const st = statusFatura(db, cartao);
+        if (st.status === 'aberta') {
+          await sendTelegramGroup(`Fatura ${capitalize(cartao)} ainda está aberta. Quando fechar, diga: *fatura do ${cartao} fechou*`);
+        } else {
+          await sendTelegramGroup(`Fatura ${capitalize(cartao)} já estava paga.`);
+        }
+        return;
+      }
+      const st = statusFatura(db, cartao);
+      let msg = `✅ *Fatura ${capitalize(cartao)} paga! R$${resultado.valorPago.toFixed(2)} quitados.*\n\n`;
+      if (st.valorProximo > 0 || st.valorAtual > 0) {
+        const proxTotal = st.valorProximo + st.valorAtual;
+        msg += `📋 Próximo ciclo em aberto: *R$${proxTotal.toFixed(2)}*\n`;
+        msg += `Todas as compras recentes já estão no novo ciclo.\n`;
+      } else {
+        msg += `🎉 Cartão ${capitalize(cartao)} sem dívidas em aberto!`;
+      }
+      await sendTelegramGroup(msg);
+      return;
+    }
+  }
+
   // Marcar dívida como paga: "paguei nubank" | "paguei DIV-123"
   const pagueiMatch = textLower.match(/^paguei\s+(.+)/);
   if (pagueiMatch) {
@@ -1201,6 +1329,13 @@ async function processarMensagemGrupo(texto, senderName, db, sendTelegramGroup, 
   let confirmacao = `${emoji} *${tipoLabel} registrada*\nR$${entrada.valor.toFixed(2)} — ${capitalize(entrada.categoria)}\n📝 ${entrada.descricao}\n👤 ${entrada.quem}`;
 
   if (transacao.tipo === 'despesa') {
+    // Verificar se é gasto no cartão com fatura fechada
+    const descLow = (entrada.descricao || '').toLowerCase() + ' ' + (entrada.categoria || '').toLowerCase();
+    const cartaoGasto = normalizarCartao(descLow);
+    if (cartaoGasto && getCiclo(db, cartaoGasto).status === 'fechada') {
+      confirmacao += `\n📦 Fatura ${capitalize(cartaoGasto)} está fechada — gasto vai para o *próximo ciclo*`;
+    }
+
     // Total da categoria no mês
     const totalCategoria = db.state.financas.transacoes
       .filter(t => t.mes === mesAtual() && t.tipo === 'despesa' && t.categoria === entrada.categoria)
@@ -1262,6 +1397,11 @@ module.exports = {
   getProgressoOrcamento,
   calcularStreak,
   CATEGORIAS,
+  // Ciclo de fatura
+  fecharFatura,
+  pagarFatura,
+  statusFatura,
+  normalizarCartao,
   // Situação financeira completa
   isSituacaoFinanceira,
   parseSituacaoFinanceira,
