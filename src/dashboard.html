@@ -564,6 +564,7 @@ a{color:var(--accent);text-decoration:none}
           <button class="tab-btn" onclick="showTab('atk','vendas');loadAtkProdutos();loadAtkVendas()">Vendas</button>
           <button class="tab-btn" onclick="showTab('atk','caixa');loadAtkCaixa()">Caixa</button>
           <button class="tab-btn" onclick="showTab('atk','crm');loadAtkCrm()">CRM</button>
+          <button class="tab-btn" onclick="showTab('atk','mkt');atkRmkLoadContatos()">MKT</button>
         </div>
 
         <!-- TAB: Agentes -->
@@ -745,6 +746,71 @@ a{color:var(--accent);text-decoration:none}
           <div class="loading"><div class="spinner"></div> Carregando CRM...</div>
         </div>
         </div><!-- /atk-tab-crm -->
+
+        <!-- TAB: MKT -->
+        <div class="tab-pane" id="atk-tab-mkt">
+          <!-- Seletor agente -->
+          <div style="display:flex;gap:6px;margin-bottom:14px">
+            <button id="atkRmkBtnPedro" onclick="atkRmkSwitchAgent('pedro',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--accent);color:#fff;border:none">Pedro</button>
+            <button id="atkRmkBtnRodrigo" onclick="atkRmkSwitchAgent('rodrigo',this)" style="flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Rodrigo</button>
+          </div>
+          <div style="max-width:560px;margin:0 auto;width:100%">
+            <!-- Filtro -->
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+              <button class="atk-rmk-filter active" data-filter="todos" onclick="atkRmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
+              <button class="atk-rmk-filter" data-filter="ativos" onclick="atkRmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
+              <button class="atk-rmk-filter" data-filter="pausados" onclick="atkRmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+            </div>
+            <!-- Selecionar todos + counter -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
+                <input type="checkbox" id="atkRmkSelectAll" onchange="atkRmkToggleAll(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+                Selecionar todos
+              </label>
+              <span id="atkRmkCounter" style="font-size:12px;color:var(--text-muted);font-weight:600">0 selecionados</span>
+            </div>
+            <!-- Lista de contatos -->
+            <div id="atkRmkContatos" style="background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;max-height:240px;overflow-y:auto">
+              <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:14px">Selecione um agente</div>
+            </div>
+            <!-- Mensagem -->
+            <textarea id="atkRmkTexto" placeholder="Mensagem do remarketing ou promoção..." style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;min-height:90px;resize:vertical;outline:none;margin-bottom:10px;line-height:1.4;display:block;box-sizing:border-box"></textarea>
+            <!-- Imagem -->
+            <div style="background:var(--card);border-radius:12px;border:1px solid var(--border);padding:10px 14px;margin-bottom:10px">
+              <input type="file" id="atkRmkImgInput" accept="image/*" style="display:none" onchange="atkRmkHandleImg(event)">
+              <div style="display:flex;gap:8px;align-items:center">
+                <button onclick="document.getElementById('atkRmkImgInput').click()" style="padding:8px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0;white-space:nowrap">📷 Imagem</button>
+                <span id="atkRmkImgNome" style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">Nenhuma imagem</span>
+                <button id="atkRmkImgRemove" onclick="atkRmkRemoveImg()" style="display:none;padding:4px 8px;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700;flex-shrink:0">✕</button>
+              </div>
+              <img id="atkRmkImgPreview" src="" alt="" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin-top:10px">
+            </div>
+            <!-- Pausar após envio -->
+            <label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px;cursor:pointer;padding:10px 14px;background:var(--card);border-radius:12px;border:1px solid var(--border)">
+              <input type="checkbox" id="atkRmkPausarApos" style="width:18px;height:18px;accent-color:var(--accent)" checked>
+              <span>Pausar contatos após envio</span>
+            </label>
+            <!-- Botões -->
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+              <button id="atkRmkBtnEnviar" onclick="atkRmkEnviar()" style="width:100%;padding:14px;border-radius:12px;background:#22c55e;color:#fff;font-weight:700;font-size:15px;border:none;cursor:pointer">📤 ENVIAR</button>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button onclick="atkRmkPausar()" style="padding:12px 8px;border-radius:12px;background:var(--warning);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏸ PAUSAR</button>
+                <button onclick="atkRmkRetomar()" style="padding:12px 8px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">▶ RETOMAR</button>
+              </div>
+              <button id="atkRmkBtnParar" onclick="atkRmkParar()" style="display:none;width:100%;padding:12px;border-radius:12px;background:var(--danger);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">⏹ PARAR ENVIO</button>
+            </div>
+            <!-- Progresso -->
+            <div id="atkRmkProgress" style="display:none;background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:600;color:var(--text)">Enviando...</span>
+                <span id="atkRmkProgressText" style="font-size:13px;color:var(--accent);font-weight:700">0 / 0</span>
+              </div>
+              <div style="background:var(--border);border-radius:99px;height:7px;overflow:hidden">
+                <div id="atkRmkProgressBar" style="height:100%;background:var(--accent);border-radius:99px;transition:width .3s;width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /atk-tab-mkt -->
 
       </div></div>
     </div>
@@ -1841,6 +1907,170 @@ async function sarahRmkParar() {
   document.getElementById('sarahRmkBtnParar').style.display = 'none';
   document.getElementById('sarahRmkBtnEnviar').disabled = false;
   clearInterval(sarahRmkStatusTimer);
+}
+
+// ===== ATK REMARKETING (Pedro / Rodrigo) =====
+let atkRmkAgente = 'pedro';
+let atkRmkFiltro = 'todos';
+let atkRmkTodosContatos = [];
+let atkRmkImgUrl = null;
+let atkRmkStatusTimer = null;
+
+function atkRmkSwitchAgent(agente, btn) {
+  atkRmkAgente = agente;
+  ['Pedro','Rodrigo'].forEach(n => {
+    const b = document.getElementById(`atkRmkBtn${n}`);
+    if (b) { b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)'; }
+  });
+  btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  atkRmkLoadContatos();
+}
+
+function atkRmkSetFilter(f, btn) {
+  atkRmkFiltro = f;
+  document.querySelectorAll('.atk-rmk-filter').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  atkRmkRenderContatos();
+}
+
+async function atkRmkLoadContatos() {
+  const el = document.getElementById('atkRmkContatos');
+  if (el) el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Carregando...</div>';
+  try {
+    const r = await fetch(`/api/remarketing/contatos?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    atkRmkTodosContatos = await r.json();
+    atkRmkRenderContatos();
+  } catch (e) { if (el) el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--danger);font-size:13px">Erro ao carregar</div>'; }
+}
+
+function atkRmkRenderContatos() {
+  const el = document.getElementById('atkRmkContatos');
+  if (!el) return;
+  let lista = atkRmkTodosContatos;
+  if (atkRmkFiltro === 'ativos') lista = lista.filter(c => !c.pausado);
+  else if (atkRmkFiltro === 'pausados') lista = lista.filter(c => c.pausado);
+  if (!lista.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Nenhum contato</div>'; atkRmkUpdateCounter(); return; }
+  el.innerHTML = lista.map(c => `
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--card)" onclick="event.stopPropagation()">
+      <input type="checkbox" class="atk-rmk-chk" data-numero="${c.numero}" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0" onchange="atkRmkUpdateCounter()">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome || c.numero}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}</div>
+      </div>
+      <span style="font-size:10px;padding:2px 7px;border-radius:99px;font-weight:700;background:${c.pausado ? '#fee2e2' : '#dcfce7'};color:${c.pausado ? '#dc2626' : '#16a34a'};flex-shrink:0">${c.pausado ? 'PAUSADO' : 'ATIVO'}</span>
+    </label>`).join('');
+  atkRmkUpdateCounter();
+}
+
+function atkRmkToggleAll(checked) { document.querySelectorAll('.atk-rmk-chk').forEach(c => c.checked = checked); atkRmkUpdateCounter(); }
+function atkRmkUpdateCounter() {
+  const sel = document.querySelectorAll('.atk-rmk-chk:checked').length;
+  const total = document.querySelectorAll('.atk-rmk-chk').length;
+  const el = document.getElementById('atkRmkCounter');
+  if (el) el.textContent = `${sel} de ${total} selecionados`;
+  const all = document.getElementById('atkRmkSelectAll');
+  if (all) { all.indeterminate = sel > 0 && sel < total; all.checked = sel === total && total > 0; }
+}
+function atkRmkGetSelecionados() { return Array.from(document.querySelectorAll('.atk-rmk-chk:checked')).map(c => c.dataset.numero); }
+
+function atkRmkHandleImg(e) {
+  const file = e.target.files[0]; if (!file) return;
+  document.getElementById('atkRmkImgNome').textContent = file.name;
+  document.getElementById('atkRmkImgRemove').style.display = 'block';
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const base64 = ev.target.result;
+    document.getElementById('atkRmkImgPreview').src = base64;
+    document.getElementById('atkRmkImgPreview').style.display = 'block';
+    try {
+      const r = await fetch('/api/remarketing/temp-img', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+        body: JSON.stringify({ base64, mimetype: file.type })
+      });
+      const d = await r.json();
+      atkRmkImgUrl = d.url;
+    } catch (e) { alert('Erro ao processar imagem'); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function atkRmkRemoveImg() {
+  atkRmkImgUrl = null;
+  document.getElementById('atkRmkImgInput').value = '';
+  document.getElementById('atkRmkImgNome').textContent = 'Nenhuma imagem';
+  document.getElementById('atkRmkImgPreview').style.display = 'none';
+  document.getElementById('atkRmkImgRemove').style.display = 'none';
+}
+
+async function atkRmkEnviar() {
+  const numeros = atkRmkGetSelecionados();
+  const texto = document.getElementById('atkRmkTexto').value.trim();
+  if (!numeros.length) return alert('Selecione pelo menos 1 contato');
+  if (!texto && !atkRmkImgUrl) return alert('Digite uma mensagem ou selecione uma imagem');
+  if (!confirm(`Enviar para ${numeros.length} contato(s) do ${atkRmkAgente}?`)) return;
+  const pausarAposEnvio = document.getElementById('atkRmkPausarApos').checked;
+  try {
+    const r = await fetch('/api/remarketing/enviar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify({ agente: atkRmkAgente, numeros, texto, imagemUrl: atkRmkImgUrl, pausarAposEnvio })
+    });
+    const d = await r.json();
+    if (!r.ok) return alert(d.error || 'Erro ao iniciar envio');
+    document.getElementById('atkRmkProgress').style.display = 'block';
+    document.getElementById('atkRmkBtnParar').style.display = 'block';
+    document.getElementById('atkRmkBtnEnviar').disabled = true;
+    atkRmkPollStatus();
+  } catch (e) { alert('Erro de conexão'); }
+}
+
+function atkRmkPollStatus() {
+  clearInterval(atkRmkStatusTimer);
+  atkRmkStatusTimer = setInterval(atkRmkCheckStatus, 1500);
+}
+
+async function atkRmkCheckStatus() {
+  try {
+    const r = await fetch(`/api/remarketing/status?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    const d = await r.json();
+    const bar = document.getElementById('atkRmkProgressBar');
+    const txt = document.getElementById('atkRmkProgressText');
+    const prog = document.getElementById('atkRmkProgress');
+    const btnParar = document.getElementById('atkRmkBtnParar');
+    const btnEnviar = document.getElementById('atkRmkBtnEnviar');
+    if (d.ativo) {
+      const pct = d.total > 0 ? Math.round((d.enviados / d.total) * 100) : 0;
+      bar.style.width = pct + '%';
+      bar.style.background = d.pausado ? 'var(--warning)' : 'var(--accent)';
+      const erroTxt = d.erros > 0 ? ` · ${d.erros} erro${d.erros > 1 ? 's' : ''}` : '';
+      txt.textContent = `${d.enviados} / ${d.total}${erroTxt}${d.pausado ? ' ⏸' : ''}`;
+      prog.style.display = 'block'; btnParar.style.display = 'block'; btnEnviar.disabled = true;
+    } else {
+      clearInterval(atkRmkStatusTimer);
+      if (d.total > 0) {
+        bar.style.width = '100%';
+        const erroFinal = d.erros > 0 ? ` (${d.erros} erro${d.erros > 1 ? 's' : ''})` : '';
+        txt.textContent = `✓ ${d.enviados}/${d.total} enviados${erroFinal}`;
+        setTimeout(() => { prog.style.display = 'none'; bar.style.width = '0%'; }, 5000);
+      }
+      btnParar.style.display = 'none'; btnEnviar.disabled = false;
+      atkRmkLoadContatos();
+    }
+  } catch (e) { clearInterval(atkRmkStatusTimer); }
+}
+
+async function atkRmkPausar() {
+  await fetch('/api/remarketing/pausar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
+}
+async function atkRmkRetomar() {
+  await fetch('/api/remarketing/retomar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
+}
+async function atkRmkParar() {
+  await fetch('/api/remarketing/parar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
+  document.getElementById('atkRmkBtnParar').style.display = 'none';
+  document.getElementById('atkRmkBtnEnviar').disabled = false;
+  clearInterval(atkRmkStatusTimer);
 }
 
 async function sarahCheckConexao() {

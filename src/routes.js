@@ -593,12 +593,16 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   }
 });
 
-// ----- Remarketing Logzz -----
+// ----- Remarketing Logzz / ATK -----
 const _remarkTempImgs = new Map();
 const _remarkState = {
-  logzz: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
-  sarah: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  logzz:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
 };
+const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo'];
+const ATK_REMARK_AGENTS   = ['pedro', 'rodrigo'];
 
 router.post('/api/remarketing/temp-img', auth, (req, res) => {
   const { base64, mimetype } = req.body;
@@ -619,23 +623,35 @@ router.get('/api/remarketing/temp-img/:id', (req, res) => {
 
 router.get('/api/remarketing/contatos', auth, (req, res) => {
   const agentId = req.query.agente;
-  if (!['logzz', 'sarah'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
   const contatos = [];
-  db.state.conversations[agentId].forEach((conv, numero) => {
-    contatos.push({
-      numero,
-      nome: conv.pushName || '',
-      ultimaMensagem: conv.ultimaMensagem || 0,
-      pausado: db.state.paused[agentId]?.has(numero) || false,
+  if (ATK_REMARK_AGENTS.includes(agentId)) {
+    const dbAtk = require('./database-atk');
+    dbAtk.state.conversations[agentId].forEach((conv, numero) => {
+      contatos.push({
+        numero,
+        nome: conv.pushName || '',
+        ultimaMensagem: conv.ultimaMensagem || 0,
+        pausado: dbAtk.isManuallyPaused(numero),
+      });
     });
-  });
+  } else {
+    db.state.conversations[agentId].forEach((conv, numero) => {
+      contatos.push({
+        numero,
+        nome: conv.pushName || '',
+        ultimaMensagem: conv.ultimaMensagem || 0,
+        pausado: db.state.paused[agentId]?.has(numero) || false,
+      });
+    });
+  }
   contatos.sort((a, b) => b.ultimaMensagem - a.ultimaMensagem);
   res.json(contatos);
 });
 
 router.post('/api/remarketing/enviar', auth, async (req, res) => {
   const { agente, numeros, texto, imagemUrl, pausarAposEnvio } = req.body;
-  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
   if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
@@ -644,11 +660,15 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numeros.length;
   res.json({ ok: true, total: numeros.length });
 
-  const sessionId = CONFIG.sessionIds[agente];
+  const isAtk = ATK_REMARK_AGENTS.includes(agente);
+  const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
   const TIMEOUT_ENVIO = 18000;
 
-  // Resolve JID correto: prioriza LID mapeado; para números ≥15 dígitos sem prefixo 55, usa @lid diretamente
   function resolveJid(numero) {
+    if (isAtk) {
+      const dbAtk = require('./database-atk');
+      return dbAtk.resolveLid ? dbAtk.resolveLid(numero) : null;
+    }
     const lidJid = db.state.phoneLidMap?.get(numero);
     if (lidJid) return lidJid;
     if (numero.length >= 15 && !numero.startsWith('55')) return `${numero}@lid`;
@@ -658,7 +678,6 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   (async () => {
     let consecutiveTimeouts = 0;
     for (const numero of numeros) {
-      // Aguarda enquanto pausado
       while (state.pausado && !state.cancelar) {
         await new Promise(r => setTimeout(r, 1000));
       }
@@ -677,11 +696,22 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           new Promise((_, rej) => setTimeout(() => rej(new Error('__timeout__')), TIMEOUT_ENVIO)),
         ]);
         consecutiveTimeouts = 0;
-        if (pausarAposEnvio) db.pausePhone(agente, numero);
-        db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
-        if (texto) {
-          const convState = db.state.conversations[agente]?.get(numero);
-          if (convState) convState.remarketingContexto = texto;
+        if (isAtk) {
+          const dbAtk = require('./database-atk');
+          if (pausarAposEnvio) dbAtk.pauseManual(numero, agente);
+          const conv = dbAtk.getConversation(agente, numero);
+          if (conv) {
+            conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: Date.now() });
+            conv.ultimaMensagem = Date.now();
+          }
+          dbAtk.save();
+        } else {
+          if (pausarAposEnvio) db.pausePhone(agente, numero);
+          db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
+          if (texto) {
+            const convState = db.state.conversations[agente]?.get(numero);
+            if (convState) convState.remarketingContexto = texto;
+          }
         }
         state.enviados++;
       } catch (e) {
@@ -707,29 +737,28 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
 
 router.get('/api/remarketing/status', auth, (req, res) => {
   const agentId = req.query.agente;
-  if (!['logzz', 'sarah'].includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
   res.json(_remarkState[agentId]);
 });
 
 router.post('/api/remarketing/parar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].cancelar = true;
-  // Force-reset ativo após 25s para desbloquear caso o loop esteja travado
   setTimeout(() => { _remarkState[agente].ativo = false; }, 25000);
   res.json({ ok: true });
 });
 
 router.post('/api/remarketing/pausar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].pausado = true;
   res.json({ ok: true });
 });
 
 router.post('/api/remarketing/retomar', auth, (req, res) => {
   const { agente } = req.body;
-  if (!['logzz', 'sarah'].includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].pausado = false;
   res.json({ ok: true });
 });
