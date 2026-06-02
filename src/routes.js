@@ -600,6 +600,7 @@ const _remarkState = {
   sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
   pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
   rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  antonio: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
 };
 const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo', 'antonio'];
 const ATK_REMARK_AGENTS   = ['pedro', 'rodrigo'];
