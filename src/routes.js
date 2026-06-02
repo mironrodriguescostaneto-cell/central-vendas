@@ -1217,19 +1217,13 @@ router.post('/api/atk/vendas', auth, (req, res) => {
 
     const sale = dbAtk.addSale({
       agentId, productId, productName: produto.nome,
-      numero: numero || '', valorFinal: totalDesc,
-      valorCusto: custoPorUnit * qtd,
-      lucro: lucroTotal,
-      quantidade: qtd, desconto: parseFloat(desconto || 0),
+      numero: numero || '',
+      valor: totalBruto,
+      desconto: parseFloat(desconto || 0),
+      quantidade: qtd,
       tipo, observacao, status: 'confirmada',
     });
 
-    // Adicionar ao caixa se estiver aberto
-    if (dbAtk.getCaixaAberto()) {
-      dbAtk.addMovimentoCaixa('venda', totalDesc, `${produto.nome}${qtd > 1 ? ` x${qtd}` : ''} - ${agentId} - ${tipo}`);
-    }
-
-    dbAtk.save();
     res.json(sale);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

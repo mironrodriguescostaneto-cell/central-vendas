@@ -457,7 +457,8 @@ function _genId() { return Date.now().toString(36) + Math.random().toString(36).
 function addSale(sale) {
   const product = sale.productId ? state.products.find(p => p.id === sale.productId) : null;
   const valor = Number(sale.valor) || 0, desconto = Number(sale.desconto) || 0;
-  const valorFinal = valor - desconto, custo = product?.precoCusto || 0, lucro = valorFinal - custo;
+  const qtd = Number(sale.quantidade) || 1;
+  const valorFinal = valor - desconto, custo = (product?.precoCusto || 0) * qtd, lucro = valorFinal - custo;
   const newSale = { id: _genId(), productId: sale.productId || null, productName: sale.productName || (product?.nome) || 'Produto', agentId: sale.agentId || 'manual', numero: sale.numero || '', cliente: sale.cliente || '', valor, desconto, valorFinal, custo, lucro, tipo: sale.tipo || 'entrega', pagamento: sale.pagamento || 'PIX', status: sale.status || 'confirmada', observacao: sale.observacao || '', createdAt: Date.now(), updatedAt: Date.now() };
   state.sales.push(newSale);
   if (state.sales.length > 2000) state.sales = state.sales.slice(-2000);
