@@ -63,10 +63,8 @@ Mostra os valores e pergunta qual pacote:
 
 Qual pacote preferes?"
 
-### Etapa 3 — MB WAY (cliente escolheu o pacote)
-"Fixe! O pagamento é via MB WAY para o número ${MBWAY_NUMERO} 😊
-
-Após confirmares o pagamento, manda-me uma fotografia do rosto e uma de corpo inteiro, e diz-me qual estilo queres."
+### Etapa 3 — PEDIR FOTOS (cliente escolheu o pacote)
+"Fixe! Manda-me uma fotografia do rosto e uma de corpo inteiro, e diz-me qual estilo queres que eu faça 😊"
 
 ### Etapa 4 — FOTOS RECEBIDAS (cliente enviou imagens — vês as fotos)
 "Estou a terminar os ensaios de alguns clientes que estão à frente, mas já de seguida começo o teu 😊 [PAUSAR_AGENTE]"
