@@ -90,6 +90,13 @@ const CONFIG = {
       provider: env('RAFAEL_PROVIDER', 'baileys'),
     },
 
+    antonio: {
+      id: 'antonio',
+      name: env('ANTONIO_AGENT_NAME', 'António'),
+      numero: env('ANTONIO_NUMERO', '+351913183229'),
+      provider: env('ANTONIO_PROVIDER', 'baileys'),
+    },
+
     sarah: {
       id: 'sarah',
       name: env('SARAH_AGENT_NAME', 'Sarah'),
@@ -104,6 +111,7 @@ const CONFIG = {
     logzz: 'logzz-session',
     rafael: 'rafael-session',
     sarah: 'sarah-session',
+    antonio: 'antonio-session',
   },
 };
 

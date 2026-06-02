@@ -12,10 +12,10 @@ const DB_PATH = path.join(
 // Estado global em memória
 const state = {
   // Conversas por agente: agentId → Map(phone → {msgs, ultimaMensagem, pushName, pausado})
-  conversations: { info: new Map(), logzz: new Map(), rafael: new Map(), sarah: new Map() },
+  conversations: { info: new Map(), logzz: new Map(), rafael: new Map(), sarah: new Map(), antonio: new Map() },
 
   // Números pausados por agente
-  paused: { info: new Set(), logzz: new Set(), rafael: new Set(), sarah: new Set() },
+  paused: { info: new Set(), logzz: new Set(), rafael: new Set(), sarah: new Set(), antonio: new Set() },
 
   // Pedidos Logzz: [{id, phone, nome, produto, status, criadoEm}]
   pedidos: [],
@@ -34,11 +34,11 @@ const state = {
   gestorChat: [],
 
   // Sessão do gestor — instruções ativas por agente
-  instrucoes: { info: '', logzz: '', rafael: '', sarah: '' },
+  instrucoes: { info: '', logzz: '', rafael: '', sarah: '', antonio: '' },
 
   // Status de conexão dos agentes
-  connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected', sarah: 'disconnected' },
-  qrCodes: { info: null, logzz: null, rafael: null, sarah: null },
+  connectionStatus: { info: 'disconnected', logzz: 'disconnected', rafael: 'disconnected', sarah: 'disconnected', antonio: 'disconnected' },
+  qrCodes: { info: null, logzz: null, rafael: null, sarah: null, antonio: null },
 
   // Compradores confirmados pela Kiwify — phone normalizado (com 55)
   sarahPurchases: new Set(),
@@ -74,12 +74,14 @@ function serialize() {
       logzz: Array.from(state.conversations.logzz.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
       rafael: Array.from(state.conversations.rafael.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
       sarah: Array.from(state.conversations.sarah.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
+      antonio: Array.from(state.conversations.antonio.entries()).map(([k, v]) => [k, { ...v, msgs: v.msgs?.slice(-50) }]),
     },
     paused: {
       info: Array.from(state.paused.info),
       logzz: Array.from(state.paused.logzz),
       rafael: Array.from(state.paused.rafael),
       sarah: Array.from(state.paused.sarah),
+      antonio: Array.from(state.paused.antonio),
     },
     sarahPurchases: Array.from(state.sarahPurchases),
     sarahSales: state.sarahSales,
@@ -112,12 +114,14 @@ function deserialize(data) {
     if (data.conversations.logzz) state.conversations.logzz = new Map(data.conversations.logzz);
     if (data.conversations.rafael) state.conversations.rafael = new Map(data.conversations.rafael);
     if (data.conversations.sarah) state.conversations.sarah = new Map(data.conversations.sarah);
+    if (data.conversations.antonio) state.conversations.antonio = new Map(data.conversations.antonio);
   }
   if (data.paused) {
     if (data.paused.info) state.paused.info = new Set(data.paused.info);
     if (data.paused.logzz) state.paused.logzz = new Set(data.paused.logzz);
     if (data.paused.rafael) state.paused.rafael = new Set(data.paused.rafael);
     if (data.paused.sarah) state.paused.sarah = new Set(data.paused.sarah);
+    if (data.paused.antonio) state.paused.antonio = new Set(data.paused.antonio);
   }
   if (data.sarahPurchases) state.sarahPurchases = new Set(data.sarahPurchases);
   if (data.sarahSales) state.sarahSales = data.sarahSales;

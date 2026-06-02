@@ -56,7 +56,7 @@ router.get('/api/health', (req, res) => {
 router.get('/api/agents/status', auth, (req, res) => {
   const status = baileys.getAllStatus();
   const result = {};
-  for (const agentId of ['info', 'logzz', 'rafael', 'sarah']) {
+  for (const agentId of ['info', 'logzz', 'rafael', 'sarah', 'antonio']) {
     const baileysStatus = status[CONFIG.sessionIds[agentId]] || { state: 'disconnected', hasQR: false };
     result[agentId] = {
       state: baileysStatus.state,
@@ -80,7 +80,7 @@ router.get('/api/agents/:agentId/qr', auth, (req, res) => {
 // ----- Página de scan local (sem auth, só localhost) -----
 router.get('/scan/:agentId', (req, res) => {
   const { agentId } = req.params;
-  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).end();
+  if (!['info', 'logzz', 'rafael', 'sarah', 'antonio'].includes(agentId)) return res.status(404).end();
   res.setHeader('Content-Type', 'text/html');
   res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conectar - ${agentId}</title>
@@ -527,7 +527,7 @@ router.post('/admin/upload-session', auth, async (req, res) => {
 // ----- Limpar pausas de um agente -----
 router.delete('/api/agents/:agentId/pauses', auth, (req, res) => {
   const { agentId } = req.params;
-  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  if (!['info', 'logzz', 'rafael', 'sarah', 'antonio'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
   db.clearPauses(agentId);
   res.json({ ok: true, message: `Pausas do agente ${agentId} limpas` });
 });
@@ -582,7 +582,7 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   const { agentId } = req.params;
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).json({ error: 'phone e message obrigatórios' });
-  if (!['info', 'logzz', 'rafael', 'sarah'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
+  if (!['info', 'logzz', 'rafael', 'sarah', 'antonio'].includes(agentId)) return res.status(404).json({ error: 'Agente não encontrado' });
   try {
     const agentMap = { logzz: './agents/logzz', rafael: './agents/rafael', info: './agents/info-produtos' };
     const agent = require(agentMap[agentId]);
@@ -601,7 +601,7 @@ const _remarkState = {
   pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
   rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
 };
-const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo'];
+const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo', 'antonio'];
 const ATK_REMARK_AGENTS   = ['pedro', 'rodrigo'];
 
 router.post('/api/remarketing/temp-img', auth, (req, res) => {

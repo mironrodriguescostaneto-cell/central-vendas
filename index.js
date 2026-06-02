@@ -48,15 +48,17 @@ async function main() {
   setTimeout(async () => {
     try {
       console.log('[MAIN] Iniciando agentes CVN...');
-      const infoAgent  = require('./src/agents/info-produtos');
-      const logzzAgent = require('./src/agents/logzz');
-      const rafaelAgent= require('./src/agents/rafael');
-      const sarahAgent = require('./src/agents/sarah');
+      const infoAgent    = require('./src/agents/info-produtos');
+      const logzzAgent   = require('./src/agents/logzz');
+      const rafaelAgent  = require('./src/agents/rafael');
+      const sarahAgent   = require('./src/agents/sarah');
+      const antonioAgent = require('./src/agents/antonio');
       await Promise.allSettled([
-        infoAgent.init().catch(e  => console.error('[MAIN] Erro agente info:', e.message)),
-        logzzAgent.init().catch(e => console.error('[MAIN] Erro agente logzz:', e.message)),
-        rafaelAgent.init().catch(e=> console.error('[MAIN] Erro agente rafael:', e.message)),
-        sarahAgent.init().catch(e => console.error('[MAIN] Erro agente sarah:', e.message)),
+        infoAgent.init().catch(e    => console.error('[MAIN] Erro agente info:', e.message)),
+        logzzAgent.init().catch(e   => console.error('[MAIN] Erro agente logzz:', e.message)),
+        rafaelAgent.init().catch(e  => console.error('[MAIN] Erro agente rafael:', e.message)),
+        sarahAgent.init().catch(e   => console.error('[MAIN] Erro agente sarah:', e.message)),
+        antonioAgent.init().catch(e => console.error('[MAIN] Erro agente antonio:', e.message)),
       ]);
       console.log('[MAIN] Agentes CVN iniciados');
     } catch (e) {

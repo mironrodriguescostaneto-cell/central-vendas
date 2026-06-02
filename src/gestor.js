@@ -155,7 +155,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        agente: { type: 'string', enum: ['info', 'logzz', 'rafael'], description: 'Qual agente' },
+        agente: { type: 'string', enum: ['info', 'logzz', 'rafael', 'antonio'], description: 'Qual agente' },
       },
       required: ['agente'],
     },
@@ -166,7 +166,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        agente: { type: 'string', enum: ['info', 'logzz', 'rafael'], description: 'Qual agente' },
+        agente: { type: 'string', enum: ['info', 'logzz', 'rafael', 'antonio'], description: 'Qual agente' },
         phone: { type: 'string', description: 'Número do cliente (ex: 5562991819645)' },
       },
       required: ['agente', 'phone'],
@@ -191,7 +191,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        agente: { type: 'string', enum: ['info', 'logzz', 'rafael'], description: 'Qual agente' },
+        agente: { type: 'string', enum: ['info', 'logzz', 'rafael', 'antonio'], description: 'Qual agente' },
         phone: { type: 'string', description: 'Número do cliente' },
         acao: { type: 'string', enum: ['pausar', 'retomar'], description: 'pausar ou retomar' },
       },
@@ -204,7 +204,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        agente: { type: 'string', enum: ['info', 'logzz', 'rafael'], description: 'Qual agente' },
+        agente: { type: 'string', enum: ['info', 'logzz', 'rafael', 'antonio'], description: 'Qual agente' },
         instrucao: { type: 'string', description: 'Nova instrução (vazio para limpar)' },
       },
       required: ['agente', 'instrucao'],
@@ -279,7 +279,7 @@ const GESTOR_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        agente: { type: 'string', enum: ['info', 'logzz', 'rafael'], description: 'Qual agente vai disparar' },
+        agente: { type: 'string', enum: ['info', 'logzz', 'rafael', 'antonio'], description: 'Qual agente vai disparar' },
         mensagem: { type: 'string', description: 'Texto da mensagem a enviar. Use {nome} para personalizar com o nome do cliente.' },
         filtro: {
           type: 'string',
