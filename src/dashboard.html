@@ -512,10 +512,15 @@ a{color:var(--accent);text-decoration:none}
             <!-- Roberto Mkt -->
             <div id="mktSectionRoberto" style="max-width:560px;margin:0 auto;width:100%">
               <!-- Filtro -->
-              <div style="display:flex;gap:6px;margin-bottom:12px">
-                <button class="rmk-filter active" data-filter="todos" onclick="rmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
-                <button class="rmk-filter" data-filter="ativos" onclick="rmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
-                <button class="rmk-filter" data-filter="pausados" onclick="rmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+              <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+                <button class="rmk-filter active" data-filter="todos" onclick="rmkSetFilter('todos',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
+                <button class="rmk-filter" data-filter="ativos" onclick="rmkSetFilter('ativos',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
+                <button class="rmk-filter" data-filter="pausados" onclick="rmkSetFilter('pausados',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+                <button class="rmk-filter" data-filter="nao_receberam" onclick="rmkSetFilter('nao_receberam',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--danger);border:1px solid var(--border)">Não receberam</button>
+              </div>
+              <!-- Botão recuperar histórico -->
+              <div style="margin-bottom:10px">
+                <button onclick="rmkRecuperar()" style="width:100%;padding:8px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">🔍 Recuperar histórico de envios</button>
               </div>
               <!-- Selecionar todos + counter -->
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
@@ -796,10 +801,15 @@ a{color:var(--accent);text-decoration:none}
           </div>
           <div style="max-width:560px;margin:0 auto;width:100%">
             <!-- Filtro -->
-            <div style="display:flex;gap:6px;margin-bottom:12px">
-              <button class="atk-rmk-filter active" data-filter="todos" onclick="atkRmkSetFilter('todos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
-              <button class="atk-rmk-filter" data-filter="ativos" onclick="atkRmkSetFilter('ativos',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
-              <button class="atk-rmk-filter" data-filter="pausados" onclick="atkRmkSetFilter('pausados',this)" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+            <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+              <button class="atk-rmk-filter active" data-filter="todos" onclick="atkRmkSetFilter('todos',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none">Todos</button>
+              <button class="atk-rmk-filter" data-filter="ativos" onclick="atkRmkSetFilter('ativos',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Não pausados</button>
+              <button class="atk-rmk-filter" data-filter="pausados" onclick="atkRmkSetFilter('pausados',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border)">Pausados</button>
+              <button class="atk-rmk-filter" data-filter="nao_receberam" onclick="atkRmkSetFilter('nao_receberam',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--danger);border:1px solid var(--border)">Não receberam</button>
+            </div>
+            <!-- Botão recuperar histórico -->
+            <div style="margin-bottom:10px">
+              <button onclick="atkRmkRecuperar()" style="width:100%;padding:8px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer">🔍 Recuperar histórico de envios</button>
             </div>
             <!-- Selecionar todos + counter -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
@@ -1627,7 +1637,8 @@ function rmkSetFilter(f, btn) {
   document.querySelectorAll('.rmk-filter').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
-  btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  btn.style.background = f === 'nao_receberam' ? 'var(--danger)' : 'var(--accent)';
+  btn.style.color = '#fff'; btn.style.border = 'none';
   rmkRenderContatos();
 }
 
@@ -1648,20 +1659,39 @@ function rmkRenderContatos() {
   let lista = rmkTodosContatos;
   if (rmkFiltro === 'ativos') lista = lista.filter(c => !c.pausado);
   else if (rmkFiltro === 'pausados') lista = lista.filter(c => c.pausado);
+  else if (rmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm);
   if (!lista.length) {
     el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Nenhum contato</div>';
     rmkUpdateCounter(); return;
   }
-  el.innerHTML = lista.map(c => `
+  el.innerHTML = lista.map(c => {
+    const rmkBadge = c.remarketingEnviadoEm
+      ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d;flex-shrink:0">✓ ${new Date(c.remarketingEnviadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`
+      : `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626;flex-shrink:0">Não enviado</span>`;
+    return `
     <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--card)" onclick="event.stopPropagation()">
       <input type="checkbox" class="rmk-chk" data-numero="${c.numero}" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0" onchange="rmkUpdateCounter()">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome || c.numero}</div>
         <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}</div>
       </div>
-      <span style="font-size:10px;padding:2px 7px;border-radius:99px;font-weight:700;background:${c.pausado ? '#fee2e2' : '#dcfce7'};color:${c.pausado ? '#dc2626' : '#16a34a'};flex-shrink:0">${c.pausado ? 'PAUSADO' : 'ATIVO'}</span>
-    </label>`).join('');
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+        ${rmkBadge}
+        <span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:${c.pausado?'#fee2e2':'#dcfce7'};color:${c.pausado?'#dc2626':'#16a34a'}">${c.pausado?'PAUSADO':'ATIVO'}</span>
+      </div>
+    </label>`;
+  }).join('');
   rmkUpdateCounter();
+}
+
+async function rmkRecuperar() {
+  const agente = 'logzz';
+  try {
+    const r = await fetch(`/api/remarketing/recuperar/${agente}`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    const d = await r.json();
+    toast(`✅ ${d.marcados} contatos marcados como "já receberam"`);
+    rmkLoadContatos();
+  } catch (e) { toast('Erro: ' + e.message); }
 }
 
 function rmkToggleAll(checked) {
@@ -1972,7 +2002,8 @@ function atkRmkSetFilter(f, btn) {
   document.querySelectorAll('.atk-rmk-filter').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
-  btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  btn.style.background = f === 'nao_receberam' ? 'var(--danger)' : 'var(--accent)';
+  btn.style.color = '#fff'; btn.style.border = 'none';
   atkRmkRenderContatos();
 }
 
@@ -1992,17 +2023,35 @@ function atkRmkRenderContatos() {
   let lista = atkRmkTodosContatos;
   if (atkRmkFiltro === 'ativos') lista = lista.filter(c => !c.pausado);
   else if (atkRmkFiltro === 'pausados') lista = lista.filter(c => c.pausado);
+  else if (atkRmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm);
   if (!lista.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Nenhum contato</div>'; atkRmkUpdateCounter(); return; }
-  el.innerHTML = lista.map(c => `
+  el.innerHTML = lista.map(c => {
+    const rmkBadge = c.remarketingEnviadoEm
+      ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d">✓ ${new Date(c.remarketingEnviadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`
+      : `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626">Não enviado</span>`;
+    return `
     <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--card)" onclick="event.stopPropagation()">
       <input type="checkbox" class="atk-rmk-chk" data-numero="${c.numero}" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0" onchange="atkRmkUpdateCounter()">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome || c.numero}</div>
         <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}</div>
       </div>
-      <span style="font-size:10px;padding:2px 7px;border-radius:99px;font-weight:700;background:${c.pausado ? '#fee2e2' : '#dcfce7'};color:${c.pausado ? '#dc2626' : '#16a34a'};flex-shrink:0">${c.pausado ? 'PAUSADO' : 'ATIVO'}</span>
-    </label>`).join('');
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+        ${rmkBadge}
+        <span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:${c.pausado?'#fee2e2':'#dcfce7'};color:${c.pausado?'#dc2626':'#16a34a'}">${c.pausado?'PAUSADO':'ATIVO'}</span>
+      </div>
+    </label>`;
+  }).join('');
   atkRmkUpdateCounter();
+}
+
+async function atkRmkRecuperar() {
+  try {
+    const r = await fetch(`/api/remarketing/recuperar/${atkRmkAgente}`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    const d = await r.json();
+    toast(`✅ ${d.marcados} contatos marcados como "já receberam"`);
+    atkRmkLoadContatos();
+  } catch (e) { toast('Erro: ' + e.message); }
 }
 
 function atkRmkToggleAll(checked) { document.querySelectorAll('.atk-rmk-chk').forEach(c => c.checked = checked); atkRmkUpdateCounter(); }

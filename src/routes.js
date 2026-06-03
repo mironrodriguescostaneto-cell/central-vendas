@@ -634,6 +634,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
         nome: conv.pushName || '',
         ultimaMensagem: conv.ultimaMensagem || 0,
         pausado: dbAtk.isManuallyPaused(numero),
+        remarketingEnviadoEm: conv.remarketingEnviadoEm || 0,
       });
     });
   } else {
@@ -643,6 +644,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
         nome: conv.pushName || '',
         ultimaMensagem: conv.ultimaMensagem || 0,
         pausado: db.state.paused[agentId]?.has(numero) || false,
+        remarketingEnviadoEm: conv.remarketingEnviadoEm || 0,
       });
     });
   }
@@ -711,11 +713,14 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           if (conv) {
             conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: Date.now() });
             conv.ultimaMensagem = Date.now();
+            conv.remarketingEnviadoEm = Date.now();
           }
           dbAtk.save();
         } else {
           if (pausarAposEnvio) db.pausePhone(agente, numero);
           db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
+          const convCvn = db.state.conversations[agente]?.get(numero);
+          if (convCvn) convCvn.remarketingEnviadoEm = Date.now();
           if (texto) {
             const convState = db.state.conversations[agente]?.get(numero);
             if (convState) convState.remarketingContexto = texto;
@@ -769,6 +774,39 @@ router.post('/api/remarketing/retomar', auth, (req, res) => {
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   _remarkState[agente].pausado = false;
   res.json({ ok: true });
+});
+
+// Recuperação retroativa: marca contatos que receberam remarketing nos últimos 7 dias
+router.post('/api/remarketing/recuperar/:agente', auth, (req, res) => {
+  const { agente } = req.params;
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  const limite = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let marcados = 0;
+  try {
+    if (ATK_REMARK_AGENTS.includes(agente)) {
+      const dbAtk = require('./database-atk');
+      dbAtk.state.conversations[agente].forEach((conv) => {
+        if (conv.remarketingEnviadoEm) return;
+        const last = [...(conv.msgs || [])].reverse().find(m => m.role === 'assistant');
+        if (last && (last.timestamp || 0) > limite) {
+          conv.remarketingEnviadoEm = last.timestamp;
+          marcados++;
+        }
+      });
+      dbAtk.save();
+    } else {
+      db.state.conversations[agente]?.forEach((conv) => {
+        if (conv.remarketingEnviadoEm) return;
+        const last = [...(conv.msgs || [])].reverse().find(m => m.role === 'assistant');
+        if (last && (last.ts || 0) > limite) {
+          conv.remarketingEnviadoEm = last.ts;
+          marcados++;
+        }
+      });
+      db.saveDB().catch(() => {});
+    }
+    res.json({ ok: true, marcados });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ----- Finanças Familiares -----
