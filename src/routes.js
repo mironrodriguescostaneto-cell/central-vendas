@@ -624,15 +624,48 @@ router.get('/api/remarketing/temp-img/:id', (req, res) => {
 
 // Normaliza número para comparação: remove @sufixo, tenta resolver LID, pega últimos 10 dígitos
 function _canonicalPhone(numero, dbAtk) {
-  const stripped = numero.replace(/@[^@]+$/, '').replace(/:/g, '');
-  if (dbAtk) {
-    const phone = dbAtk.resolvePhone(stripped);
-    if (phone) return phone.replace(/\D/g, '').slice(-10);
+  if (!numero) return '';
+  const raw = String(numero);
+  const stripped = raw.replace(/@[^@]+$/, '').replace(/:/g, '');
+  const candidates = [raw, stripped];
+  if (!raw.includes('@') && stripped) {
+    candidates.push(`${stripped}@lid`, `${stripped}@s.whatsapp.net`);
   }
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const clean = String(candidate).replace(/@[^@]+$/, '').replace(/:/g, '');
+
+    if (dbAtk) {
+      const atkPhone = dbAtk.resolvePhone(candidate) || dbAtk.resolvePhone(clean);
+      if (atkPhone) return String(atkPhone).replace(/\D/g, '').slice(-10);
+    }
+
+    const mappedPhone = db.mapLidToPhone?.(candidate) || db.mapLidToPhone?.(clean);
+    if (mappedPhone) return String(mappedPhone).replace(/\D/g, '').slice(-10);
+  }
+
   return stripped.replace(/\D/g, '').slice(-10);
 }
 
 // Deduplica array de contatos por telefone canônico, mantendo o mais recente
+function _mergeRemarketingContato(base, incoming) {
+  const merged = { ...base };
+  if ((incoming.ultimaMensagem || 0) > (merged.ultimaMensagem || 0)) {
+    merged.numero = incoming.numero;
+    merged.nome = incoming.nome || merged.nome;
+    merged.ultimaMensagem = incoming.ultimaMensagem || merged.ultimaMensagem;
+  } else if (!merged.nome && incoming.nome) {
+    merged.nome = incoming.nome;
+  }
+  merged.pausado = !!(merged.pausado || incoming.pausado);
+  merged.remarketingEnviadoEm = Math.max(
+    Number(merged.remarketingEnviadoEm || 0),
+    Number(incoming.remarketingEnviadoEm || 0)
+  );
+  return merged;
+}
+
 function _deduplicateContatos(contatos, dbAtk) {
   const seen = new Map();
   const result = [];
@@ -641,13 +674,30 @@ function _deduplicateContatos(contatos, dbAtk) {
     if (!canon || canon.length < 6) { result.push(c); continue; }
     if (seen.has(canon)) {
       const idx = seen.get(canon);
-      if (c.ultimaMensagem > result[idx].ultimaMensagem) result[idx] = c;
+      result[idx] = _mergeRemarketingContato(result[idx], c);
     } else {
       seen.set(canon, result.length);
       result.push(c);
     }
   }
   return result;
+}
+
+function _markCanonicalRemarketingSent(agente, numero, sentAt, dbAtk) {
+  const targetCanon = _canonicalPhone(numero, dbAtk);
+  if (!targetCanon || targetCanon.length < 6) return 0;
+  let marked = 0;
+  const map = ATK_REMARK_AGENTS.includes(agente)
+    ? dbAtk?.state?.conversations?.[agente]
+    : db.state.conversations[agente];
+  if (!map) return 0;
+
+  map.forEach((conv, key) => {
+    if (_canonicalPhone(key, dbAtk) !== targetCanon) return;
+    conv.remarketingEnviadoEm = Math.max(Number(conv.remarketingEnviadoEm || 0), sentAt);
+    marked++;
+  });
+  return marked;
 }
 
 router.get('/api/remarketing/contatos', auth, (req, res) => {
@@ -690,11 +740,22 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
 
-  const state = _remarkState[agente];
-  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numeros.length;
-  res.json({ ok: true, total: numeros.length });
-
   const isAtk = ATK_REMARK_AGENTS.includes(agente);
+  const dbAtkForDedup = isAtk ? require('./database-atk') : null;
+  const seenInput = new Set();
+  const numerosParaEnvio = [];
+  for (const numero of numeros) {
+    const canon = _canonicalPhone(numero, dbAtkForDedup);
+    const key = canon && canon.length >= 6 ? canon : `raw:${numero}`;
+    if (seenInput.has(key)) continue;
+    seenInput.add(key);
+    numerosParaEnvio.push(numero);
+  }
+
+  const state = _remarkState[agente];
+  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numerosParaEnvio.length;
+  res.json({ ok: true, total: numerosParaEnvio.length });
+
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
   const TIMEOUT_ENVIO = 18000;
 
@@ -719,7 +780,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   (async () => {
     let consecutiveTimeouts = 0;
     const _sentCanonical = new Set(); // anti-duplicata por sessão de envio
-    for (const numero of numeros) {
+    for (const numero of numerosParaEnvio) {
       // Bloqueia duplicata: mesmo número com chaves diferentes no Map
       const canon = _canonicalPhone(numero, isAtk ? require('./database-atk') : null);
       if (canon && canon.length >= 6) {
@@ -748,21 +809,24 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           new Promise((_, rej) => setTimeout(() => rej(new Error('__timeout__')), TIMEOUT_ENVIO)),
         ]);
         consecutiveTimeouts = 0;
+        const sentAt = Date.now();
         if (isAtk) {
           const dbAtk = require('./database-atk');
           if (pausarAposEnvio) dbAtk.pauseManual(numero, agente);
           const conv = dbAtk.getConversation(agente, numero);
           if (conv) {
-            conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: Date.now() });
-            conv.ultimaMensagem = Date.now();
-            conv.remarketingEnviadoEm = Date.now();
+            conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: sentAt });
+            conv.ultimaMensagem = sentAt;
+            conv.remarketingEnviadoEm = sentAt;
           }
+          _markCanonicalRemarketingSent(agente, numero, sentAt, dbAtk);
           dbAtk.save();
         } else {
           if (pausarAposEnvio) db.pausePhone(agente, numero);
           db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
           const convCvn = db.state.conversations[agente]?.get(numero);
-          if (convCvn) convCvn.remarketingEnviadoEm = Date.now();
+          if (convCvn) convCvn.remarketingEnviadoEm = sentAt;
+          _markCanonicalRemarketingSent(agente, numero, sentAt, null);
           if (texto) {
             const convState = db.state.conversations[agente]?.get(numero);
             if (convState) convState.remarketingContexto = texto;
