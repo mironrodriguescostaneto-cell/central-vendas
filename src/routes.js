@@ -709,6 +709,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
     const dbAtk = require('./database-atk');
     dbAtkRef = dbAtk;
     dbAtk.state.conversations[agentId].forEach((conv, numero) => {
+      if (!conv.msgs || conv.msgs.length === 0) return;
       raw.push({
         numero,
         nome: conv.pushName || '',
@@ -719,6 +720,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
     });
   } else {
     db.state.conversations[agentId].forEach((conv, numero) => {
+      if (!conv.msgs || conv.msgs.length === 0) return;
       raw.push({
         numero,
         nome: conv.pushName || '',
