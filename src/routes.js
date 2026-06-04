@@ -622,14 +622,44 @@ router.get('/api/remarketing/temp-img/:id', (req, res) => {
   res.send(img.buffer);
 });
 
+// Normaliza número para comparação: remove @sufixo, tenta resolver LID, pega últimos 10 dígitos
+function _canonicalPhone(numero, dbAtk) {
+  const stripped = numero.replace(/@[^@]+$/, '').replace(/:/g, '');
+  if (dbAtk) {
+    const phone = dbAtk.resolvePhone(stripped);
+    if (phone) return phone.replace(/\D/g, '').slice(-10);
+  }
+  return stripped.replace(/\D/g, '').slice(-10);
+}
+
+// Deduplica array de contatos por telefone canônico, mantendo o mais recente
+function _deduplicateContatos(contatos, dbAtk) {
+  const seen = new Map();
+  const result = [];
+  for (const c of contatos) {
+    const canon = _canonicalPhone(c.numero, dbAtk);
+    if (!canon || canon.length < 6) { result.push(c); continue; }
+    if (seen.has(canon)) {
+      const idx = seen.get(canon);
+      if (c.ultimaMensagem > result[idx].ultimaMensagem) result[idx] = c;
+    } else {
+      seen.set(canon, result.length);
+      result.push(c);
+    }
+  }
+  return result;
+}
+
 router.get('/api/remarketing/contatos', auth, (req, res) => {
   const agentId = req.query.agente;
   if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
-  const contatos = [];
+  const raw = [];
+  let dbAtkRef = null;
   if (ATK_REMARK_AGENTS.includes(agentId)) {
     const dbAtk = require('./database-atk');
+    dbAtkRef = dbAtk;
     dbAtk.state.conversations[agentId].forEach((conv, numero) => {
-      contatos.push({
+      raw.push({
         numero,
         nome: conv.pushName || '',
         ultimaMensagem: conv.ultimaMensagem || 0,
@@ -639,7 +669,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
     });
   } else {
     db.state.conversations[agentId].forEach((conv, numero) => {
-      contatos.push({
+      raw.push({
         numero,
         nome: conv.pushName || '',
         ultimaMensagem: conv.ultimaMensagem || 0,
@@ -648,6 +678,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
       });
     });
   }
+  const contatos = _deduplicateContatos(raw, dbAtkRef);
   contatos.sort((a, b) => b.ultimaMensagem - a.ultimaMensagem);
   res.json(contatos);
 });
@@ -687,7 +718,18 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
 
   (async () => {
     let consecutiveTimeouts = 0;
+    const _sentCanonical = new Set(); // anti-duplicata por sessão de envio
     for (const numero of numeros) {
+      // Bloqueia duplicata: mesmo número com chaves diferentes no Map
+      const canon = _canonicalPhone(numero, isAtk ? require('./database-atk') : null);
+      if (canon && canon.length >= 6) {
+        if (_sentCanonical.has(canon)) {
+          console.log(`[Remarketing] Duplicata ignorada: ${numero} (canon: ${canon})`);
+          continue;
+        }
+        _sentCanonical.add(canon);
+      }
+
       while (state.pausado && !state.cancelar) {
         await new Promise(r => setTimeout(r, 1000));
       }
