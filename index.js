@@ -1,7 +1,7 @@
 'use strict';
 
 // ============================================================
-// CENTRAL VENDAS — Entry Point
+// CENTRAL VENDAS — Entry Point v2.5.1
 // Sistema Operacional de Vendas: Info-Produtos + Logzz + Jarvis
 // ============================================================
 
