@@ -511,8 +511,11 @@ function getSales(filters = {}) {
   let filtered = [...state.sales];
   if (filters.status)  filtered = filtered.filter(s => s.status === filters.status);
   if (filters.agentId) filtered = filtered.filter(s => s.agentId === filters.agentId);
-  const brasiliaDateStr = getBrasiliaDate();
-  if (filters.periodo) {
+  if (filters.tsInicio !== undefined) {
+    const fim = filters.tsFim !== undefined ? filters.tsFim : Date.now();
+    filtered = filtered.filter(s => s.createdAt >= filters.tsInicio && s.createdAt <= fim);
+  } else if (filters.periodo) {
+    const brasiliaDateStr = getBrasiliaDate();
     let inicio;
     const now = Date.now();
     if (filters.periodo === 'hoje')   inicio = new Date(brasiliaDateStr + 'T00:00:00-03:00').getTime();
@@ -523,9 +526,10 @@ function getSales(filters = {}) {
   return filtered;
 }
 
-function getSalesReport(periodo) {
-  const confirmed = getSales({ periodo, status: 'confirmada' });
-  const all = getSales({ periodo });
+function getSalesReport(periodo, opts = {}) {
+  const baseFilter = opts.tsInicio !== undefined ? { tsInicio: opts.tsInicio, tsFim: opts.tsFim } : { periodo };
+  const confirmed = getSales({ ...baseFilter, status: 'confirmada' });
+  const all = getSales(baseFilter);
   const totalVendas = confirmed.length;
   const totalValor = confirmed.reduce((s, x) => s + (x.valorFinal || 0), 0);
   const totalCusto = confirmed.reduce((s, x) => s + (x.custo || 0), 0);

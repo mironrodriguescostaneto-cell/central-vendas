@@ -686,9 +686,27 @@ a{color:var(--accent);text-decoration:none}
 
         <!-- TAB: Vendas -->
         <div class="tab-pane" id="atk-tab-vendas">
-          <!-- Resumo do mês -->
+          <!-- Filtro de período -->
+          <div style="margin-bottom:12px">
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+              <button class="atk-periodo-btn" data-p="hoje" onclick="atkPeriodoSet('hoje',this)" style="flex:1;min-width:55px;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border);cursor:pointer">Hoje</button>
+              <button class="atk-periodo-btn" data-p="semana" onclick="atkPeriodoSet('semana',this)" style="flex:1;min-width:55px;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border);cursor:pointer">Semana</button>
+              <button class="atk-periodo-btn active" data-p="mes" onclick="atkPeriodoSet('mes',this)" style="flex:1;min-width:55px;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">Este Mês</button>
+              <button class="atk-periodo-btn" data-p="mes_passado" onclick="atkPeriodoSet('mes_passado',this)" style="flex:1;min-width:55px;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border);cursor:pointer">Mês Passado</button>
+              <button class="atk-periodo-btn" data-p="custom" onclick="atkPeriodoSet('custom',this)" style="flex:1;min-width:55px;padding:7px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--text-muted);border:1px solid var(--border);cursor:pointer">Período</button>
+            </div>
+            <div id="atkPeriodoCustom" style="display:none;background:var(--card);border-radius:12px;border:1px solid var(--border);padding:12px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                <div><label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">DE</label><input type="date" id="atkPeriodoDe" class="form-input" style="font-size:14px"></div>
+                <div><label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">ATÉ</label><input type="date" id="atkPeriodoAte" class="form-input" style="font-size:14px"></div>
+              </div>
+              <button onclick="loadAtkVendas()" style="width:100%;padding:9px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer">Buscar</button>
+            </div>
+            <div id="atkPeriodoLabel" style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:5px;font-weight:600">Este mês</div>
+          </div>
+          <!-- Resumo do período -->
           <div class="stats-grid" style="margin-bottom:12px">
-            <div class="stat-card"><div class="stat-val" id="atkVendasMesTotal" style="color:var(--success)">–</div><div class="stat-lbl">Vendas/mês</div></div>
+            <div class="stat-card"><div class="stat-val" id="atkVendasMesTotal" style="color:var(--success)">–</div><div class="stat-lbl">Vendas</div></div>
             <div class="stat-card"><div class="stat-val" id="atkVendasMesValor" style="color:var(--success)">–</div><div class="stat-lbl">Faturamento</div></div>
             <div class="stat-card"><div class="stat-val" id="atkVendasMesLucro" style="color:var(--accent)">–</div><div class="stat-lbl">Lucro</div></div>
             <div class="stat-card"><div class="stat-val" id="atkVendasMesMargem" style="color:var(--accent)">–</div><div class="stat-lbl">Margem</div></div>
@@ -757,7 +775,7 @@ a{color:var(--accent);text-decoration:none}
             </details>
           </div>
           <!-- Lista de vendas -->
-          <div class="section-title">Vendas do Mês</div>
+          <div class="section-title" id="atkVendasListaTitulo">Vendas do Período</div>
           <div id="atkVendasLista">
             <div class="loading"><div class="spinner"></div> Carregando...</div>
           </div>
@@ -2288,9 +2306,42 @@ async function atkToggleProduto(id, ativo) {
   } catch (e) { toast('Erro: ' + e.message); }
 }
 
+let _atkPeriodoAtual = 'mes';
+
+function atkPeriodoSet(p, btn) {
+  _atkPeriodoAtual = p;
+  document.querySelectorAll('.atk-periodo-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.border = 'none';
+  const customDiv = document.getElementById('atkPeriodoCustom');
+  if (customDiv) customDiv.style.display = p === 'custom' ? 'block' : 'none';
+  if (p !== 'custom') {
+    const labels = { hoje: 'Hoje', semana: 'Esta semana', mes: 'Este mês', mes_passado: 'Mês passado' };
+    const lbl = document.getElementById('atkPeriodoLabel');
+    if (lbl) lbl.textContent = labels[p] || p;
+    loadAtkVendas();
+  }
+}
+
+function _atkPeriodoParams() {
+  if (_atkPeriodoAtual === 'custom') {
+    const de = document.getElementById('atkPeriodoDe')?.value;
+    const ate = document.getElementById('atkPeriodoAte')?.value;
+    if (!de || !ate) return null;
+    const fmt = d => { const [y,m,d2] = d.split('-'); return `${d2}/${m}/${y}`; };
+    const lbl = document.getElementById('atkPeriodoLabel');
+    if (lbl) lbl.textContent = `${fmt(de)} a ${fmt(ate)}`;
+    return { q: `?de=${de}&ate=${ate}`, listaQ: `?de=${de}&ate=${ate}` };
+  }
+  return { q: `?periodo=${_atkPeriodoAtual}`, listaQ: `?periodo=${_atkPeriodoAtual}` };
+}
+
 async function loadAtkVendas() {
+  const params = _atkPeriodoParams();
+  if (!params) return;
   try {
-    const data = await api('/api/atk/vendas?periodo=mes');
+    const data = await api(`/api/atk/vendas${params.q}`);
     document.getElementById('atkVendasMesTotal').textContent = data.totalVendas || 0;
     document.getElementById('atkVendasMesValor').textContent = `R$${(data.totalValor||0).toLocaleString('pt-BR')}`;
     document.getElementById('atkVendasMesLucro').textContent = `R$${(data.totalLucro||0).toLocaleString('pt-BR')}`;
@@ -2308,11 +2359,11 @@ async function loadAtkVendas() {
     }
 
     // Lista de vendas individuais
-    const vendas = await api('/api/atk/vendas/lista').catch(() => null);
+    const vendas = await api(`/api/atk/vendas/lista${params.listaQ}`).catch(() => null);
     const lista = document.getElementById('atkVendasLista');
     if (lista && vendas?.vendas) {
       if (vendas.vendas.length === 0) {
-        lista.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><div class="empty-text">Nenhuma venda no mês</div></div>';
+        lista.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><div class="empty-text">Nenhuma venda no período</div></div>';
       } else {
         lista.innerHTML = vendas.vendas.map(v => `
           <div class="pedido-item">

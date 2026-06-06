@@ -1232,8 +1232,29 @@ router.post('/api/atk/conversas/:agentId/:numero/send', auth, async (req, res) =
 router.get('/api/atk/vendas', auth, (req, res) => {
   try {
     const dbAtk = require('./database-atk');
-    const periodo = req.query.periodo || 'mes';
-    const report = dbAtk.getSalesReport(periodo);
+    const { periodo = 'mes', de, ate } = req.query;
+    let opts = {};
+    if (de && ate) {
+      opts.tsInicio = new Date(de + 'T00:00:00-03:00').getTime();
+      opts.tsFim    = new Date(ate + 'T23:59:59-03:00').getTime();
+    } else if (periodo === 'semana') {
+      const bdStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const bd = new Date(bdStr + 'T12:00:00-03:00');
+      const dow = bd.getDay(), off = dow === 0 ? 6 : dow - 1;
+      bd.setDate(bd.getDate() - off);
+      const monStr = bd.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      opts.tsInicio = new Date(monStr + 'T00:00:00-03:00').getTime();
+      opts.tsFim    = Date.now();
+    } else if (periodo === 'mes_passado') {
+      const bdStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const [ano, mes] = bdStr.split('-').map(Number);
+      const mp = mes === 1 ? 12 : mes - 1, ap = mes === 1 ? ano - 1 : ano;
+      const ultDia = new Date(ano, mes - 1, 0).getDate();
+      const mm = String(mp).padStart(2, '0'), ud = String(ultDia).padStart(2, '0');
+      opts.tsInicio = new Date(`${ap}-${mm}-01T00:00:00-03:00`).getTime();
+      opts.tsFim    = new Date(`${ap}-${mm}-${ud}T23:59:59-03:00`).getTime();
+    }
+    const report = dbAtk.getSalesReport(periodo, opts);
     res.json(report);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1277,14 +1298,41 @@ router.delete('/api/atk/produtos/:id', auth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Lista de vendas individuais ATK (mês atual)
+// Lista de vendas individuais ATK (mês atual ou período)
 router.get('/api/atk/vendas/lista', auth, (req, res) => {
   try {
     const dbAtk = require('./database-atk');
-    const brasiliaDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const inicioMes = new Date(brasiliaDate.substring(0, 7) + '-01T00:00:00-03:00').getTime();
+    const { de, ate, periodo = 'mes' } = req.query;
+    let tsInicio, tsFim;
+    if (de && ate) {
+      tsInicio = new Date(de + 'T00:00:00-03:00').getTime();
+      tsFim    = new Date(ate + 'T23:59:59-03:00').getTime();
+    } else if (periodo === 'hoje') {
+      const bd = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      tsInicio = new Date(bd + 'T00:00:00-03:00').getTime();
+      tsFim    = Date.now();
+    } else if (periodo === 'semana') {
+      const bdStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const bd = new Date(bdStr + 'T12:00:00-03:00');
+      const dow = bd.getDay(), off = dow === 0 ? 6 : dow - 1;
+      bd.setDate(bd.getDate() - off);
+      tsInicio = new Date(bd.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + 'T00:00:00-03:00').getTime();
+      tsFim    = Date.now();
+    } else if (periodo === 'mes_passado') {
+      const bdStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const [ano, mes] = bdStr.split('-').map(Number);
+      const mp = mes === 1 ? 12 : mes - 1, ap = mes === 1 ? ano - 1 : ano;
+      const ultDia = new Date(ano, mes - 1, 0).getDate();
+      const mm = String(mp).padStart(2, '0'), ud = String(ultDia).padStart(2, '0');
+      tsInicio = new Date(`${ap}-${mm}-01T00:00:00-03:00`).getTime();
+      tsFim    = new Date(`${ap}-${mm}-${ud}T23:59:59-03:00`).getTime();
+    } else {
+      const brasiliaDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      tsInicio = new Date(brasiliaDate.substring(0, 7) + '-01T00:00:00-03:00').getTime();
+      tsFim    = Date.now();
+    }
     const vendas = (dbAtk.state.sales || [])
-      .filter(v => (v.createdAt || 0) >= inicioMes)
+      .filter(v => (v.createdAt || 0) >= tsInicio && (v.createdAt || 0) <= tsFim)
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, 200);
     res.json({ vendas, total: vendas.length });
