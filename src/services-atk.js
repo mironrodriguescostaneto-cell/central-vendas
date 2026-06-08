@@ -11,9 +11,17 @@ const GEMINI_KEY     = () => process.env.GEMINI_API_KEY || '';
 const ANTHROPIC_KEY  = () => process.env.ANTHROPIC_API_KEY || '';
 const GROQ_KEY       = () => process.env.GROQ_API_KEY || '';
 const GEMINI_MODEL   = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 const CLAUDE_TOKENS  = () => parseInt(process.env.CLAUDE_MAX_TOKENS || '800');
 const CLAUDE_TIMEOUT = () => parseInt(process.env.CLAUDE_TIMEOUT || '25000');
+
+// Diagnóstico de keys na inicialização
+setTimeout(() => {
+  const gk = GEMINI_KEY();
+  const ak = ANTHROPIC_KEY();
+  console.log(`[ATK/AI] Keys configuradas — Gemini: ${gk ? 'SIM (' + gk.slice(0,8) + '...)' : 'NAO'} | Anthropic: ${ak ? 'SIM (' + ak.slice(0,8) + '...)' : 'NAO'}`);
+  if (!gk && !ak) console.error('[ATK/AI] ATENCAO: Nenhuma API key configurada! Agentes vao responder com instabilidade.');
+}, 5000);
 const STORE_LAT      = parseFloat(process.env.STORE_LAT || '-16.6939');
 const STORE_LNG      = parseFloat(process.env.STORE_LNG || '-49.2648');
 const SEU_WHATSAPP   = process.env.SEU_WHATSAPP || '5562991819645';
@@ -80,7 +88,7 @@ function convertMessagesToGemini(messages) {
 // --- callGeminiDirect ---
 async function callGeminiDirect(systemPrompt, messages, { maxTokens, timeout } = {}) {
   const key = GEMINI_KEY();
-  if (!key) return null;
+  if (!key) { console.warn('[ATK/AI] Gemini: GEMINI_API_KEY nao configurada'); return null; }
   maxTokens = maxTokens || CLAUDE_TOKENS();
   timeout   = timeout   || CLAUDE_TIMEOUT();
   const model = GEMINI_MODEL();
@@ -108,7 +116,7 @@ async function callGeminiDirect(systemPrompt, messages, { maxTokens, timeout } =
 // --- callClaudeDirect ---
 async function callClaudeDirect(systemPrompt, messages, { model, maxTokens, timeout } = {}) {
   const key = ANTHROPIC_KEY();
-  if (!key) return null;
+  if (!key) { console.warn('[ATK/AI] Claude: ANTHROPIC_API_KEY nao configurada'); return null; }
   model     = model     || CLAUDE_MODEL();
   maxTokens = maxTokens || CLAUDE_TOKENS();
   timeout   = timeout   || CLAUDE_TIMEOUT();
