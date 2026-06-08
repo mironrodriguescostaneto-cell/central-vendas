@@ -1444,6 +1444,51 @@ router.get('/api/atk/eventos', auth, (req, res) => {
   res.json(dbAtk.state.events.slice(-100).reverse());
 });
 
+// Teste real da API de IA — retorna resultado ou erro exato
+router.get('/api/atk/ai-test', auth, async (req, res) => {
+  const { callGeminiDirect, callClaudeDirect } = require('./services-atk');
+  const sys = 'Responda apenas: OK';
+  const msgs = [{ role: 'user', content: 'teste' }];
+  const geminiKey = !!(process.env.GEMINI_API_KEY);
+  const claudeKey = !!(process.env.ANTHROPIC_API_KEY);
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const claudeModel = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
+
+  let geminiResult = null, geminiError = null;
+  let claudeResult = null, claudeError = null;
+
+  if (geminiKey) {
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'teste' }] }], generationConfig: { maxOutputTokens: 10 } }), signal: AbortSignal.timeout(10000) }
+      );
+      const d = await r.json();
+      if (d.error) geminiError = `${d.error.code}: ${d.error.message}`;
+      else geminiResult = d.candidates?.[0]?.content?.parts?.[0]?.text || '(vazio)';
+    } catch (e) { geminiError = e.message; }
+  }
+
+  if (claudeKey) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: claudeModel, max_tokens: 10, system: sys, messages: [{ role: 'user', content: 'teste' }] }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const d = await r.json();
+      if (d.error) claudeError = `[${d.error.type}] ${d.error.message}`;
+      else claudeResult = d.content?.[0]?.text || '(vazio)';
+    } catch (e) { claudeError = e.message; }
+  }
+
+  res.json({
+    gemini: { key: geminiKey, model: geminiModel, result: geminiResult, error: geminiError },
+    claude: { key: claudeKey, model: claudeModel, result: claudeResult, error: claudeError },
+  });
+});
+
 // Debug ATK: últimas mensagens recebidas + estado interno
 router.get('/api/atk/debug', auth, (req, res) => {
   const dbAtk = require('./database-atk');
