@@ -2345,9 +2345,11 @@ async function handleSentMessage(agentId, body) {
     // MAS se o cliente JA estava em conversa ativa (bot respondeu recentemente), pausar mesmo assim
     // para garantir que quando Miron envia manualmente, SEMPRE pausa
     if (db.state.botSending[agentId]) {
-      const isBotSending = db.state.botSending[agentId].has(numero);
+      const now = Date.now();
+      const bsMap = db.state.botSending[agentId];
       const last8 = numero.slice(-8);
-      const isBotSendingFallback = [...(db.state.botSending[agentId])].some(n => n.slice(-8) === last8);
+      const isBotSending = (bsMap.get(numero) || 0) > now;
+      const isBotSendingFallback = [...bsMap.entries()].some(([n, exp]) => n.slice(-8) === last8 && exp > now);
       if (isBotSending || isBotSendingFallback) {
         console.log(`[SENT] ${CONFIG.AGENTS[agentId].name} → ${numero}: anti-loop ativo (bot enviando), ignorando`);
         return;

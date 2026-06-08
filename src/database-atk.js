@@ -79,7 +79,7 @@ const state = {
   // Transient
   followupTimers: new Map(),
   schedules: new Map(),
-  botSending: { pedro: new Set(), rodrigo: new Set() },
+  botSending: { pedro: new Map(), rodrigo: new Map() }, // numero -> expiry timestamp
   lastResponse: new Map(),
   debounceTimers: new Map(),
   processingLock: new Map(),

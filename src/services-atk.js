@@ -326,15 +326,13 @@ async function sendText(agentId, numero, texto, options = {}) {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendText`);
     return;
   }
-  if (db.state.botSending[agentId]) db.state.botSending[agentId].add(numero);
+  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 15000);
   try {
     const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;
     await baileys.sendText(agentId, numero, texto, originalJid);
   } catch (e) {
     console.error(`[ATK/SEND] Erro sendText ${agentId} → ${numero}:`, e.message);
-  } finally {
-    setTimeout(() => { if (db.state.botSending[agentId]) db.state.botSending[agentId].delete(numero); }, 5000);
   }
 }
 
@@ -346,7 +344,7 @@ async function sendMedia(agentId, numero, type, url, caption) {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendMedia`);
     return;
   }
-  if (db.state.botSending[agentId]) db.state.botSending[agentId].add(numero);
+  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 15000);
   try {
     const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;
@@ -354,8 +352,6 @@ async function sendMedia(agentId, numero, type, url, caption) {
     console.log(`[ATK/MEDIA] OK: ${agentId} → ${numero} (${type})`);
   } catch (e) {
     console.error(`[ATK/MEDIA] Erro ${agentId} → ${numero}:`, e.message);
-  } finally {
-    setTimeout(() => { if (db.state.botSending[agentId]) db.state.botSending[agentId].delete(numero); }, 5000);
   }
 }
 
