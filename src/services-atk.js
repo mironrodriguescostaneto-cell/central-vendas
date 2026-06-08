@@ -11,7 +11,7 @@ const GEMINI_KEY     = () => process.env.GEMINI_API_KEY || '';
 const ANTHROPIC_KEY  = () => process.env.ANTHROPIC_API_KEY || '';
 const GROQ_KEY       = () => process.env.GROQ_API_KEY || '';
 const GEMINI_MODEL   = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
 const CLAUDE_TOKENS  = () => parseInt(process.env.CLAUDE_MAX_TOKENS || '800');
 const CLAUDE_TIMEOUT = () => parseInt(process.env.CLAUDE_TIMEOUT || '25000');
 
