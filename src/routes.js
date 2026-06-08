@@ -49,7 +49,12 @@ router.post('/api/login', (req, res) => {
 // ----- Health -----
 router.get('/api/health', (req, res) => {
   const status = baileys.getAllStatus();
-  res.json({ ok: true, agents: status, ts: Date.now() });
+  const keys = {
+    gemini: !!(process.env.GEMINI_API_KEY || '').trim(),
+    anthropic: !!(process.env.ANTHROPIC_API_KEY || '').trim(),
+    groq: !!(process.env.GROQ_API_KEY || '').trim(),
+  };
+  res.json({ ok: true, agents: status, keys, ts: Date.now() });
 });
 
 // ----- Status de conexão dos agentes -----
