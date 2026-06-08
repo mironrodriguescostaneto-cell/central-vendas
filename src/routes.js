@@ -49,9 +49,11 @@ router.post('/api/login', (req, res) => {
 // ----- Health -----
 router.get('/api/health', (req, res) => {
   const status = baileys.getAllStatus();
+  const gk = (process.env.GEMINI_API_KEY || '').trim();
+  const ak = (process.env.ANTHROPIC_API_KEY || '').trim();
   const keys = {
-    gemini: !!(process.env.GEMINI_API_KEY || '').trim(),
-    anthropic: !!(process.env.ANTHROPIC_API_KEY || '').trim(),
+    gemini: gk ? gk.slice(0,8)+'...' : false,
+    anthropic: ak ? ak.slice(0,12)+'...' : false,
     groq: !!(process.env.GROQ_API_KEY || '').trim(),
   };
   res.json({ ok: true, agents: status, keys, ts: Date.now() });
