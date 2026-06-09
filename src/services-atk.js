@@ -334,7 +334,7 @@ async function sendText(agentId, numero, texto, options = {}) {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendText`);
     return;
   }
-  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 15000);
+  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 60000);
   try {
     const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;
@@ -352,7 +352,7 @@ async function sendMedia(agentId, numero, type, url, caption) {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendMedia`);
     return;
   }
-  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 15000);
+  if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 60000);
   try {
     const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;

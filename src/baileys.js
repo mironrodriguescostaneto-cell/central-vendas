@@ -302,7 +302,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         if (!phone) continue;
 
-        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.interactiveMessage?.body?.text || msg.message?.buttonsResponseMessage?.selectedDisplayText || msg.message?.templateButtonReplyMessage?.selectedDisplayText || '';
         const pushName = msg.pushName || '';
 
         const locMsg = msg.message?.locationMessage;
