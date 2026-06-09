@@ -1207,6 +1207,7 @@ router.get('/api/atk/conversas/:agentId', auth, (req, res) => {
         ultimaMensagem: conv.ultimaMensagem, pausado: dbAtk.isManuallyPaused(numero),
         score: score.score, temperatura: score.temperatura,
         ultimoTexto: (conv.msgs.at(-1)?.content || conv.msgs.at(-1)?.text || '').slice(0, 80),
+        ultimoRole: conv.msgs.at(-1)?.role || 'user',
       });
     });
     convs.sort((a, b) => (b.ultimaMensagem || 0) - (a.ultimaMensagem || 0) || b.score - a.score);

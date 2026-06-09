@@ -1112,7 +1112,7 @@ function showPage(page) {
 
   if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); loadSarahVendas(); }
   if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
-  if (page === 'atk') { loadAtkStatus(); }
+  if (page === 'atk') { loadAtkStatus(); atkLoadConversas('pedro'); }
   if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
@@ -2699,19 +2699,30 @@ async function loadAtkStatus() {
 
 function atkRenderConvList(agentId, convs, listEl) {
   if (!convs.length) { listEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma conversa</div></div>'; return; }
-  listEl.innerHTML = convs.slice(0, 100).map(c => `
+  let hasNew = false;
+  listEl.innerHTML = convs.slice(0, 100).map(c => {
+    const key = agentId + c.numero;
+    const isUnread = c.ultimaMensagem && c.ultimoRole !== 'assistant' &&
+      c.ultimaMensagem > (lastSeenTs[key] || 0) && c.numero !== chatWindowPhone;
+    if (isUnread) hasNew = true;
+    return `
     <div class="chat-item" onclick="atkOpenConv('${agentId}','${esc(c.numero)}','${esc(c.pushName||c.numero)}')">
-      <div class="chat-avatar">${(c.pushName||c.numero||'?')[0].toUpperCase()}</div>
+      <div class="chat-avatar" style="position:relative">
+        ${(c.pushName||c.numero||'?')[0].toUpperCase()}
+        ${isUnread ? '<span style="position:absolute;top:0;right:0;width:10px;height:10px;background:var(--danger);border-radius:50%;border:2px solid var(--bg)"></span>' : ''}
+      </div>
       <div class="chat-body">
-        <div class="chat-name">${esc(c.pushName||c.numero)} ${c.pausado?'<span style="color:var(--warning)">⏸</span>':''}</div>
-        <div class="chat-preview">${esc(c.ultimoTexto||'–')}</div>
+        <div class="chat-name" style="${isUnread ? 'font-weight:700' : ''}">${esc(c.pushName||c.numero)} ${c.pausado?'<span style="color:var(--warning)">⏸</span>':''}</div>
+        <div class="chat-preview" style="${isUnread ? 'color:var(--text)' : ''}">${esc(c.ultimoTexto||'–')}</div>
       </div>
       <div class="chat-meta">
-        <div class="chat-time" style="font-size:10px;color:var(--text-muted)">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : ''}</div>
+        <div class="chat-time" style="font-size:10px;${isUnread ? 'color:var(--danger);font-weight:700' : 'color:var(--text-muted)'}">${c.ultimaMensagem ? formatTs(c.ultimaMensagem) : ''}</div>
         <div class="chat-badge" style="background:${c.temperatura==='muito_quente'?'var(--danger)':c.temperatura==='quente'?'var(--warning)':c.temperatura==='morno'?'#f5a623':'var(--border)'}">${c.score}</div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+  if (hasNew) startTitleFlash();
 }
 
 async function atkLoadConversas(agentId) {
