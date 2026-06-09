@@ -15,6 +15,14 @@ const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-202505
 const CLAUDE_TOKENS  = () => parseInt(process.env.CLAUDE_MAX_TOKENS || '800');
 const CLAUDE_TIMEOUT = () => parseInt(process.env.CLAUDE_TIMEOUT || '25000');
 
+// Circuit breaker Gemini: abre quando 429 (sem créditos), fecha após 2h
+let _geminiCircuitOpenUntil = 0;
+function geminiCircuitOpen() { return Date.now() < _geminiCircuitOpenUntil; }
+function openGeminiCircuit() {
+  _geminiCircuitOpenUntil = Date.now() + 2 * 60 * 60 * 1000;
+  console.warn('[ATK/AI] Gemini circuit breaker ABERTO por 2h (429 — sem créditos)');
+}
+
 // Diagnóstico de keys na inicialização
 setTimeout(() => {
   const gk = GEMINI_KEY();
@@ -104,7 +112,11 @@ async function callGeminiDirect(systemPrompt, messages, { maxTokens, timeout } =
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal }
     );
     const data = await r.json();
-    if (data.error) { console.error(`[ATK/AI] Gemini error ${data.error.code}: ${data.error.message}`); return null; }
+    if (data.error) {
+      if (data.error.code === 429) openGeminiCircuit();
+      console.error(`[ATK/AI] Gemini error ${data.error.code}: ${data.error.message}`);
+      return null;
+    }
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } catch (e) {
     if (e.name === 'AbortError') console.error('[ATK/AI] Gemini timeout');
@@ -148,7 +160,7 @@ async function callClaudeDirect(systemPrompt, messages, { model, maxTokens, time
 
 // --- callClaude (Gemini primário → Claude fallback) ---
 async function callClaude(systemPrompt, messages, options = {}) {
-  if (GEMINI_KEY()) {
+  if (GEMINI_KEY() && !geminiCircuitOpen()) {
     const result = await callGeminiDirect(systemPrompt, messages, options);
     if (result !== null) return result;
     console.warn('[ATK/AI] Gemini falhou — usando Claude...');
