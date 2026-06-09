@@ -473,6 +473,14 @@ async function fetchBuffer(url, hops = 5) {
         return;
       }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      // Google Drive retorna HTML quando precisa de confirmação de download (arquivos grandes)
+      const ct = res.headers['content-type'] || '';
+      if (ct.includes('text/html') && hops > 0) {
+        res.resume();
+        const confirmUrl = url.includes('confirm=') ? url : (url.includes('?') ? url + '&confirm=t' : url + '?confirm=t');
+        fetchBuffer(confirmUrl, hops - 1).then(resolve).catch(reject);
+        return;
+      }
       const chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => resolve(Buffer.concat(chunks)));
