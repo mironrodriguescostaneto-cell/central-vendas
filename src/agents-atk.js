@@ -1882,17 +1882,8 @@ async function handleIncomingMessage(agentId, body) {
 
     // Salvar mensagem no historico imediatamente
     const convDB = db.getConversation(agentId, numero);
-    const isFirstMessage = convDB.msgs.length === 0;
     convDB.msgs.push({ role: "user", content: sanitize(mensagem), timestamp: Date.now() });
     convDB.ultimaMensagem = Date.now();
-
-    // Notificar Miron quando cliente novo chega pela primeira vez
-    if (isFirstMessage) {
-      const pushNameLabel = (body.pushName || '').trim() ? ` (${body.pushName.trim()})` : '';
-      sendText(agentId, CONFIG.SEU_WHATSAPP,
-        `🔔 *${agent.name.toUpperCase()} — CLIENTE NOVO*\n\nCliente: wa.me/${numero}${pushNameLabel}\nMsg: "${(mensagem || '').slice(0, 100)}"\n\n_Respondendo automaticamente._`
-      ).catch(() => {});
-    }
 
     // Se já tem um debounce pendente, cancelar (nova msg chegou, esperar mais)
     if (db.state.debounceTimers && db.state.debounceTimers.has(rateKey)) {
