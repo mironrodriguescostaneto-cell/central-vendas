@@ -1743,10 +1743,13 @@ async function handleIncomingMessage(agentId, body) {
     // Check if manually paused by Miron — nunca responder, mas notificar se conversa finalizada
     if (db.isManuallyPaused(numero)) {
       const convCheck = db.getConversation(agentId, numero);
-      if (convCheck && convCheck.finalizado) {
-        const textoCliente = extractText(body) || "[mensagem]";
-        // Salvar msg do cliente no historico sempre
+      const textoCliente = extractText(body) || "[mensagem]";
+      // Salvar msg do cliente no historico SEMPRE (pausado manual ou não)
+      if (convCheck) {
         convCheck.msgs.push({ role: "user", content: sanitize(textoCliente), timestamp: Date.now() });
+        convCheck.ultimaMensagem = Date.now();
+      }
+      if (convCheck && convCheck.finalizado) {
 
         if (!convCheck.avisouFinalizacao) {
           // PRIMEIRA vez — marcar ANTES de enviar pra evitar duplicação por race condition
@@ -1776,9 +1779,14 @@ async function handleIncomingMessage(agentId, body) {
     }
 
     // Auto-pause: limpar quando cliente responde (ele quer continuar conversando)
-    if (db.state.paused[agentId] && db.state.paused[agentId].has(numero)) {
-      db.state.paused[agentId].delete(numero);
-      console.log(`${agent.name}: auto-pause removido para ${numero} (cliente respondeu)`);
+    // Usa last-8 fuzzy match para cobrir variações de formato do mesmo número
+    if (db.state.paused[agentId]) {
+      const last8 = numero.slice(-8);
+      const toRemove = [...db.state.paused[agentId]].filter(n => n === numero || n.slice(-8) === last8);
+      if (toRemove.length > 0) {
+        toRemove.forEach(n => db.state.paused[agentId].delete(n));
+        console.log(`${agent.name}: auto-pause removido para ${numero} (cliente respondeu)`);
+      }
     }
 
     // Block agent numbers
