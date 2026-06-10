@@ -1847,7 +1847,7 @@ function monitorLeads() {
               content: sanitize(m.content || m.text || ""),
             }));
 
-            const agentsModule = require("./agents");
+            const agentsModule = require("./agents-atk");
             const monitorSystemPrompt = agentsModule.buildSystemPrompt(agentId, numero);
             const response = await callClaude(
               monitorSystemPrompt,
@@ -1927,7 +1927,7 @@ function dailySweep() {
           content: sanitize(m.content || m.text || ""),
         }));
 
-        const agentsModuleSweep = require("./agents");
+        const agentsModuleSweep = require("./agents-atk");
         const sweepSystemPrompt = agentsModuleSweep.buildSystemPrompt(item.agentId, item.numero);
         const response = await callClaude(
           sweepSystemPrompt,
