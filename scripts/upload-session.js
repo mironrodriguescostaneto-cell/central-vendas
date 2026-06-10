@@ -16,7 +16,7 @@ if (!agentId || !baseUrl || !password) {
 }
 
 const LOCAL_BASE = process.env.RAILWAY_VOLUME_MOUNT_PATH || '/tmp';
-const sessionMap = { logzz: 'logzz-session', info: 'info-session', rafael: 'rafael-session' };
+const sessionMap = { logzz: 'logzz-session', info: 'info-session', rafael: 'rafael-session', sarah: 'sarah-session' };
 const sessionId = sessionMap[agentId] || `${agentId}-session`;
 const authDir = path.join(LOCAL_BASE, `baileys_cv_${sessionId}`);
 
