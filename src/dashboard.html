@@ -2041,7 +2041,7 @@ function atkRmkRenderContatos() {
   let lista = atkRmkTodosContatos;
   if (atkRmkFiltro === 'ativos') lista = lista.filter(c => !c.pausado);
   else if (atkRmkFiltro === 'pausados') lista = lista.filter(c => c.pausado);
-  else if (atkRmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm);
+  else if (atkRmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm && c.pausado);
   if (!lista.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Nenhum contato</div>'; atkRmkUpdateCounter(); return; }
   el.innerHTML = lista.map(c => {
     const rmkBadge = c.remarketingEnviadoEm

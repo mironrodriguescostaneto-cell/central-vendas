@@ -766,8 +766,10 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
       });
     });
   }
-  const contatos = _deduplicateContatos(raw, dbAtkRef);
+  let contatos = _deduplicateContatos(raw, dbAtkRef);
   contatos.sort((a, b) => b.ultimaMensagem - a.ultimaMensagem);
+  if (req.query.pausado === 'true') contatos = contatos.filter(c => c.pausado);
+  if (req.query.pausado === 'false') contatos = contatos.filter(c => !c.pausado);
   res.json(contatos);
 });
 
