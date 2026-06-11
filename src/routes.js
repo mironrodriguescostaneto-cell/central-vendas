@@ -953,6 +953,57 @@ router.post('/api/remarketing/recuperar/:agente', auth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Limpeza de duplicatas: consolida entradas com mesmo telefone canônico no Map
+router.post('/api/remarketing/deduplicar/:agente', auth, (req, res) => {
+  const { agente } = req.params;
+  if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
+  try {
+    const isAtk = ATK_REMARK_AGENTS.includes(agente);
+    const dbAtk = isAtk ? require('./database-atk') : null;
+    const map = isAtk ? dbAtk.state.conversations[agente] : db.state.conversations[agente];
+    if (!map) return res.status(404).json({ error: 'agente sem conversas' });
+
+    // 1. Agrupar chaves por telefone canônico
+    const grupos = new Map(); // canon -> [{ key, conv }]
+    map.forEach((conv, key) => {
+      if (!conv.msgs || conv.msgs.length === 0) return;
+      const canon = _canonicalPhone(key, dbAtk);
+      if (!canon || canon.length < 6) return;
+      if (!grupos.has(canon)) grupos.set(canon, []);
+      grupos.get(canon).push({ key, conv });
+    });
+
+    let removidos = 0;
+    // 2. Para cada grupo com duplicatas, manter o melhor e deletar os outros
+    grupos.forEach((entries) => {
+      if (entries.length <= 1) return;
+      // Ordenar: prefere chave sem @lid, depois mais recente
+      entries.sort((a, b) => {
+        const aLid = a.key.includes('@lid') ? 1 : 0;
+        const bLid = b.key.includes('@lid') ? 1 : 0;
+        if (aLid !== bLid) return aLid - bLid;
+        return (b.conv.ultimaMensagem || 0) - (a.conv.ultimaMensagem || 0);
+      });
+      const [keeper, ...losers] = entries;
+      // Mesclar remarketingEnviadoEm do melhor valor entre todos
+      const bestRemark = Math.max(...entries.map(e => Number(e.conv.remarketingEnviadoEm || 0)));
+      if (bestRemark > 0) keeper.conv.remarketingEnviadoEm = bestRemark;
+      // Mesclar msgs: keeper fica com seus msgs + qualquer msg dos losers mais recente que a última do keeper
+      for (const loser of losers) {
+        map.delete(loser.key);
+        removidos++;
+      }
+    });
+
+    if (isAtk) dbAtk.save();
+    else db.saveDB().catch(() => {});
+
+    const totalRestante = [...map.values()].filter(c => c.msgs && c.msgs.length > 0).length;
+    const naoReceberam = [...map.values()].filter(c => c.msgs && c.msgs.length > 0 && !c.remarketingEnviadoEm).length;
+    res.json({ ok: true, removidos, totalRestante, naoReceberam });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ----- Finanças Familiares -----
 const financas = require('./financas');
 
