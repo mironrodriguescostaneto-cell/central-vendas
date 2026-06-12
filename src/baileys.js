@@ -263,6 +263,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         let phone = jidToPhone(msg.key.remoteJid);
         let originalJid = msg.key.remoteJid;
+        let isTempId = false;
 
         // ----- LID resolution (Meta @lid bug) -----
         if (msg.key.remoteJid?.includes('@lid')) {
@@ -290,8 +291,12 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
           // Estratégia 3: database persistido
           if (!session.lidMap[lid]) {
             try {
-              const db = require('./database');
-              const resolved = db.mapLidToPhone(lid);
+              const isAtkSession = ['pedro', 'rodrigo'].includes(sessionId);
+              const db = isAtkSession ? require('./database-atk') : require('./database');
+              const lidKey = lid.replace(/@lid$/, '');
+              const resolved = isAtkSession
+                ? db.resolvePhone(lidKey)
+                : (db.mapLidToPhone(lid) || db.mapLidToPhone(lidKey));
               if (resolved) session.lidMap[lid] = resolved;
             } catch { /* ignore */ }
           }
@@ -299,16 +304,18 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
           if (session.lidMap[lid]) {
             phone = session.lidMap[lid];
             try {
-              const db = require('./database');
-              db.registerLid(lid, phone);
+              if (['pedro', 'rodrigo'].includes(sessionId)) {
+                const db = require('./database-atk');
+                db.mapLidToPhone(lid.replace(/@lid$/, ''), phone);
+              } else {
+                const db = require('./database');
+                db.registerLid(lid, phone);
+              }
             } catch { /* ignore */ }
             console.log(`[BAILEYS:${sessionId}] LID resolvido: ${lid} → ${phone}`);
           } else {
             phone = lid.replace(/@lid$/, '');
-            try {
-              const db = require('./database');
-              db.registerLid(lid, phone);
-            } catch { /* ignore */ }
+            isTempId = true;
             console.log(`[BAILEYS:${sessionId}] LID não resolvido, usando como-está: ${phone}`);
           }
         }
@@ -384,6 +391,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
           pushName,
           senderName: pushName,
           _originalJid: originalJid,
+          isTempId,
         };
 
         if (session.messageHandler) session.messageHandler('received', normalized);
@@ -398,9 +406,15 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
           const id = c.id || '';
           if (c.lid && id.includes('@s.whatsapp.net')) {
             const phone = jidToPhone(id);
-            db.registerLid(c.lid, phone);
+            if (['pedro', 'rodrigo'].includes(sessionId)) {
+              const dbAtk = require('./database-atk');
+              dbAtk.mapLidToPhone(String(c.lid).replace(/@lid$/, ''), phone);
+            } else {
+              db.registerLid(c.lid, phone);
+            }
             if (!session.lidMap) session.lidMap = {};
             session.lidMap[c.lid] = phone;
+            session.lidMap[String(c.lid).replace(/@lid$/, '') + '@lid'] = phone;
           }
         }
       } catch { /* ignore */ }

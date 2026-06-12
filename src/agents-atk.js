@@ -1611,6 +1611,14 @@ function extractLocation(body) {
   return null;
 }
 
+function isTemporaryLid(body, numero) {
+  return !!(
+    body?.isTempId ||
+    body?._originalJid?.includes("@lid") ||
+    db.isLidFormat(numero)
+  );
+}
+
 // ============================================
 // handleIncomingMessage — MAIN ENTRY POINT
 // ============================================
@@ -1637,10 +1645,18 @@ async function handleIncomingMessage(agentId, body) {
     const numero = body.phone;
     if (!numero) return;
 
-    // Filter groups
-    if (numero.includes("-group") || numero.includes("@g.us") || numero.length > 15) return;
+    // Filter groups / invalid IDs. Meta lead LIDs can be >15 digits before phone resolution.
+    const tempLid = isTemporaryLid(body, numero);
+    if (numero.includes("-group") || numero.includes("@g.us") || (numero.length > 15 && !tempLid)) return;
 
     const texto = extractText(body);
+
+    const convEntrada = db.getConversation(agentId, numero);
+    if (convEntrada) {
+      if (body._originalJid) convEntrada._originalJid = body._originalJid;
+      if (tempLid) convEntrada.isTempId = true;
+      if (body.pushName || body.senderName) convEntrada.pushName = body.pushName || body.senderName;
+    }
 
     // LID→Owner mapping: WhatsApp Business usa LID em vez do numero real
     // Mapeamento persistente de LIDs conhecidos do dono
