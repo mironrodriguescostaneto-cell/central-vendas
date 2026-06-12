@@ -797,6 +797,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
     dbAtkRef = dbAtk;
     dbAtk.state.conversations[agentId].forEach((conv, numero) => {
       if (!conv.msgs || conv.msgs.length === 0) return;
+      if (dbAtk.isAgentNumber(numero)) return;
       const campaignMeta = _remarketingCampaignMeta(dbAtk, agentId, numero);
       raw.push({
         numero,
@@ -859,6 +860,12 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     seenInput.add(key);
     numerosParaEnvio.push(numero);
   }
+  if (isAtk) {
+    for (let i = numerosParaEnvio.length - 1; i >= 0; i--) {
+      if (dbAtkForDedup.isAgentNumber(numerosParaEnvio[i])) numerosParaEnvio.splice(i, 1);
+    }
+  }
+  if (!numerosParaEnvio.length) return res.status(400).json({ error: 'nenhum numero valido para envio' });
 
   let remarketingCampaign = null;
   if (isAtk) {
@@ -880,14 +887,34 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
   const TIMEOUT_ENVIO = 18000;
 
+  function isOwnAgentJid(jid) {
+    if (!jid) return false;
+    const digits = String(jid).replace(/\D/g, '');
+    const dbAtk = require('./database-atk');
+    return dbAtk.isAgentNumber(digits);
+  }
+
+  function jidLooksCompatible(jid, numero) {
+    if (!jid || !numero) return false;
+    if (String(jid).includes('@lid')) return true;
+    const jidDigits = String(jid).replace(/\D/g, '');
+    const numDigits = String(numero).replace(/\D/g, '');
+    if (!jidDigits || !numDigits) return false;
+    return jidDigits.endsWith(numDigits.slice(-8)) || numDigits.endsWith(jidDigits.slice(-8));
+  }
+
   function resolveJid(numero) {
     if (isAtk) {
       const dbAtk = require('./database-atk');
       // 1. Pegar _originalJid salvo na conversa (fonte mais confiável)
       const conv = dbAtk.state.conversations[agente]?.get(numero);
-      if (conv?._originalJid) return conv._originalJid;
+      if (conv?._originalJid && !isOwnAgentJid(conv._originalJid) && jidLooksCompatible(conv._originalJid, numero)) return conv._originalJid;
+      if (conv?._originalJid && isOwnAgentJid(conv._originalJid)) {
+        delete conv._originalJid;
+        dbAtk.save();
+      }
       // 2. Se o numero já tem @ (é JID completo), usar direto
-      if (numero.includes('@')) return numero;
+      if (numero.includes('@') && !isOwnAgentJid(numero)) return numero;
       // 3. Se parece LID (sem prefixo 55 e ≥12 dígitos), usar @lid
       if (!numero.startsWith('55') && numero.length >= 12) return `${numero}@lid`;
       return null;

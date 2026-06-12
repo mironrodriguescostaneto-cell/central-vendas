@@ -116,6 +116,19 @@ function phoneToJid(phone) {
   return phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
 }
 
+function assertNotOwnAgentDestination(sessionId, jid) {
+  if (!['pedro', 'rodrigo'].includes(sessionId)) return;
+  const digits = String(jid || '').replace(/\D/g, '');
+  try {
+    const dbAtk = require('./database-atk');
+    if (dbAtk.isAgentNumber(digits)) {
+      throw new Error(`Destino bloqueado: tentativa de enviar para o proprio agente (${sessionId})`);
+    }
+  } catch (e) {
+    if (e.message?.startsWith('Destino bloqueado')) throw e;
+  }
+}
+
 // Notifica database sobre status de conexão
 function notifyStatus(sessionId, status, qr = undefined) {
   try {
@@ -459,6 +472,7 @@ async function sendText(sessionId, phone, text, originalJid) {
     throw new Error(`WhatsApp ${sessionId} não conectado`);
   }
   const jid = originalJid || phoneToJid(phone);
+  assertNotOwnAgentDestination(sessionId, jid);
   console.log(`[BAILEYS:${sessionId}] sendText → jid=${jid}`);
   const sent = await session.sock.sendMessage(jid, { text });
   _markSentId(session, sent);
@@ -495,6 +509,7 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
     throw new Error(`WhatsApp ${sessionId} não conectado`);
   }
   const jid = originalJid || phoneToJid(phone);
+  assertNotOwnAgentDestination(sessionId, jid);
   let sent;
   if (type === 'image') {
     const buf = await fetchBuffer(url);
@@ -518,6 +533,7 @@ async function sendMediaBuffer(sessionId, phone, type, buffer, caption, original
     throw new Error(`WhatsApp ${sessionId} nÃ£o conectado`);
   }
   const jid = originalJid || phoneToJid(phone);
+  assertNotOwnAgentDestination(sessionId, jid);
   console.log(`[BAILEYS:${sessionId}] sendMediaBuffer â†’ jid=${jid} type=${type} bytes=${buffer?.length || 0}`);
   let sent;
   if (type === 'image') {
