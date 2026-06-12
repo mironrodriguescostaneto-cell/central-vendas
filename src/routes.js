@@ -632,11 +632,11 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
 // ----- Remarketing Logzz / ATK -----
 const _remarkTempImgs = new Map();
 const _remarkState = {
-  logzz:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
-  sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
-  pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
-  rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
-  antonio: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0 },
+  logzz:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
+  sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
+  pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
+  rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
+  antonio: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
 };
 const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo', 'antonio'];
 const ATK_REMARK_AGENTS   = ['pedro', 'rodrigo'];
@@ -703,6 +703,17 @@ function _mergeRemarketingContato(base, incoming) {
     Number(merged.remarketingEnviadoEm || 0),
     Number(incoming.remarketingEnviadoEm || 0)
   );
+  merged.respondeuRemarketingEm = Math.max(
+    Number(merged.respondeuRemarketingEm || 0),
+    Number(incoming.respondeuRemarketingEm || 0)
+  );
+  merged.falhaRemarketingEm = Math.max(
+    Number(merged.falhaRemarketingEm || 0),
+    Number(incoming.falhaRemarketingEm || 0)
+  );
+  merged.falhaRemarketingMotivo = incoming.falhaRemarketingMotivo || merged.falhaRemarketingMotivo || '';
+  merged.campanhaId = incoming.campanhaId || merged.campanhaId || '';
+  merged.campanhaNome = incoming.campanhaNome || merged.campanhaNome || '';
   return merged;
 }
 
@@ -721,6 +732,33 @@ function _deduplicateContatos(contatos, dbAtk) {
     }
   }
   return result;
+}
+
+function _lastUserAfterRemarketing(conv) {
+  const sentAt = Number(conv?.remarketingEnviadoEm || 0);
+  if (!sentAt) return Number(conv?.remarketingRespondidoEm || 0);
+  let last = Number(conv?.remarketingRespondidoEm || 0);
+  for (const msg of conv?.msgs || []) {
+    const ts = Number(msg.timestamp || msg.ts || 0);
+    if (msg.role === 'user' && ts > sentAt && ts > last) last = ts;
+  }
+  return last;
+}
+
+function _remarketingCampaignMeta(dbAtk, agentId, numero) {
+  if (!dbAtk?.listRemarketingCampaigns) return {};
+  const last8 = String(numero || '').slice(-8);
+  for (const c of dbAtk.listRemarketingCampaigns(agentId)) {
+    const hasNumber = (item) => {
+      const n = typeof item === 'object' && item ? item.numero : item;
+      return n === numero || String(n || '').slice(-8) === last8;
+    };
+    if ((c.responded || []).some(hasNumber)) return { campanhaId: c.id, campanhaNome: c.name, respondeuRemarketingEm: c.updatedAt || c.createdAt || 0 };
+    const failed = (c.failedTo || []).find(hasNumber);
+    if (failed) return { campanhaId: c.id, campanhaNome: c.name, falhaRemarketingEm: failed.at || c.updatedAt || 0, falhaRemarketingMotivo: failed.error || 'erro' };
+    if ((c.sentTo || []).some(hasNumber)) return { campanhaId: c.id, campanhaNome: c.name };
+  }
+  return {};
 }
 
 function _markCanonicalRemarketingSent(agente, numero, sentAt, dbAtk) {
@@ -750,6 +788,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
     dbAtkRef = dbAtk;
     dbAtk.state.conversations[agentId].forEach((conv, numero) => {
       if (!conv.msgs || conv.msgs.length === 0) return;
+      const campaignMeta = _remarketingCampaignMeta(dbAtk, agentId, numero);
       raw.push({
         numero,
         nome: conv.pushName || '',
@@ -757,6 +796,11 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
         pausado: dbAtk.isManuallyPaused(numero),
         pausadoEm: dbAtk.getManualPausedAt(numero, agentId),
         remarketingEnviadoEm: conv.remarketingEnviadoEm || 0,
+        respondeuRemarketingEm: Math.max(_lastUserAfterRemarketing(conv), Number(campaignMeta.respondeuRemarketingEm || 0)),
+        falhaRemarketingEm: campaignMeta.falhaRemarketingEm || 0,
+        falhaRemarketingMotivo: campaignMeta.falhaRemarketingMotivo || '',
+        campanhaId: campaignMeta.campanhaId || conv.ultimaCampanhaRemarketingId || '',
+        campanhaNome: campaignMeta.campanhaNome || '',
       });
     });
   } else {
@@ -768,6 +812,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
         ultimaMensagem: conv.ultimaMensagem || 0,
         pausado: db.state.paused[agentId]?.has(numero) || false,
         remarketingEnviadoEm: conv.remarketingEnviadoEm || 0,
+        respondeuRemarketingEm: _lastUserAfterRemarketing(conv),
       });
     });
   }
@@ -778,8 +823,17 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
   res.json(contatos);
 });
 
+router.get('/api/remarketing/campanhas', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!ATK_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente ATK invalido' });
+  try {
+    const dbAtk = require('./database-atk');
+    res.json(dbAtk.listRemarketingCampaigns(agentId).slice(0, 20));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/api/remarketing/enviar', auth, async (req, res) => {
-  const { agente, numeros, texto, imagemUrl, pausarAposEnvio } = req.body;
+  const { agente, numeros, texto, imagemUrl, pausarAposEnvio, nomeCampanha } = req.body;
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
   if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
@@ -797,9 +851,22 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     numerosParaEnvio.push(numero);
   }
 
+  let remarketingCampaign = null;
+  if (isAtk) {
+    remarketingCampaign = dbAtkForDedup.createRemarketingCampaign({
+      agentId: agente,
+      name: nomeCampanha,
+      text: texto,
+      imageUrl: imagemUrl,
+      pauseAfterSend: pausarAposEnvio,
+      total: numerosParaEnvio.length,
+      recipients: numerosParaEnvio,
+    });
+  }
+
   const state = _remarkState[agente];
-  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.total = numerosParaEnvio.length;
-  res.json({ ok: true, total: numerosParaEnvio.length });
+  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.pulados = 0; state.total = numerosParaEnvio.length; state.campanhaId = remarketingCampaign?.id || null; state.atual = '';
+  res.json({ ok: true, total: numerosParaEnvio.length, campanhaId: remarketingCampaign?.id || null });
 
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
   const TIMEOUT_ENVIO = 18000;
@@ -831,6 +898,8 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       if (canon && canon.length >= 6) {
         if (_sentCanonical.has(canon)) {
           console.log(`[Remarketing] Duplicata ignorada: ${numero} (canon: ${canon})`);
+          state.pulados++;
+          if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignSkipped(remarketingCampaign.id, numero, 'duplicata');
           continue;
         }
         _sentCanonical.add(canon);
@@ -840,6 +909,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         await new Promise(r => setTimeout(r, 1000));
       }
       if (state.cancelar) break;
+      state.atual = numero;
       if (baileys.getState(sessionId) !== 'connected') {
         console.log(`[Remarketing] ${sessionId} desconectado — abortando`);
         break;
@@ -863,8 +933,11 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
             conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: sentAt });
             conv.ultimaMensagem = sentAt;
             conv.remarketingEnviadoEm = sentAt;
+            conv.remarketingRespondidoEm = 0;
+            conv.ultimaCampanhaRemarketingId = remarketingCampaign?.id || null;
           }
           _markCanonicalRemarketingSent(agente, numero, sentAt, dbAtk);
+          if (remarketingCampaign) dbAtk.markRemarketingCampaignSent(remarketingCampaign.id, numero);
           dbAtk.save();
         } else {
           if (pausarAposEnvio) db.pausePhone(agente, numero);
@@ -880,6 +953,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         state.enviados++;
       } catch (e) {
         state.erros++;
+        if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignFailed(remarketingCampaign.id, numero, e.message);
         if (e.message === '__timeout__') {
           consecutiveTimeouts++;
           console.error(`[Remarketing] Timeout ${numero} (${consecutiveTimeouts} consecutivos)`);
@@ -895,6 +969,10 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       await new Promise(r => setTimeout(r, 3000));
     }
     state.ativo = false;
+    state.atual = '';
+    if (isAtk && remarketingCampaign) {
+      require('./database-atk').finishRemarketingCampaign(remarketingCampaign.id, state.cancelar ? 'stopped' : 'finished');
+    }
     console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} OK, ${state.erros} erros`);
   })();
 });

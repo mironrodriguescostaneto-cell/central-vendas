@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preview MKT Atacadao</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #657083;
+      --line: #dde3ee;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --violet: #7c3aed;
+      --soft-blue: #eff6ff;
+      --soft-green: #ecfdf5;
+      --soft-amber: #fffbeb;
+      --soft-red: #fef2f2;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); }
+    button, input, textarea, select { font: inherit; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 280px 1fr 360px; }
+    .side, .right { background: var(--panel); border-right: 1px solid var(--line); padding: 18px; }
+    .right { border-right: 0; border-left: 1px solid var(--line); }
+    .brand { font-size: 20px; font-weight: 800; margin: 0 0 18px; }
+    .nav { display: grid; gap: 8px; }
+    .nav button, .chip, .btn, .icon-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .nav button.active, .chip.active, .btn.primary { background: var(--blue); color: white; border-color: var(--blue); }
+    .btn.success { background: var(--green); color: white; border-color: var(--green); }
+    .btn.danger { background: var(--red); color: white; border-color: var(--red); }
+    .btn.ghost { background: #f8fafc; color: var(--muted); }
+    main { padding: 18px 22px; overflow: auto; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    h1 { font-size: 24px; margin: 0; }
+    .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    .metric b { display: block; font-size: 22px; line-height: 1.1; }
+    .metric span { color: var(--muted); font-size: 12px; }
+    .toolbar { display: grid; grid-template-columns: 1.2fr 180px 180px auto; gap: 10px; margin-bottom: 12px; }
+    .toolbar input, .toolbar select, textarea, .field input {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .chip { padding: 8px 10px; font-size: 12px; }
+    .content { display: grid; grid-template-columns: 1fr 320px; gap: 14px; align-items: start; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .panel-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .list { max-height: calc(100vh - 310px); overflow: auto; }
+    .row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 11px 14px; border-bottom: 1px solid #eef2f7; }
+    .row:last-child { border-bottom: 0; }
+    .name { font-weight: 800; font-size: 14px; }
+    .phone { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+    .badge { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 4px 7px; white-space: nowrap; }
+    .b-green { background: var(--soft-green); color: #15803d; }
+    .b-amber { background: var(--soft-amber); color: #92400e; }
+    .b-red { background: var(--soft-red); color: #b91c1c; }
+    .b-blue { background: var(--soft-blue); color: #1d4ed8; }
+    .b-gray { background: #f1f5f9; color: #475569; }
+    .composer { padding: 14px; display: grid; gap: 10px; }
+    textarea { min-height: 122px; resize: vertical; line-height: 1.42; }
+    .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .preview { background: #f8fafc; border: 1px dashed var(--line); border-radius: 8px; padding: 10px; color: var(--muted); font-size: 13px; min-height: 74px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .send { grid-column: 1 / -1; }
+    .progress { margin-top: 10px; background: #eef2ff; height: 9px; border-radius: 99px; overflow: hidden; }
+    .bar { height: 100%; width: 0; background: var(--blue); transition: width .25s; }
+    .campaign { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fbfdff; }
+    .campaign h3 { margin: 0 0 7px; font-size: 14px; }
+    .campaign .mini { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    @media (max-width: 1180px) {
+      .shell { grid-template-columns: 220px 1fr; }
+      .right { display: none; }
+      .content { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 780px) {
+      .shell { grid-template-columns: 1fr; }
+      .side { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+      .top { align-items: stretch; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <p class="brand">Atacadão</p>
+      <div class="nav">
+        <button>Conversas</button>
+        <button>Vendas</button>
+        <button class="active">MKT</button>
+        <button>Produtos</button>
+      </div>
+      <div style="margin-top:18px" class="campaign">
+        <h3>Pré-envio inteligente</h3>
+        <div class="mini">Antes de disparar, o sistema mostra contatos únicos, duplicados removidos, já enviados e pendentes reais.</div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="top">
+        <div>
+          <h1>MKT de Remarketing</h1>
+          <div class="sub">Preview funcional: campanhas, retomada, filtros e auditoria de envio.</div>
+        </div>
+        <div class="chips">
+          <button class="chip active" id="pedroBtn" onclick="switchAgent('pedro')">Pedro</button>
+          <button class="chip" id="rodrigoBtn" onclick="switchAgent('rodrigo')">Rodrigo</button>
+        </div>
+      </div>
+
+      <section class="metrics">
+        <div class="metric"><b id="mTotal">0</b><span>contatos únicos</span></div>
+        <div class="metric"><b id="mPend">0</b><span>não receberam</span></div>
+        <div class="metric"><b id="mPaused">0</b><span>pausados</span></div>
+        <div class="metric"><b id="mNoDate">0</b><span>pausados sem data</span></div>
+        <div class="metric"><b id="mSelected">0</b><span>selecionados</span></div>
+      </section>
+
+      <div class="toolbar">
+        <input id="search" placeholder="Buscar por nome ou telefone" oninput="render()">
+        <select id="sort" onchange="render()">
+          <option value="pause_desc">Pausa mais recente</option>
+          <option value="last_desc">Última mensagem</option>
+          <option value="name">Nome</option>
+          <option value="status">Status</option>
+        </select>
+        <select id="delay" onchange="updatePreflight()">
+          <option value="3">Intervalo 3s</option>
+          <option value="5">Intervalo 5s</option>
+          <option value="10">Intervalo 10s</option>
+        </select>
+        <button class="btn ghost" onclick="exportCsv()">Exportar CSV</button>
+      </div>
+
+      <div class="chips">
+        <button class="chip active filter" data-filter="todos" onclick="setFilter('todos')">Todos</button>
+        <button class="chip filter" data-filter="naoReceberam" onclick="setFilter('naoReceberam')">Não receberam</button>
+        <button class="chip filter" data-filter="campanhaPendente" onclick="setFilter('campanhaPendente')">Pendentes da campanha</button>
+        <button class="chip filter" data-filter="falhou" onclick="setFilter('falhou')">Falharam</button>
+        <button class="chip filter" data-filter="semData" onclick="setFilter('semData')">Pausados sem data</button>
+        <button class="chip filter" data-filter="responderam" onclick="setFilter('responderam')">Responderam</button>
+      </div>
+
+      <div class="content">
+        <section class="panel">
+          <div class="panel-head">
+            <label style="display:flex;gap:8px;align-items:center;font-weight:800">
+              <input id="selectAll" type="checkbox" onchange="toggleAll(this.checked)"> selecionar visíveis
+            </label>
+            <span id="visibleCount" class="sub">0 visíveis</span>
+          </div>
+          <div class="list" id="list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><strong>Nova campanha</strong><span id="campaignId" class="sub">Rascunho</span></div>
+          <div class="composer">
+            <div class="field"><input id="campaignName" value="Oferta Uni TV - retomada dos pausados"></div>
+            <div class="template-grid">
+              <button class="btn ghost" onclick="template('desconto')">Template desconto</button>
+              <button class="btn ghost" onclick="template('escassez')">Template escassez</button>
+            </div>
+            <textarea id="message" oninput="updatePreflight()">Oi {{nome}}, passando para te avisar que ainda consigo manter a condição especial de hoje. Quer que eu te mande o link agora?</textarea>
+            <div class="preview" id="preview"></div>
+            <div class="split">
+              <button class="btn ghost" onclick="dryRun()">Simular envio</button>
+              <button class="btn ghost" onclick="resumeCampaign()">Retomar</button>
+            </div>
+            <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)">
+              <input id="pauseAfter" type="checkbox" checked> Pausar cliente depois do envio
+            </label>
+            <button class="btn success send" onclick="startCampaign()">Enviar campanha</button>
+            <div id="preflight" class="preview"></div>
+            <div id="progressBox" style="display:none">
+              <div class="sub" id="progressText">0 / 0</div>
+              <div class="progress"><div class="bar" id="bar"></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="right">
+      <h2 style="margin:0 0 12px;font-size:18px">Histórico</h2>
+      <div id="history"></div>
+      <h2 style="margin:20px 0 12px;font-size:18px">Pendências</h2>
+      <div class="campaign">
+        <h3>Datas de pausa antigas</h3>
+        <div class="mini">Contatos antigos podem aparecer como “sem data”. A melhoria ideal é estimar a data pelo histórico e marcar como estimada.</div>
+      </div>
+      <div class="campaign">
+        <h3>Deduplicação</h3>
+        <div class="mini">O envio deve usar telefone canônico e mostrar quantos duplicados foram removidos antes de disparar.</div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const base = {
+      pedro: [
+        ['Maria Alves','5562998111001',true,0,0,Date.now()-3600e3,'pending'],
+        ['Carlos Lima','5562998111002',true,Date.now()-86400e3,0,Date.now()-7200e3,'pending'],
+        ['Ana Paula','5562998111003',true,Date.now()-3*86400e3,Date.now()-2*86400e3,Date.now()-4*3600e3,'sent'],
+        ['Joao Batista','5562998111004',false,0,0,Date.now()-2*3600e3,'active'],
+        ['Patricia Souza','5562998111005',true,0,0,Date.now()-6*3600e3,'failed'],
+        ['Leandro Costa','5562998111006',true,Date.now()-7*86400e3,0,Date.now()-8*3600e3,'responded'],
+        ['Fernanda Reis','5562998111007',true,0,0,Date.now()-9*3600e3,'pending'],
+        ['Bruno Martins','5562998111008',true,Date.now()-2*86400e3,0,Date.now()-11*3600e3,'pending']
+      ],
+      rodrigo: [
+        ['Rafael Nunes','5562998222001',true,0,0,Date.now()-3600e3,'pending'],
+        ['Elaine Rocha','5562998222002',true,0,0,Date.now()-2*3600e3,'pending'],
+        ['Sandro Melo','5562998222003',true,Date.now()-5*86400e3,0,Date.now()-4*3600e3,'failed'],
+        ['Luciana Dias','5562998222004',false,0,0,Date.now()-3*3600e3,'active'],
+        ['Wesley Prado','5562998222005',true,0,0,Date.now()-7*3600e3,'pending'],
+        ['Monica Sales','5562998222006',true,Date.now()-86400e3,0,Date.now()-8*3600e3,'responded']
+      ]
+    };
+    let agent = 'pedro', filter = 'todos', selected = new Set(), running = null;
+    const contacts = {};
+    Object.keys(base).forEach(a => contacts[a] = base[a].map((r,i) => ({ id: `${a}-${i}`, nome:r[0], numero:r[1], pausado:r[2], pausadoEm:r[3], remarketingEm:r[4], ultima:r[5], status:r[6] })));
+    let history = [
+      {name:'Retomada pausados Pedro', agent:'Pedro', total:1000, sent:400, fail:8, pending:592, status:'Pausada'},
+      {name:'Oferta furadeira Rodrigo', agent:'Rodrigo', total:300, sent:0, fail:0, pending:300, status:'Rascunho'}
+    ];
+
+    function fmt(ts) { return ts ? new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : ''; }
+    function switchAgent(a) {
+      agent = a; selected.clear();
+      document.querySelectorAll('#pedroBtn,#rodrigoBtn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`${a}Btn`).classList.add('active');
+      render();
+    }
+    function setFilter(f) {
+      filter = f;
+      document.querySelectorAll('.filter').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+      render();
+    }
+    function visible() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      let rows = contacts[agent].filter(c => !q || c.nome.toLowerCase().includes(q) || c.numero.includes(q));
+      if (filter === 'naoReceberam') rows = rows.filter(c => !c.remarketingEm && c.pausado);
+      if (filter === 'campanhaPendente') rows = rows.filter(c => c.status === 'pending');
+      if (filter === 'falhou') rows = rows.filter(c => c.status === 'failed');
+      if (filter === 'semData') rows = rows.filter(c => c.pausado && !c.pausadoEm);
+      if (filter === 'responderam') rows = rows.filter(c => c.status === 'responded');
+      const sort = document.getElementById('sort').value;
+      rows.sort((a,b) => sort === 'name' ? a.nome.localeCompare(b.nome) : sort === 'last_desc' ? b.ultima-a.ultima : sort === 'status' ? a.status.localeCompare(b.status) : (b.pausadoEm||0)-(a.pausadoEm||0));
+      return rows;
+    }
+    function render() {
+      const rows = visible();
+      const all = contacts[agent];
+      document.getElementById('mTotal').textContent = all.length.toLocaleString('pt-BR');
+      document.getElementById('mPend').textContent = all.filter(c => !c.remarketingEm && c.pausado).length.toLocaleString('pt-BR');
+      document.getElementById('mPaused').textContent = all.filter(c => c.pausado).length.toLocaleString('pt-BR');
+      document.getElementById('mNoDate').textContent = all.filter(c => c.pausado && !c.pausadoEm).length.toLocaleString('pt-BR');
+      document.getElementById('mSelected').textContent = selected.size.toLocaleString('pt-BR');
+      document.getElementById('visibleCount').textContent = `${rows.length} visíveis`;
+      document.getElementById('list').innerHTML = rows.map(c => `
+        <div class="row">
+          <input type="checkbox" ${selected.has(c.id) ? 'checked' : ''} onchange="mark('${c.id}', this.checked)">
+          <div><div class="name">${c.nome}</div><div class="phone">${c.numero} · última msg ${fmt(c.ultima)}</div></div>
+          <div class="badges">${badges(c)}</div>
+        </div>`).join('') || '<div style="padding:20px;color:var(--muted)">Nenhum contato neste filtro.</div>';
+      document.getElementById('selectAll').checked = rows.length > 0 && rows.every(c => selected.has(c.id));
+      updatePreflight();
+      renderHistory();
+    }
+    function badges(c) {
+      const out = [];
+      out.push(c.pausado ? '<span class="badge b-amber">Pausado</span>' : '<span class="badge b-green">Ativo</span>');
+      out.push(c.remarketingEm || c.status === 'responded' ? `<span class="badge b-green">${c.remarketingEm ? `Recebeu ${fmt(c.remarketingEm)}` : 'Recebeu'}</span>` : '<span class="badge b-red">Não recebeu</span>');
+      if (c.pausado && !c.pausadoEm) out.push('<span class="badge b-red">Sem data</span>');
+      if (c.pausadoEm) out.push(`<span class="badge b-blue">Pausa ${fmt(c.pausadoEm)}</span>`);
+      if (c.status === 'failed') out.push('<span class="badge b-red">Falhou</span>');
+      if (c.status === 'responded') out.push('<span class="badge b-green">Respondeu</span>');
+      return out.join('');
+    }
+    function mark(id, checked) { checked ? selected.add(id) : selected.delete(id); render(); }
+    function toggleAll(checked) { visible().forEach(c => checked ? selected.add(c.id) : selected.delete(c.id)); render(); }
+    function selectedContacts() { return contacts[agent].filter(c => selected.has(c.id)); }
+    function updatePreflight() {
+      const rows = selectedContacts();
+      const delay = Number(document.getElementById('delay').value);
+      const msg = document.getElementById('message').value;
+      const first = rows[0] || contacts[agent][0];
+      document.getElementById('preview').textContent = msg.replace('{{nome}}', first ? first.nome.split(' ')[0] : 'Cliente');
+      const already = rows.filter(c => c.remarketingEm).length;
+      const noDate = rows.filter(c => c.pausado && !c.pausadoEm).length;
+      const eta = Math.ceil(rows.length * delay / 60);
+      document.getElementById('preflight').innerHTML = `<b>Conferência:</b> ${rows.length} selecionados · ${already} já receberam · ${noDate} pausados sem data · ETA ${eta} min · duplicados removidos: simulado 0`;
+    }
+    function template(kind) {
+      document.getElementById('message').value = kind === 'desconto'
+        ? 'Oi {{nome}}, consegui liberar uma condição especial só para hoje. Quer que eu te mande o link com o valor atualizado?'
+        : 'Oi {{nome}}, passando rápido porque a condição que você viu está acabando hoje. Posso separar seu pedido agora?';
+      updatePreflight();
+    }
+    function dryRun() {
+      alert(`Simulação pronta: ${selected.size} contatos, sem enviar WhatsApp.`);
+    }
+    function startCampaign() {
+      const rows = selectedContacts();
+      if (!rows.length) return alert('Selecione contatos primeiro.');
+      const name = document.getElementById('campaignName').value || 'Campanha sem nome';
+      running = {name, total: rows.length, sent:0, fail:0, pending: rows.length, rows};
+      document.getElementById('campaignId').textContent = 'Campanha ativa';
+      document.getElementById('progressBox').style.display = 'block';
+      tick();
+    }
+    function tick() {
+      if (!running) return;
+      if (running.sent + running.fail >= running.total) {
+        history.unshift({name: running.name, agent: agent === 'pedro' ? 'Pedro' : 'Rodrigo', total: running.total, sent: running.sent, fail: running.fail, pending:0, status:'Concluída'});
+        running.rows.forEach(c => { c.remarketingEm = Date.now(); c.status = 'sent'; if (document.getElementById('pauseAfter').checked) { c.pausado = true; c.pausadoEm = c.pausadoEm || Date.now(); }});
+        running = null; selected.clear(); document.getElementById('campaignId').textContent = 'Concluída'; render(); return;
+      }
+      running.sent += 1;
+      running.pending = running.total - running.sent - running.fail;
+      document.getElementById('progressText').textContent = `${running.sent} enviados · ${running.pending} pendentes · ETA ${(running.pending * Number(document.getElementById('delay').value) / 60).toFixed(1)} min`;
+      document.getElementById('bar').style.width = `${Math.round((running.sent + running.fail) / running.total * 100)}%`;
+      setTimeout(tick, 450);
+    }
+    function resumeCampaign() {
+      setFilter('campanhaPendente');
+      selected.clear();
+      visible().forEach(c => selected.add(c.id));
+      render();
+    }
+    function exportCsv() {
+      const csv = ['nome,numero,status,pausado,pausadoEm,remarketingEm'].concat(visible().map(c => `${c.nome},${c.numero},${c.status},${c.pausado},${fmt(c.pausadoEm)},${fmt(c.remarketingEm)}`)).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `mkt-${agent}.csv`; a.click();
+    }
+    function renderHistory() {
+      document.getElementById('history').innerHTML = history.map(h => `<div class="campaign"><h3>${h.name}</h3><div class="mini">${h.agent} · ${h.status}<br>${h.sent}/${h.total} enviados · ${h.fail} falhas · ${h.pending} pendentes</div></div>`).join('');
+    }
+    render();
+  </script>
+</body>
+</html>

@@ -76,6 +76,7 @@ const state = {
   activeOffers: {},
   remarketingPausado: { pedro: false, rodrigo: false },
   visualCampaigns: {},
+  remarketingCampaigns: {},
   pendingOwnerMedia: null,
   // Transient
   followupTimers: new Map(),
@@ -777,6 +778,117 @@ function getCampaign(campaignId) { return state.visualCampaigns[campaignId] || n
 function cancelCampaign(campaignId) { const c = state.visualCampaigns[campaignId]; if (!c) return null; c.status = 'cancelled'; addEvent(`campanha_visual_cancelada: ${campaignId}`); save(); return c; }
 function listCampaigns() { return Object.values(state.visualCampaigns).sort((a, b) => b.createdAt - a.createdAt); }
 
+// --- Campanhas de Remarketing Manual (aba MKT) ---
+function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSend, total, recipients }) {
+  const id = `rmk_${Date.now()}_${agentId}`;
+  state.remarketingCampaigns[id] = {
+    id,
+    agentId,
+    name: name || `Remarketing ${agentId}`,
+    text: text || '',
+    imageUrl: imageUrl || null,
+    pauseAfterSend: pauseAfterSend !== false,
+    status: 'active',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    finishedAt: 0,
+    total: Number(total || recipients?.length || 0),
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    pending: Number(total || recipients?.length || 0),
+    recipients: Array.isArray(recipients) ? recipients : [],
+    sentTo: [],
+    failedTo: [],
+    skippedTo: [],
+    responded: [],
+  };
+  addEvent(`remarketing_campanha_criada: ${agentId} ${id}`);
+  save();
+  return state.remarketingCampaigns[id];
+}
+
+function getRemarketingCampaign(campaignId) {
+  return state.remarketingCampaigns[campaignId] || null;
+}
+
+function listRemarketingCampaigns(agentId = null) {
+  return Object.values(state.remarketingCampaigns)
+    .filter(c => !agentId || c.agentId === agentId)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function _campaignHasNumber(list, numero) {
+  const last8 = String(numero || '').slice(-8);
+  return (list || []).some(item => {
+    const n = typeof item === 'object' && item ? item.numero : item;
+    return n === numero || String(n || '').slice(-8) === last8;
+  });
+}
+
+function markRemarketingCampaignSent(campaignId, numero) {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return;
+  if (!_campaignHasNumber(c.sentTo, numero)) c.sentTo.push(numero);
+  c.sent = c.sentTo.length;
+  c.pending = Math.max(0, (c.total || 0) - c.sent - (c.failedTo?.length || 0) - (c.skippedTo?.length || 0));
+  c.updatedAt = Date.now();
+}
+
+function markRemarketingCampaignFailed(campaignId, numero, error) {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return;
+  if (!_campaignHasNumber(c.failedTo, numero)) c.failedTo.push({ numero, error: error || 'erro', at: Date.now() });
+  c.failed = c.failedTo.length;
+  c.pending = Math.max(0, (c.total || 0) - (c.sentTo?.length || 0) - c.failed - (c.skippedTo?.length || 0));
+  c.updatedAt = Date.now();
+}
+
+function markRemarketingCampaignSkipped(campaignId, numero, reason) {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return;
+  if (!_campaignHasNumber(c.skippedTo, numero)) c.skippedTo.push({ numero, reason: reason || 'ignorado', at: Date.now() });
+  c.skipped = c.skippedTo.length;
+  c.pending = Math.max(0, (c.total || 0) - (c.sentTo?.length || 0) - (c.failedTo?.length || 0) - c.skipped);
+  c.updatedAt = Date.now();
+}
+
+function finishRemarketingCampaign(campaignId, status = 'finished') {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return null;
+  c.status = status;
+  c.finishedAt = Date.now();
+  c.updatedAt = Date.now();
+  c.sent = c.sentTo?.length || 0;
+  c.failed = c.failedTo?.length || 0;
+  c.skipped = c.skippedTo?.length || 0;
+  c.pending = Math.max(0, (c.total || 0) - c.sent - c.failed - c.skipped);
+  save();
+  return c;
+}
+
+function getActiveRemarketingCampaignForClient(agentId, numero) {
+  const now = Date.now();
+  const maxAge = 14 * 24 * 60 * 60 * 1000;
+  for (const c of listRemarketingCampaigns(agentId)) {
+    if (!['active', 'finished', 'stopped'].includes(c.status)) continue;
+    if ((now - (c.createdAt || 0)) > maxAge) continue;
+    if (!_campaignHasNumber(c.sentTo, numero)) continue;
+    if (_campaignHasNumber(c.responded, numero)) continue;
+    return c;
+  }
+  return null;
+}
+
+function markRemarketingCampaignResponded(campaignId, numero) {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return;
+  if (!_campaignHasNumber(c.responded, numero)) c.responded.push(numero);
+  c.updatedAt = Date.now();
+  addEvent(`remarketing_campanha_resposta: ${campaignId} ${numero}`);
+  save();
+}
+
 function setPendingOwnerMedia(mediaUrl) { state.pendingOwnerMedia = mediaUrl ? { mediaUrl, timestamp: Date.now() } : null; }
 function getPendingOwnerMedia() { const p = state.pendingOwnerMedia; if (!p) return null; if (Date.now() - p.timestamp > 5 * 60 * 1000) { state.pendingOwnerMedia = null; return null; } return p.mediaUrl; }
 function clearPendingOwnerMedia() { state.pendingOwnerMedia = null; }
@@ -831,6 +943,7 @@ function serializeState() {
     activeOffers: state.activeOffers,
     remarketingPausado: state.remarketingPausado,
     visualCampaigns: state.visualCampaigns,
+    remarketingCampaigns: state.remarketingCampaigns,
   };
   for (const id of ['pedro','rodrigo']) {
     data[`conversas_${id}`] = {};
@@ -877,6 +990,7 @@ function restoreState(data) {
     }
   }
   if (data.visualCampaigns) Object.assign(state.visualCampaigns, data.visualCampaigns);
+  if (data.remarketingCampaigns) Object.assign(state.remarketingCampaigns, data.remarketingCampaigns);
   for (const id of ['pedro','rodrigo']) {
     const convData = data[`conversas_${id}`];
     if (convData) Object.entries(convData).forEach(([k, v]) => state.conversations[id].set(k, v));
@@ -983,6 +1097,9 @@ module.exports = {
   setOffer, getActiveOffer, hasFreteGratis, cancelOffer, expireOffer, convertOffer, getOfferInfo, cleanExpiredOffers,
   createVisualCampaign, getActiveCampaignForClient, markCampaignSent, markCampaignResponded,
   getCampaign, cancelCampaign, listCampaigns,
+  createRemarketingCampaign, getRemarketingCampaign, listRemarketingCampaigns,
+  markRemarketingCampaignSent, markRemarketingCampaignFailed, markRemarketingCampaignSkipped,
+  markRemarketingCampaignResponded, getActiveRemarketingCampaignForClient, finishRemarketingCampaign,
   setPendingOwnerMedia, getPendingOwnerMedia, clearPendingOwnerMedia,
   cleanupOldData,
   getMemoryStats,

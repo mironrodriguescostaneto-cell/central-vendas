@@ -1717,6 +1717,15 @@ async function handleIncomingMessage(agentId, body) {
       return;
     }
 
+    // Marca retorno de remarketing manual antes da regra de pausado manual.
+    const activeRemarketingCampaign = db.getActiveRemarketingCampaignForClient(agentId, numero);
+    if (activeRemarketingCampaign) {
+      const conv = db.getConversation(agentId, numero);
+      if (conv) conv.remarketingRespondidoEm = Date.now();
+      db.markRemarketingCampaignResponded(activeRemarketingCampaign.id, numero);
+      console.log(`[RemarketingMKT] ${agentId} [${numero}]: respondeu campanha ${activeRemarketingCampaign.id}`);
+    }
+
     // Intercept: cliente respondeu a campanha visual ativa — pausa + notifica Miron
     const activeCampaign = db.getActiveCampaignForClient(agentId, numero);
     if (activeCampaign) {

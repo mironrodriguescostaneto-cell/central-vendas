@@ -2004,8 +2004,44 @@ let atkRmkFiltro = 'todos';
 let atkRmkTodosContatos = [];
 let atkRmkImgUrl = null;
 let atkRmkStatusTimer = null;
+let atkRmkCampanhas = [];
+let atkRmkEnhancedReady = false;
+let atkRmkCampanhaSelecionada = null;
+
+function atkRmkEnsureEnhancedUi() {
+  if (atkRmkEnhancedReady) return;
+  const filtros = document.querySelector('#atk-tab-mkt .atk-rmk-filter')?.parentElement;
+  if (filtros) {
+    filtros.insertAdjacentHTML('beforeend', `
+      <button class="atk-rmk-filter" data-filter="responderam" onclick="atkRmkSetFilter('responderam',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--success);border:1px solid var(--border)">Responderam</button>
+      <button class="atk-rmk-filter" data-filter="falharam" onclick="atkRmkSetFilter('falharam',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--warning);border:1px solid var(--border)">Falharam</button>
+      <button class="atk-rmk-filter" data-filter="sem_data" onclick="atkRmkSetFilter('sem_data',this)" style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:11px;font-weight:600;background:var(--card);color:var(--warning);border:1px solid var(--border)">Sem data</button>
+    `);
+    filtros.insertAdjacentHTML('afterend', `
+      <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;margin-bottom:10px">
+        <input id="atkRmkBusca" oninput="atkRmkRenderContatos()" placeholder="Buscar nome ou telefone" style="width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;outline:none">
+        <select id="atkRmkSort" onchange="atkRmkRenderContatos()" style="width:100%;padding:9px 8px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;outline:none">
+          <option value="ultima">Ultima msg</option>
+          <option value="pausa">Data pausa</option>
+          <option value="nome">Nome</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
+      <div id="atkRmkResumo" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px"></div>
+      <div id="atkRmkCampanhas" style="margin-bottom:10px"></div>
+    `);
+  }
+  const textarea = document.getElementById('atkRmkTexto');
+  if (textarea) {
+    textarea.insertAdjacentHTML('beforebegin', `<input id="atkRmkNomeCampanha" placeholder="Nome da campanha" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box">`);
+    textarea.insertAdjacentHTML('afterend', `<div id="atkRmkPreflight" style="background:var(--card);border-radius:12px;border:1px dashed var(--border);padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--text-muted);line-height:1.45"></div>`);
+    textarea.addEventListener('input', atkRmkUpdatePreflight);
+  }
+  atkRmkEnhancedReady = true;
+}
 
 function atkRmkSwitchAgent(agente, btn) {
+  atkRmkEnsureEnhancedUi();
   atkRmkAgente = agente;
   ['Pedro','Rodrigo'].forEach(n => {
     const b = document.getElementById(`atkRmkBtn${n}`);
@@ -2017,6 +2053,7 @@ function atkRmkSwitchAgent(agente, btn) {
 
 function atkRmkSetFilter(f, btn) {
   atkRmkFiltro = f;
+  atkRmkCampanhaSelecionada = null;
   document.querySelectorAll('.atk-rmk-filter').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
@@ -2026,42 +2063,122 @@ function atkRmkSetFilter(f, btn) {
 }
 
 async function atkRmkLoadContatos() {
+  atkRmkEnsureEnhancedUi();
   const el = document.getElementById('atkRmkContatos');
   if (el) el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Carregando...</div>';
   try {
     const r = await fetch(`/api/remarketing/contatos?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
     atkRmkTodosContatos = await r.json();
+    await atkRmkLoadCampanhas();
     atkRmkRenderContatos();
   } catch (e) { if (el) el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--danger);font-size:13px">Erro ao carregar</div>'; }
+}
+
+async function atkRmkLoadCampanhas() {
+  try {
+    const r = await fetch(`/api/remarketing/campanhas?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    atkRmkCampanhas = await r.json();
+    atkRmkRenderCampanhas();
+  } catch (e) { atkRmkCampanhas = []; atkRmkRenderCampanhas(); }
+}
+
+function atkRmkRenderCampanhas() {
+  const el = document.getElementById('atkRmkCampanhas');
+  if (!el) return;
+  if (!atkRmkCampanhas.length) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px">
+      <div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:6px">Ultimas campanhas</div>
+      ${atkRmkCampanhas.slice(0,3).map(c => `
+        <button onclick="atkRmkSelectCampaignPendentes('${c.id}')" style="width:100%;text-align:left;border:0;background:transparent;border-top:1px solid var(--border);padding:7px 0;cursor:pointer">
+          <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name || c.id)}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${c.status} · ${c.sent || 0}/${c.total || 0} enviados · ${c.failed || 0} falhas · ${c.responded?.length || 0} responderam</div>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function atkRmkSelectCampaignPendentes(id) {
+  const c = atkRmkCampanhas.find(x => x.id === id);
+  if (!c) return;
+  atkRmkFiltro = 'campanha_pendente';
+  atkRmkCampanhaSelecionada = c;
+  document.querySelectorAll('.atk-rmk-filter').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
+  });
+  atkRmkRenderContatos();
+  document.querySelectorAll('.atk-rmk-chk').forEach(chk => { chk.checked = true; });
+  atkRmkUpdateCounter();
+  toast(`Pendentes da campanha carregados`);
 }
 
 function atkRmkRenderContatos() {
   const el = document.getElementById('atkRmkContatos');
   if (!el) return;
-  let lista = atkRmkTodosContatos;
+  let lista = [...atkRmkTodosContatos];
+  const busca = (document.getElementById('atkRmkBusca')?.value || '').trim().toLowerCase();
+  if (busca) lista = lista.filter(c => String(c.nome || '').toLowerCase().includes(busca) || String(c.numero || '').includes(busca));
   if (atkRmkFiltro === 'ativos') lista = lista.filter(c => !c.pausado);
   else if (atkRmkFiltro === 'pausados') lista = lista.filter(c => c.pausado);
-  else if (atkRmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm && c.pausado);
+  else if (atkRmkFiltro === 'nao_receberam') lista = lista.filter(c => !c.remarketingEnviadoEm && !c.respondeuRemarketingEm && c.pausado);
+  else if (atkRmkFiltro === 'responderam') lista = lista.filter(c => c.respondeuRemarketingEm);
+  else if (atkRmkFiltro === 'falharam') lista = lista.filter(c => c.falhaRemarketingEm);
+  else if (atkRmkFiltro === 'sem_data') lista = lista.filter(c => c.pausado && !c.pausadoEm);
+  else if (atkRmkFiltro === 'campanha_pendente' && atkRmkCampanhaSelecionada) {
+    const recipients = new Set((atkRmkCampanhaSelecionada.recipients || []).map(n => String(n).slice(-8)));
+    const sent = new Set((atkRmkCampanhaSelecionada.sentTo || []).map(n => String(n).slice(-8)));
+    const failed = new Set((atkRmkCampanhaSelecionada.failedTo || []).map(item => String(item?.numero || item).slice(-8)));
+    lista = lista.filter(c => {
+      const key = String(c.numero || '').slice(-8);
+      return recipients.has(key) && !sent.has(key) && !failed.has(key);
+    });
+  }
+  const sort = document.getElementById('atkRmkSort')?.value || 'ultima';
+  lista.sort((a, b) => {
+    if (sort === 'nome') return String(a.nome || a.numero).localeCompare(String(b.nome || b.numero));
+    if (sort === 'pausa') return Number(b.pausadoEm || 0) - Number(a.pausadoEm || 0);
+    if (sort === 'status') return Number(!!b.respondeuRemarketingEm) - Number(!!a.respondeuRemarketingEm) || Number(!!b.falhaRemarketingEm) - Number(!!a.falhaRemarketingEm);
+    return Number(b.ultimaMensagem || 0) - Number(a.ultimaMensagem || 0);
+  });
+  atkRmkRenderResumo(lista);
   if (!lista.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Nenhum contato</div>'; atkRmkUpdateCounter(); return; }
   el.innerHTML = lista.map(c => {
-    const rmkBadge = c.remarketingEnviadoEm
-      ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d">✓ ${new Date(c.remarketingEnviadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`
-      : `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626">Não enviado</span>`;
+    const recebeu = c.remarketingEnviadoEm || c.respondeuRemarketingEm;
+    const rmkBadge = recebeu
+      ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d">Recebeu ${c.remarketingEnviadoEm ? new Date(c.remarketingEnviadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : ''}</span>`
+      : `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626">Nao enviado</span>`;
     return `
     <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--card)" onclick="event.stopPropagation()">
       <input type="checkbox" class="atk-rmk-chk" data-numero="${c.numero}" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0" onchange="atkRmkUpdateCounter()">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome || c.numero}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}${c.campanhaNome ? ` · ${esc(c.campanhaNome)}` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
         ${rmkBadge}
-        ${atkRmkFiltro === 'nao_receberam' && c.pausado ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fef3c7;color:#92400e">${c.pausadoEm ? `Pausado ${new Date(c.pausadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}` : 'Pausado sem data'}</span>` : ''}
+        ${c.respondeuRemarketingEm ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d">Respondeu ${new Date(c.respondeuRemarketingEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
+        ${c.falhaRemarketingEm ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fef3c7;color:#92400e">Falhou</span>` : ''}
+        ${c.pausado ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fef3c7;color:#92400e">${c.pausadoEm ? `Pausado ${new Date(c.pausadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}` : 'Pausado sem data'}</span>` : ''}
         <span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:${c.pausado?'#fee2e2':'#dcfce7'};color:${c.pausado?'#dc2626':'#16a34a'}">${c.pausado?'PAUSADO':'ATIVO'}</span>
       </div>
     </label>`;
   }).join('');
   atkRmkUpdateCounter();
+}
+
+function atkRmkRenderResumo(listaVisivel) {
+  const el = document.getElementById('atkRmkResumo');
+  if (!el) return;
+  const total = atkRmkTodosContatos.length;
+  const naoReceberam = atkRmkTodosContatos.filter(c => c.pausado && !c.remarketingEnviadoEm && !c.respondeuRemarketingEm).length;
+  const responderam = atkRmkTodosContatos.filter(c => c.respondeuRemarketingEm).length;
+  const semData = atkRmkTodosContatos.filter(c => c.pausado && !c.pausadoEm).length;
+  const card = (n, label, color) => `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px"><div style="font-size:16px;font-weight:800;color:${color}">${n}</div><div style="font-size:10px;color:var(--text-muted);font-weight:700">${label}</div></div>`;
+  el.innerHTML = card(total, 'unicos', 'var(--text)') + card(naoReceberam, 'nao receberam', 'var(--danger)') + card(responderam, 'responderam', 'var(--success)') + card(semData, 'sem data', 'var(--warning)') + card(listaVisivel.length, 'visiveis', 'var(--accent)') + card(document.querySelectorAll('.atk-rmk-chk:checked').length, 'selecionados', 'var(--text)');
+  atkRmkUpdatePreflight();
 }
 
 async function atkRmkRecuperar() {
@@ -2081,8 +2198,23 @@ function atkRmkUpdateCounter() {
   if (el) el.textContent = `${sel} de ${total} selecionados`;
   const all = document.getElementById('atkRmkSelectAll');
   if (all) { all.indeterminate = sel > 0 && sel < total; all.checked = sel === total && total > 0; }
+  atkRmkUpdatePreflight();
 }
 function atkRmkGetSelecionados() { return Array.from(document.querySelectorAll('.atk-rmk-chk:checked')).map(c => c.dataset.numero); }
+
+function atkRmkUpdatePreflight() {
+  const el = document.getElementById('atkRmkPreflight');
+  if (!el) return;
+  const numeros = atkRmkGetSelecionados();
+  const set = new Set(numeros.map(n => String(n).slice(-10)));
+  const selecionados = atkRmkTodosContatos.filter(c => set.has(String(c.numero).replace(/\D/g,'').slice(-10)));
+  const jaReceberam = selecionados.filter(c => c.remarketingEnviadoEm || c.respondeuRemarketingEm).length;
+  const responderam = selecionados.filter(c => c.respondeuRemarketingEm).length;
+  const semData = selecionados.filter(c => c.pausado && !c.pausadoEm).length;
+  const falhas = selecionados.filter(c => c.falhaRemarketingEm).length;
+  const etaMin = Math.ceil(numeros.length * 3 / 60);
+  el.innerHTML = `<b>Conferencia:</b> ${numeros.length} selecionados · ${jaReceberam} ja receberam · ${responderam} responderam · ${falhas} com falha anterior · ${semData} pausados sem data · ETA ${etaMin} min`;
+}
 
 function atkRmkHandleImg(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -2118,12 +2250,13 @@ async function atkRmkEnviar() {
   const texto = document.getElementById('atkRmkTexto').value.trim();
   if (!numeros.length) return alert('Selecione pelo menos 1 contato');
   if (!texto && !atkRmkImgUrl) return alert('Digite uma mensagem ou selecione uma imagem');
-  if (!confirm(`Enviar para ${numeros.length} contato(s) do ${atkRmkAgente}?`)) return;
+  const nomeCampanha = document.getElementById('atkRmkNomeCampanha')?.value.trim() || `Remarketing ${atkRmkAgente} ${new Date().toLocaleDateString('pt-BR')}`;
+  if (!confirm(`Enviar campanha "${nomeCampanha}" para ${numeros.length} contato(s) do ${atkRmkAgente}?`)) return;
   const pausarAposEnvio = document.getElementById('atkRmkPausarApos').checked;
   try {
     const r = await fetch('/api/remarketing/enviar', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
-      body: JSON.stringify({ agente: atkRmkAgente, numeros, texto, imagemUrl: atkRmkImgUrl, pausarAposEnvio })
+      body: JSON.stringify({ agente: atkRmkAgente, numeros, texto, imagemUrl: atkRmkImgUrl, pausarAposEnvio, nomeCampanha })
     });
     const d = await r.json();
     if (!r.ok) return alert(d.error || 'Erro ao iniciar envio');
