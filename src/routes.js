@@ -695,6 +695,10 @@ function _mergeRemarketingContato(base, incoming) {
     merged.nome = incoming.nome;
   }
   merged.pausado = !!(merged.pausado || incoming.pausado);
+  merged.pausadoEm = Math.max(
+    Number(merged.pausadoEm || 0),
+    Number(incoming.pausadoEm || 0)
+  );
   merged.remarketingEnviadoEm = Math.max(
     Number(merged.remarketingEnviadoEm || 0),
     Number(incoming.remarketingEnviadoEm || 0)
@@ -751,6 +755,7 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
         nome: conv.pushName || '',
         ultimaMensagem: conv.ultimaMensagem || 0,
         pausado: dbAtk.isManuallyPaused(numero),
+        pausadoEm: dbAtk.getManualPausedAt(numero, agentId),
         remarketingEnviadoEm: conv.remarketingEnviadoEm || 0,
       });
     });

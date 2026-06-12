@@ -43,6 +43,7 @@ const state = {
   conversations: { pedro: new Map(), rodrigo: new Map() },
   paused:        { pedro: new Set(), rodrigo: new Set() },
   pausedManual:  { pedro: new Set(), rodrigo: new Set() },
+  pausedManualAt:{ pedro: {}, rodrigo: {} },
   metrics: {
     pedro:   { atendimentos: 0, vendas: 0 },
     rodrigo: { atendimentos: 0, vendas: 0 },
@@ -108,7 +109,14 @@ function mapLidToPhone(lid, phone) {
   }
   for (const agentId of ['pedro','rodrigo']) {
     if (state.paused[agentId]?.has(lid))       { state.paused[agentId].add(phone);       state.paused[agentId].delete(lid); }
-    if (state.pausedManual[agentId]?.has(lid)) { state.pausedManual[agentId].add(phone); state.pausedManual[agentId].delete(lid); }
+    if (state.pausedManual[agentId]?.has(lid)) {
+      state.pausedManual[agentId].add(phone);
+      state.pausedManual[agentId].delete(lid);
+      if (state.pausedManualAt[agentId]?.[lid]) {
+        state.pausedManualAt[agentId][phone] = state.pausedManualAt[agentId][lid];
+        delete state.pausedManualAt[agentId][lid];
+      }
+    }
   }
 }
 
@@ -128,7 +136,14 @@ function _migrateExistingLidConversations() {
       for (const n of [...s]) {
         if (!isLidFormat(n)) continue;
         const phone = state.lidPhoneMap[n];
-        if (phone) { s.add(phone); s.delete(n); }
+        if (phone) {
+          s.add(phone);
+          s.delete(n);
+          if (s === state.pausedManual[agentId] && state.pausedManualAt[agentId]?.[n]) {
+            state.pausedManualAt[agentId][phone] = state.pausedManualAt[agentId][n];
+            delete state.pausedManualAt[agentId][n];
+          }
+        }
       }
     }
   }
@@ -186,6 +201,15 @@ function matchesNumber(set, numero) {
   return false;
 }
 
+function findMatchedNumber(set, numero) {
+  if (set.has(numero)) return numero;
+  const alt = resolveLid(numero) || resolvePhone(numero);
+  if (alt && set.has(alt)) return alt;
+  const last8 = numero.slice(-8);
+  for (const n of set) { if (n.slice(-8) === last8) return n; }
+  return null;
+}
+
 function isPaused(agentId, numero) {
   if (agentId && state.paused[agentId] && matchesNumber(state.paused[agentId], numero)) return true;
   return Object.values(state.pausedManual).some((s) => matchesNumber(s, numero));
@@ -195,12 +219,29 @@ function isManuallyPaused(numero) {
   return Object.values(state.pausedManual).some((s) => matchesNumber(s, numero));
 }
 
+function getManualPausedAt(numero, agentId = null) {
+  const ids = agentId ? [agentId] : ['pedro','rodrigo'];
+  let best = 0;
+  for (const id of ids) {
+    const matched = findMatchedNumber(state.pausedManual[id], numero);
+    const pausedAt = matched ? Number(state.pausedManualAt[id]?.[matched] || 0) : 0;
+    if (pausedAt > best) best = pausedAt;
+  }
+  return best;
+}
+
 function pauseManual(numero, agentId) {
+  const pausedAt = Date.now();
   if (agentId) {
     state.paused[agentId]?.add(numero);
     state.pausedManual[agentId]?.add(numero);
+    if (state.pausedManualAt[agentId]) state.pausedManualAt[agentId][numero] = pausedAt;
   } else {
-    for (const id of ['pedro','rodrigo']) { state.paused[id].add(numero); state.pausedManual[id].add(numero); }
+    for (const id of ['pedro','rodrigo']) {
+      state.paused[id].add(numero);
+      state.pausedManual[id].add(numero);
+      state.pausedManualAt[id][numero] = pausedAt;
+    }
   }
   const last8 = numero.slice(-8);
   for (const id of ['pedro','rodrigo']) {
@@ -221,8 +262,14 @@ function resumeManual(numero) {
   for (const id of ['pedro','rodrigo']) {
     state.paused[id].delete(numero);
     state.pausedManual[id].delete(numero);
+    delete state.pausedManualAt[id][numero];
     for (const n of [...state.paused[id]])       { if (n.slice(-8) === last8) state.paused[id].delete(n); }
-    for (const n of [...state.pausedManual[id]]) { if (n.slice(-8) === last8) state.pausedManual[id].delete(n); }
+    for (const n of [...state.pausedManual[id]]) {
+      if (n.slice(-8) === last8) {
+        state.pausedManual[id].delete(n);
+        delete state.pausedManualAt[id][n];
+      }
+    }
     const conv = state.conversations[id]?.get(numero);
     if (conv) { conv.finalizado = false; conv.avisouFinalizacao = false; }
   }
@@ -236,6 +283,7 @@ function resumeManualAll(agentId = null) {
     count += state.paused[id].size;
     state.paused[id].clear();
     state.pausedManual[id].clear();
+    state.pausedManualAt[id] = {};
     state.conversations[id]?.forEach((conv) => {
       if (conv) { conv.finalizado = false; conv.avisouFinalizacao = false; }
     });
@@ -791,6 +839,7 @@ function serializeState() {
     data[`instrucoes_${id}`]   = state.instructions[id];
     data[`pausados_${id}`]     = [...state.paused[id]];
     data[`pausadosManuais_${id}`] = [...state.pausedManual[id]];
+    data[`pausadosManuaisEm_${id}`] = state.pausedManualAt[id] || {};
   }
   if (Object.keys(state.lidPhoneMap).length > 0) data.lidPhoneMap = state.lidPhoneMap;
   return data;
@@ -839,6 +888,8 @@ function restoreState(data) {
     if (pData) { state.paused[id].clear(); pData.forEach(n => state.paused[id].add(n)); }
     const mData = data[`pausadosManuais_${id}`];
     if (mData) { state.pausedManual[id].clear(); mData.forEach(n => state.pausedManual[id].add(n)); }
+    const mAtData = data[`pausadosManuaisEm_${id}`] || data[`pausedManualAt_${id}`];
+    if (mAtData) state.pausedManualAt[id] = { ...mAtData };
   }
   if (data.lidPhoneMap) Object.assign(state.lidPhoneMap, data.lidPhoneMap);
   _migrateExistingLidConversations();
@@ -898,6 +949,7 @@ module.exports = {
   resolveLid,
   isPaused,
   isManuallyPaused,
+  getManualPausedAt,
   pauseManual,
   resumeManual,
   resumeManualAll,

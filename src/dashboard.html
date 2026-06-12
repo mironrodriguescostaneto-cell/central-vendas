@@ -2056,6 +2056,7 @@ function atkRmkRenderContatos() {
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
         ${rmkBadge}
+        ${atkRmkFiltro === 'nao_receberam' && c.pausado ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fef3c7;color:#92400e">${c.pausadoEm ? `Pausado ${new Date(c.pausadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}` : 'Pausado sem data'}</span>` : ''}
         <span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:${c.pausado?'#fee2e2':'#dcfce7'};color:${c.pausado?'#dc2626':'#16a34a'}">${c.pausado?'PAUSADO':'ATIVO'}</span>
       </div>
     </label>`;
