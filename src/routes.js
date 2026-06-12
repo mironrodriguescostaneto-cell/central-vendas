@@ -658,6 +658,15 @@ router.get('/api/remarketing/temp-img/:id', (req, res) => {
   res.send(img.buffer);
 });
 
+function _getRemarketingTempImage(imagemUrl) {
+  if (!imagemUrl) return null;
+  const id = String(imagemUrl).split('/api/remarketing/temp-img/')[1]?.split(/[?#]/)[0];
+  if (!id) return null;
+  const img = _remarkTempImgs.get(id);
+  if (!img || img.expiresAt < Date.now()) return null;
+  return img;
+}
+
 // Normaliza número para comparação: remove @sufixo, tenta resolver LID, pega últimos 10 dígitos
 function _canonicalPhone(numero, dbAtk) {
   if (!numero) return '';
@@ -916,8 +925,11 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       }
       try {
         const originalJid = resolveJid(numero);
+        const tempImage = _getRemarketingTempImage(imagemUrl);
         const sendFn = imagemUrl
-          ? () => baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', originalJid)
+          ? () => tempImage
+            ? baileys.sendMediaBuffer(sessionId, numero, 'image', tempImage.buffer, texto || '', originalJid, tempImage.mimetype)
+            : baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', originalJid)
           : () => baileys.sendText(sessionId, numero, texto, originalJid);
         await Promise.race([
           sendFn(),

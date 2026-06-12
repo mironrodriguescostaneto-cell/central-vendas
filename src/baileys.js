@@ -447,9 +447,10 @@ function _syncContactsFromLidMap(sessionId) {
 
 function _markSentId(session, sent) {
   const id = sent?.key?.id;
-  if (!id) return;
+  if (!id) throw new Error('WhatsApp nao confirmou ID da mensagem enviada');
   if (!session._seenMsgIds) session._seenMsgIds = new Set();
   session._seenMsgIds.add(id);
+  return id;
 }
 
 async function sendText(sessionId, phone, text, originalJid) {
@@ -507,6 +508,22 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
     }
   } else if (type === 'audio') {
     sent = await session.sock.sendMessage(jid, { audio: { url }, mimetype: 'audio/mp4' });
+  }
+  _markSentId(session, sent);
+}
+
+async function sendMediaBuffer(sessionId, phone, type, buffer, caption, originalJid, mimetype) {
+  const session = getSession(sessionId);
+  if (!session.sock || session.connectionState !== 'connected') {
+    throw new Error(`WhatsApp ${sessionId} nÃ£o conectado`);
+  }
+  const jid = originalJid || phoneToJid(phone);
+  console.log(`[BAILEYS:${sessionId}] sendMediaBuffer â†’ jid=${jid} type=${type} bytes=${buffer?.length || 0}`);
+  let sent;
+  if (type === 'image') {
+    sent = await session.sock.sendMessage(jid, { image: buffer, caption: caption || '', mimetype: mimetype || 'image/jpeg' });
+  } else if (type === 'video') {
+    sent = await session.sock.sendMessage(jid, { video: buffer, caption: caption || '', mimetype: mimetype || 'video/mp4' });
   }
   _markSentId(session, sent);
 }
@@ -594,6 +611,7 @@ module.exports = {
   connect,
   sendText,
   sendMedia,
+  sendMediaBuffer,
   getQRCode,
   getState,
   getAllStatus,
