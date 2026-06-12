@@ -496,7 +496,8 @@ async function sendMedia(sessionId, phone, type, url, caption, originalJid) {
   const jid = originalJid || phoneToJid(phone);
   let sent;
   if (type === 'image') {
-    sent = await session.sock.sendMessage(jid, { image: { url }, caption: caption || '' });
+    const buf = await fetchBuffer(url);
+    sent = await session.sock.sendMessage(jid, { image: buf, caption: caption || '' });
   } else if (type === 'video') {
     try {
       const buf = await fetchBuffer(url);
