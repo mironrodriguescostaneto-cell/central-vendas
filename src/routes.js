@@ -5,7 +5,6 @@ const path = require('path');
 const crypto = require('crypto');
 const { CONFIG } = require('./config');
 const db = require('./database');
-const { chat: gestorChat } = require('./gestor');
 const baileys = require('./baileys');
 
 const router = express.Router();
@@ -463,26 +462,14 @@ router.delete('/api/links-oferta/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ----- Gestor (Jarvis) -----
-router.post('/api/gestor/chat', auth, async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: 'Mensagem ausente' });
-  try {
-    const resposta = await gestorChat(message);
-    res.json({ resposta });
-  } catch (e) {
-    console.error('[ROUTES] Erro gestor chat:', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.get('/api/gestor/logs', auth, (req, res) => {
+// ----- Logs operacionais -----
+router.get('/api/system/logs', auth, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
-  res.json(db.getGestorLogs(limit));
-});
-
-router.get('/api/gestor/chat/history', auth, (req, res) => {
-  res.json(db.getGestorChat(50));
+  const logs = db
+    .getGestorLogs(limit * 3)
+    .filter((log) => !/jarvis|gestor/i.test(log.msg || ''))
+    .slice(0, limit);
+  res.json(logs);
 });
 
 // ----- Instruções dos agentes -----
@@ -1331,7 +1318,7 @@ router.post('/atk/webhook/rodrigo', async (req, res) => {
   } catch (e) { console.error('[ATK/WEBHOOK/RODRIGO]', e.message); }
 });
 
-// Chat com Aslam (Super Jarvis ATK)
+// Chat com Aslam ATK
 router.post('/api/atk/aslam', auth, async (req, res) => {
   try {
     const { message, mediaUrl } = req.body;

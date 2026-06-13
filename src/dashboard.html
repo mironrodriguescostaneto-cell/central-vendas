@@ -172,20 +172,6 @@ a{color:var(--accent);text-decoration:none}
 .btn-copy:active{background:var(--border)}
 .btn-del{background:#fee2e2;border:none;border-radius:8px;padding:7px 10px;font-size:12px;color:#991b1b}
 
-/* GESTOR CHAT */
-.gestor-chat{display:flex;flex-direction:column;height:calc(100vh - var(--header-h) - var(--nav-h) - 130px)}
-.gestor-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)}
-.gestor-msg{max-width:85%;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.5;word-break:break-word}
-.gestor-msg.user{background:var(--accent);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
-.gestor-msg.assistant{background:#fff;color:var(--text);border-bottom-left-radius:4px;align-self:flex-start;box-shadow:var(--shadow);border:1px solid var(--border)}
-.gestor-msg.system{background:rgba(139,108,247,.1);color:#5b21b6;border-radius:8px;font-size:12px;align-self:center;padding:8px 14px;border:1px solid rgba(139,108,247,.2)}
-.gestor-msg-time{font-size:10px;opacity:.5;margin-top:4px}
-.gestor-input-row{display:flex;gap:8px;margin-top:10px}
-.gestor-input{flex:1;padding:12px 16px;border-radius:var(--radius);border:1.5px solid var(--border);outline:none;font-size:14px;resize:none;transition:border .15s;min-height:44px;max-height:120px;overflow-y:auto}
-.gestor-input:focus{border-color:var(--gestor)}
-.btn-gestor-send{width:44px;height:44px;border-radius:50%;background:var(--gestor);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:background .15s}
-.btn-gestor-send:active{background:#7c3aed}
-
 /* LOGS */
 .log-list{display:flex;flex-direction:column;gap:6px}
 .log-item{background:var(--card);border-radius:10px;padding:10px 12px;border:1px solid var(--border);font-size:12px;display:flex;gap:10px;align-items:flex-start}
@@ -305,7 +291,7 @@ a{color:var(--accent);text-decoration:none}
             <div class="stat-card"><div class="stat-val" id="statLinks">–</div><div class="stat-lbl">Links Oferta</div></div>
           </div>
 
-          <div class="section-title">Jarvis — Últimos Eventos</div>
+          <div class="section-title">Eventos do Sistema</div>
           <div id="painelLogs" class="log-list">
             <div class="loading"><div class="spinner"></div> Carregando...</div>
           </div>
@@ -678,7 +664,6 @@ a{color:var(--accent);text-decoration:none}
           <div style="display:flex;gap:8px;flex-direction:column">
             <button class="btn-primary" onclick="atkLiberarTodos('pedro')">▶ Liberar todos do Pedro</button>
             <button class="btn-primary" onclick="atkLiberarTodos('rodrigo')">▶ Liberar todos do Rodrigo</button>
-            <button class="btn-secondary" onclick="showPage('gestor')">🤖 Abrir Super Jarvis</button>
           </div>
         </div>
 
@@ -883,39 +868,6 @@ a{color:var(--accent);text-decoration:none}
       </div></div>
     </div>
 
-    <!-- PAGE: GESTOR -->
-
-    <div class="page" id="pageGestor">
-      <div class="page-scroll">
-        <div class="page-content">
-          <div class="tabs" id="tabsGestor">
-            <button class="tab-btn active" onclick="showTab('gestor','chat')">Chat</button>
-            <button class="tab-btn" onclick="showTab('gestor','logs')">Logs</button>
-          </div>
-
-          <!-- Chat Jarvis -->
-          <div class="tab-pane active" id="gestor-tab-chat">
-            <div class="gestor-chat">
-              <div class="gestor-msgs" id="gestorMsgs">
-                <div class="gestor-msg assistant">Olá, Miron! Sou o Jarvis, seu Gestor de Projetos. Posso ajudar com análises do sistema, corrigir bugs, responder dúvidas sobre marketing e vendas, e fazer deploys com sua autorização. O que precisa?</div>
-              </div>
-              <div class="gestor-input-row">
-                <textarea class="gestor-input" id="gestorInput" placeholder="Pergunte algo ao Jarvis..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendGestor()}"></textarea>
-                <button class="btn-gestor-send" onclick="sendGestor()">➤</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Logs -->
-          <div class="tab-pane" id="gestor-tab-logs">
-            <div id="gestorLogsList" class="log-list">
-              <div class="loading"><div class="spinner"></div> Carregando logs...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div><!-- app-body -->
 
   <!-- HEADER -->
@@ -945,10 +897,6 @@ a{color:var(--accent);text-decoration:none}
     <button class="nav-item" id="nav-atk" onclick="showPage('atk')">
       <div class="nav-icon">🛒</div>
       <span class="nav-label">Atacadão</span>
-    </button>
-    <button class="nav-item" id="nav-gestor" onclick="showPage('gestor')">
-      <div class="nav-icon">🧠</div>
-      <span class="nav-label">Jarvis</span>
     </button>
   </nav>
 </div><!-- app -->
@@ -1103,8 +1051,8 @@ function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`pagePainel`);
-  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', atk: 'pageAtk', gestor: 'pageGestor' };
-  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', atk: 'Atacadão', gestor: 'Super Jarvis' };
+  const pageMap = { painel: 'pagePainel', info: 'pageInfo', logzz: 'pageLogzz', rafael: 'pageRafael', atk: 'pageAtk' };
+  const titleMap = { painel: 'Painel', info: 'Info-Produtos', logzz: 'Logzz', rafael: 'Rafael — TVO Fotografias', atk: 'Atacadão' };
   document.getElementById(pageMap[page])?.classList.add('active');
   document.getElementById(`nav-${page}`)?.classList.add('active');
   document.getElementById('pageTitle').textContent = titleMap[page] || 'Central Vendas';
@@ -1113,7 +1061,6 @@ function showPage(page) {
   if (page === 'info') { loadConversas('rafael'); loadInstrucao('rafael'); loadSarahVendas(); }
   if (page === 'logzz') { loadConversas('logzz'); loadConversas('sarah'); loadPedidos(); loadLinks(); loadInstrucao('logzz'); loadInstrucao('sarah'); }
   if (page === 'atk') { loadAtkStatus(); atkLoadConversas('pedro'); }
-  if (page === 'gestor') { loadGestorLogs(); loadGestorHistory(); }
 }
 
 // ----- Tabs -----
@@ -1138,7 +1085,6 @@ function showTab(page, tab) {
   if (page === 'logzz' && tab === 'remarketing') { rmkLoadContatos(); sarahRmkLoadContatos(); }
   if (page === 'rafael' && tab === 'conversa') loadConversas('rafael');
   if (page === 'rafael' && tab === 'conexao') loadAgentStatus();
-  if (page === 'gestor' && tab === 'logs') loadGestorLogs();
 }
 
 // ----- Polling -----
@@ -1165,7 +1111,7 @@ async function loadPainelData() {
   try {
     const [statusData, logsData, convsRafael, convsLogzz, pedidos, links] = await Promise.all([
       api('/api/agents/status'),
-      api('/api/gestor/logs?limit=5'),
+      api('/api/system/logs?limit=5'),
       api('/api/conversas/rafael'),
       api('/api/conversas/logzz'),
       api('/api/pedidos'),
@@ -1508,65 +1454,6 @@ async function addLink() {
     toast('Link adicionado!');
     loadLinks();
   } catch (e) { toast(`Erro: ${e.message}`); }
-}
-
-// ----- Gestor Jarvis -----
-let gestorSending = false;
-
-async function sendGestor() {
-  if (gestorSending) return;
-  const input = document.getElementById('gestorInput');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  gestorSending = true;
-
-  const msgs = document.getElementById('gestorMsgs');
-  msgs.innerHTML += `<div class="gestor-msg user">${esc(text)}<div class="gestor-msg-time">${new Date().toLocaleTimeString('pt-BR')}</div></div>`;
-  msgs.innerHTML += `<div class="gestor-msg assistant" id="gestorTyping"><div class="spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px"></div> Jarvis pensando...</div>`;
-  msgs.scrollTop = msgs.scrollHeight;
-
-  try {
-    const res = await api('/api/gestor/chat', 'POST', { message: text });
-    document.getElementById('gestorTyping')?.remove();
-    msgs.innerHTML += `<div class="gestor-msg assistant">${esc(res.resposta).replace(/\n/g,'<br>')}<div class="gestor-msg-time">${new Date().toLocaleTimeString('pt-BR')}</div></div>`;
-    msgs.scrollTop = msgs.scrollHeight;
-  } catch (e) {
-    document.getElementById('gestorTyping')?.remove();
-    msgs.innerHTML += `<div class="gestor-msg system">Erro: ${e.message}</div>`;
-  } finally {
-    gestorSending = false;
-  }
-}
-
-async function loadGestorLogs() {
-  const el = document.getElementById('gestorLogsList');
-  if (!el) return;
-  try {
-    const data = await api('/api/gestor/logs?limit=50');
-    if (!data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Nenhum log</div></div>'; return; }
-    el.innerHTML = data.map(l => `
-      <div class="log-item">
-        <div class="log-dot ${l.tipo}"></div>
-        <div class="log-body">
-          <div class="log-time">${formatTs(l.ts)}</div>
-          <div class="log-msg">${esc(l.msg)}</div>
-        </div>
-      </div>
-    `).join('');
-  } catch {}
-}
-
-async function loadGestorHistory() {
-  try {
-    const data = await api('/api/gestor/chat/history');
-    if (!data.length) return;
-    const msgs = document.getElementById('gestorMsgs');
-    msgs.innerHTML = data.map(m => `
-      <div class="gestor-msg ${m.role}">${esc(m.content).replace(/\n/g,'<br>')}<div class="gestor-msg-time">${formatTs(m.ts)}</div></div>
-    `).join('');
-    msgs.scrollTop = msgs.scrollHeight;
-  } catch {}
 }
 
 // ----- Instruções -----

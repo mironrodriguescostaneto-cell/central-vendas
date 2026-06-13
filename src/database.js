@@ -31,8 +31,6 @@ const state = {
   gestorLogs: [],
 
   // Chat com Gestor: [{role, content, ts}]
-  gestorChat: [],
-
   // Sessão do gestor — instruções ativas por agente
   instrucoes: { info: '', logzz: '', rafael: '', sarah: '', antonio: '' },
 
@@ -156,7 +154,7 @@ async function saveDB() {
   } catch (e) {
     console.error('[DB] Falha total ao salvar dados:', e.message);
     try {
-      const { sendTelegram } = require('./gestor');
+      const { sendTelegram } = require('./notifier');
       sendTelegram(`🚨 *DB Save Falhou*\nRedis e filesystem inacessíveis.\nErro: ${e.message}`).catch(() => {});
     } catch {}
   }
@@ -283,13 +281,6 @@ function addGestorLog(tipo, msg, resolvido = false) {
 function getGestorLogs(limit = 50) { return state.gestorLogs.slice(0, limit); }
 
 // ----- Gestor Chat -----
-function addGestorChat(role, content) {
-  state.gestorChat.push({ role, content, ts: Date.now() });
-  if (state.gestorChat.length > 200) state.gestorChat = state.gestorChat.slice(-200);
-}
-
-function getGestorChat(limit = 50) { return state.gestorChat.slice(-limit); }
-
 // ----- Instruções por agente -----
 function setInstrucao(agentId, texto) {
   state.instrucoes[agentId] = texto;
@@ -323,8 +314,6 @@ module.exports = {
   getLinksOferta,
   addGestorLog,
   getGestorLogs,
-  addGestorChat,
-  getGestorChat,
   setInstrucao,
   getInstrucao,
   setConnectionStatus,

@@ -2,7 +2,7 @@
 
 // ============================================================
 // CENTRAL VENDAS — Entry Point v2.5.1
-// Sistema Operacional de Vendas: Info-Produtos + Logzz + Jarvis
+// Sistema Operacional de Vendas: Info-Produtos + Logzz + Atacadao
 // ============================================================
 
 require('dotenv').config();
@@ -12,7 +12,7 @@ const { CONFIG } = require('./src/config');
 const db = require('./src/database');
 const dbAtk = require('./src/database-atk');
 const routes = require('./src/routes');
-const gestor = require('./src/gestor');
+const monitor = require('./src/monitor');
 
 const app = express();
 
@@ -40,9 +40,9 @@ async function main() {
   await dbAtk.load();
   console.log('[MAIN] Banco ATK carregado — pedro:', dbAtk.state.conversations.pedro.size, 'conversas | rodrigo:', dbAtk.state.conversations.rodrigo.size, 'conversas');
 
-  // 2. Inicializar monitor de erros do Gestor
-  gestor.initErrorMonitor();
-  console.log('[MAIN] Gestor Jarvis inicializado');
+  // 2. Inicializar monitor de erros operacional
+  monitor.initErrorMonitor();
+  console.log('[MAIN] Monitor operacional inicializado');
 
   // 3. Inicializar agentes WhatsApp (em paralelo, sem bloquear startup)
   setTimeout(async () => {
@@ -81,7 +81,7 @@ async function main() {
   // 4. Health check periódico (a cada 5 min)
   setInterval(async () => {
     try {
-      const status = await gestor.healthCheck();
+      const status = await monitor.healthCheck();
       console.log(`[HEALTH] ${status}`);
     } catch {}
   }, 5 * 60 * 1000);
@@ -94,7 +94,7 @@ async function main() {
     console.log(`║   http://localhost:${port}            ║`);
     console.log(`║   Senha: ${CONFIG.dashboardPassword}                  ║`);
     console.log(`╚═══════════════════════════════════╝\n`);
-    gestor.addGestorLog('info', `Sistema iniciado na porta ${port}`);
+    db.addGestorLog('info', `Sistema iniciado na porta ${port}`);
   });
 }
 
