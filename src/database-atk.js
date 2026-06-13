@@ -197,8 +197,12 @@ function matchesNumber(set, numero) {
   if (set.has(numero)) return true;
   const alt = resolveLid(numero) || resolvePhone(numero);
   if (alt && set.has(alt)) return true;
+  if (isLidFormat(numero)) return false;
   const last8 = numero.slice(-8);
-  for (const n of set) { if (n.slice(-8) === last8) return true; }
+  for (const n of set) {
+    if (isLidFormat(n)) continue;
+    if (n.slice(-8) === last8) return true;
+  }
   return false;
 }
 
@@ -206,8 +210,12 @@ function findMatchedNumber(set, numero) {
   if (set.has(numero)) return numero;
   const alt = resolveLid(numero) || resolvePhone(numero);
   if (alt && set.has(alt)) return alt;
+  if (isLidFormat(numero)) return null;
   const last8 = numero.slice(-8);
-  for (const n of set) { if (n.slice(-8) === last8) return n; }
+  for (const n of set) {
+    if (isLidFormat(n)) continue;
+    if (n.slice(-8) === last8) return n;
+  }
   return null;
 }
 
@@ -233,6 +241,7 @@ function getManualPausedAt(numero, agentId = null) {
 
 function pauseManual(numero, agentId) {
   const pausedAt = Date.now();
+  const isLidNumero = isLidFormat(numero);
   if (agentId) {
     state.paused[agentId]?.add(numero);
     state.pausedManual[agentId]?.add(numero);
@@ -248,7 +257,7 @@ function pauseManual(numero, agentId) {
   for (const id of ['pedro','rodrigo']) {
     const toCancel = [];
     state.followupTimers.forEach((timers, key) => {
-      if (key === `${id}_${numero}` || key.slice(-8) === last8) {
+      if (key === `${id}_${numero}` || (!isLidNumero && key.slice(-8) === last8)) {
         if (Array.isArray(timers)) timers.forEach(clearTimeout);
         else if (typeof timers === 'number') clearTimeout(timers);
         toCancel.push(key);
@@ -264,9 +273,11 @@ function resumeManual(numero) {
     state.paused[id].delete(numero);
     state.pausedManual[id].delete(numero);
     delete state.pausedManualAt[id][numero];
-    for (const n of [...state.paused[id]])       { if (n.slice(-8) === last8) state.paused[id].delete(n); }
+    for (const n of [...state.paused[id]]) {
+      if (!isLidFormat(numero) && !isLidFormat(n) && n.slice(-8) === last8) state.paused[id].delete(n);
+    }
     for (const n of [...state.pausedManual[id]]) {
-      if (n.slice(-8) === last8) {
+      if (!isLidFormat(numero) && !isLidFormat(n) && n.slice(-8) === last8) {
         state.pausedManual[id].delete(n);
         delete state.pausedManualAt[id][n];
       }

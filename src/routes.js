@@ -1380,6 +1380,7 @@ router.get('/api/atk/conversas/:agentId', auth, (req, res) => {
       convs.push({
         numero, pushName: conv.pushName || '', totalMsgs: conv.msgs.length,
         ultimaMensagem: conv.ultimaMensagem, pausado: dbAtk.isManuallyPaused(numero),
+        isTempId: !!conv.isTempId || dbAtk.isLidFormat(numero),
         score: score.score, temperatura: score.temperatura,
         ultimoTexto: (conv.msgs.at(-1)?.content || conv.msgs.at(-1)?.text || '').slice(0, 80),
         ultimoRole: conv.msgs.at(-1)?.role || 'user',
@@ -1396,7 +1397,7 @@ router.get('/api/atk/conversas/:agentId/:numero', auth, (req, res) => {
     const dbAtk = require('./database-atk');
     const { agentId, numero } = req.params;
     const conv = dbAtk.getConversation(agentId, numero);
-    res.json({ numero, msgs: conv?.msgs || [], pausado: dbAtk.isManuallyPaused(numero) });
+    res.json({ numero, msgs: conv?.msgs || [], pausado: dbAtk.isManuallyPaused(numero), isTempId: !!conv?.isTempId || dbAtk.isLidFormat(numero) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
