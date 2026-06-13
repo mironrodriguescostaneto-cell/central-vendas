@@ -1,7 +1,7 @@
 {
   "name": "central-vendas",
   "version": "1.0.0",
-  "description": "Sistema Operacional de Vendas — Info-produtos + Logzz + Gestor Jarvis",
+  "description": "Sistema Operacional de Vendas - Info-produtos + Logzz + Atacadao",
   "main": "index.js",
   "engines": {
     "node": ">=20.0.0"

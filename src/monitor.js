@@ -8,14 +8,14 @@ function initErrorMonitor() {
   process.on('uncaughtException', async (error) => {
     const msg = `Erro critico: ${error.message}`;
     console.error('[MONITOR] uncaughtException:', error);
-    db.addGestorLog('error', msg);
+    db.addSystemLog('error', msg);
     await sendTelegram(`🚨 *Central Vendas — Erro Crítico*\n\n${error.message}`).catch(() => {});
   });
 
   process.on('unhandledRejection', (reason) => {
     const message = reason?.message || String(reason);
     console.error('[MONITOR] unhandledRejection:', reason);
-    db.addGestorLog('warning', `Promise rejeitada: ${message}`);
+    db.addSystemLog('warning', `Promise rejeitada: ${message}`);
   });
 }
 
@@ -26,7 +26,7 @@ async function healthCheck() {
     .map(([id]) => id);
 
   if (disconnected.length) {
-    db.addGestorLog('warning', `Agentes desconectados: ${disconnected.join(', ')}`);
+    db.addSystemLog('warning', `Agentes desconectados: ${disconnected.join(', ')}`);
     return `warning: ${disconnected.length} agentes desconectados`;
   }
 

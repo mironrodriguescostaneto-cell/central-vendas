@@ -94,7 +94,7 @@ async function main() {
     console.log(`║   http://localhost:${port}            ║`);
     console.log(`║   Senha: ${CONFIG.dashboardPassword}                  ║`);
     console.log(`╚═══════════════════════════════════╝\n`);
-    db.addGestorLog('info', `Sistema iniciado na porta ${port}`);
+    db.addSystemLog('info', `Sistema iniciado na porta ${port}`);
   });
 }
 

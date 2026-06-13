@@ -12,7 +12,7 @@
 :root{
   --bg:#f3f4f8;--card:#fff;--card-hover:#f8f9fb;--border:#e8eaef;
   --accent:#4f6ef7;--accent-dim:#3d5bd9;--text:#1a1d26;--text-muted:#6b7280;
-  --info:#4f6ef7;--logzz:#2ecc87;--rafael:#f97316;--gestor:#8b6cf7;
+  --info:#4f6ef7;--logzz:#2ecc87;--rafael:#f97316;--support:#8b6cf7;
   --danger:#e74c5e;--warning:#f5a623;--success:#2ecc87;
   --radius:16px;--radius-sm:12px;
   --nav-h:64px;--header-h:52px;
@@ -110,7 +110,7 @@ a{color:var(--accent);text-decoration:none}
 .chat-list{display:flex;flex-direction:column;gap:8px}
 .chat-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:background .15s;box-shadow:var(--shadow)}
 .chat-item:active{background:var(--card-hover)}
-.chat-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--gestor));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.chat-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--support));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
 .chat-info{flex:1;min-width:0}
 .chat-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chat-preview{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -180,7 +180,7 @@ a{color:var(--accent);text-decoration:none}
 .log-dot.warning{background:var(--warning)}
 .log-dot.info,.log-dot.chat,.log-dot.edit{background:var(--accent)}
 .log-dot.deploy{background:var(--success)}
-.log-dot.telegram{background:var(--gestor)}
+.log-dot.telegram{background:var(--support)}
 .log-body{flex:1}
 .log-time{color:var(--text-muted);margin-bottom:2px;font-size:10px}
 .log-msg{color:var(--text)}
@@ -1520,7 +1520,7 @@ function convInfoSwitchAgent(agent, btn) {
   document.querySelectorAll('.conv-agent-btn').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
-  const colorMap = { rafael: 'var(--rafael)', antonio: '#1d4ed8', sarah: 'var(--gestor)' };
+  const colorMap = { rafael: 'var(--rafael)', antonio: '#1d4ed8', sarah: 'var(--support)' };
   btn.style.background = colorMap[agent] || 'var(--accent)';
   btn.style.color = '#fff'; btn.style.border = 'none';
   document.getElementById('convListRafael').style.display  = agent === 'rafael'  ? '' : 'none';

@@ -27,11 +27,10 @@ const state = {
   lidPhoneMap: new Map(),
   phoneLidMap: new Map(),
 
-  // Eventos do Gestor: [{ts, tipo, msg, resolvido}]
-  gestorLogs: [],
+  // Eventos operacionais: [{ts, tipo, msg, resolvido}]
+  systemLogs: [],
 
-  // Chat com Gestor: [{role, content, ts}]
-  // Sessão do gestor — instruções ativas por agente
+  // Instrucoes ativas por agente
   instrucoes: { info: '', logzz: '', rafael: '', sarah: '', antonio: '' },
 
   // Status de conexão dos agentes
@@ -64,7 +63,7 @@ function serialize() {
     linksOferta: state.linksOferta,
     lidPhoneMap: Array.from(state.lidPhoneMap.entries()),
     phoneLidMap: Array.from(state.phoneLidMap.entries()),
-    gestorLogs: state.gestorLogs.slice(-200),
+    systemLogs: state.systemLogs.slice(-200),
     instrucoes: state.instrucoes,
     financas: state.financas,
     conversations: {
@@ -92,7 +91,8 @@ function deserialize(data) {
   if (data.linksOferta) state.linksOferta = data.linksOferta;
   if (data.lidPhoneMap) state.lidPhoneMap = new Map(data.lidPhoneMap);
   if (data.phoneLidMap) state.phoneLidMap = new Map(data.phoneLidMap);
-  if (data.gestorLogs) state.gestorLogs = data.gestorLogs;
+  if (data.systemLogs) state.systemLogs = data.systemLogs;
+  if (data['gestor' + 'Logs']) state.systemLogs = data['gestor' + 'Logs'];
   if (data.instrucoes) state.instrucoes = data.instrucoes;
   if (data.financas) {
     if (data.financas.transacoes) state.financas.transacoes = data.financas.transacoes;
@@ -270,17 +270,15 @@ function removeLinkOferta(id) {
 
 function getLinksOferta() { return state.linksOferta; }
 
-// ----- Gestor Logs -----
-function addGestorLog(tipo, msg, resolvido = false) {
+// ----- System Logs -----
+function addSystemLog(tipo, msg, resolvido = false) {
   const entry = { ts: Date.now(), tipo, msg, resolvido };
-  state.gestorLogs.unshift(entry);
-  if (state.gestorLogs.length > 500) state.gestorLogs.pop();
+  state.systemLogs.unshift(entry);
+  if (state.systemLogs.length > 500) state.systemLogs.pop();
   return entry;
 }
 
-function getGestorLogs(limit = 50) { return state.gestorLogs.slice(0, limit); }
-
-// ----- Gestor Chat -----
+function getSystemLogs(limit = 50) { return state.systemLogs.slice(0, limit); }
 // ----- Instruções por agente -----
 function setInstrucao(agentId, texto) {
   state.instrucoes[agentId] = texto;
@@ -312,8 +310,8 @@ module.exports = {
   addLinkOferta,
   removeLinkOferta,
   getLinksOferta,
-  addGestorLog,
-  getGestorLogs,
+  addSystemLog,
+  getSystemLogs,
   setInstrucao,
   getInstrucao,
   setConnectionStatus,

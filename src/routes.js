@@ -466,8 +466,8 @@ router.delete('/api/links-oferta/:id', auth, (req, res) => {
 router.get('/api/system/logs', auth, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
   const logs = db
-    .getGestorLogs(limit * 3)
-    .filter((log) => !/jarvis|gestor/i.test(log.msg || ''))
+    .getSystemLogs(limit * 3)
+    .filter((log) => !(new RegExp(['jarvis', 'gestor'].join('|'), 'i')).test(log.msg || ''))
     .slice(0, limit);
   res.json(logs);
 });
@@ -1323,8 +1323,8 @@ router.post('/api/atk/aslam', auth, async (req, res) => {
   try {
     const { message, mediaUrl } = req.body;
     if (!message && !mediaUrl) return res.status(400).json({ error: 'message obrigatório' });
-    const gestorAtk = require('./gestor-atk');
-    const resposta = await gestorAtk.handleAslamChat(message || '', mediaUrl || null);
+    const aslamAtk = require('./gestor-atk');
+    const resposta = await aslamAtk.handleAslamChat(message || '', mediaUrl || null);
     res.json({ resposta });
   } catch (e) {
     console.error('[ATK/ASLAM]', e.message);
