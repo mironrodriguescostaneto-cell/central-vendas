@@ -1611,6 +1611,63 @@ function extractLocation(body) {
   return null;
 }
 
+function normalizeTextBasic(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isDeliveryTimingQuestion(text) {
+  const msg = normalizeTextBasic(text);
+  return (
+    /\b(?:chega|entrega|entregar|recebo|receber)\s+(?:que|qual)\s+dia\b/.test(msg) ||
+    /\b(?:chega|entrega|entregar|recebo|receber)\s+hoje\b/.test(msg) ||
+    /\b(?:consegue|da|pode)\s+(?:entregar|chegar)\s+hoje\b/.test(msg) ||
+    /\bprazo\s+(?:de\s+)?entrega\b/.test(msg) ||
+    /\b(?:quando|que\s+dia)\s+(?:chega|entrega|entregar)\b/.test(msg) ||
+    /\bdemora\s+(?:quanto|muito)\b/.test(msg)
+  );
+}
+
+function getDeliveryWindow() {
+  const time = getBrasiliaTime();
+  const isSunday = time.dia === "Domingo";
+  const isSaturday = time.dia === "Sabado";
+  const isWeekday = !isSunday && !isSaturday;
+  const inWeekdayWindow = isWeekday && (
+    (time.hora > 10 || (time.hora === 10 && time.minuto >= 0)) &&
+    (time.hora < 16 || (time.hora === 16 && time.minuto < 30))
+  );
+  const inSaturdayWindow = isSaturday && time.hora >= 9 && time.hora < 13;
+  if (inWeekdayWindow) return { today: true, label: "hoje", window: "entre 10:00 e 16:30" };
+  if (inSaturdayWindow) return { today: true, label: "hoje", window: "entre 09:00 e 13:00" };
+  if (isSunday) return { today: false, label: "segunda-feira", window: "a partir das 10:00" };
+  if (isSaturday) {
+    if (time.hora < 9) return { today: false, label: "hoje", window: "a partir das 09:00" };
+    return { today: false, label: "segunda-feira", window: "a partir das 10:00" };
+  }
+  if (time.hora < 10) return { today: false, label: "hoje", window: "a partir das 10:00" };
+  if (time.dia === "Sexta") return { today: false, label: "segunda-feira", window: "a partir das 10:00" };
+  return { today: false, label: "amanha", window: "a partir das 10:00" };
+}
+
+function buildDeliveryTimingReply(agentId, numero) {
+  const delivery = getDeliveryWindow();
+  const conv = db.getConversation(agentId, numero);
+  const frete = conv?.freteCalculado;
+  const valores = frete?.total
+    ? ` O total ficou R$${frete.total}${frete.freteGratis ? " com frete gratis" : ` com frete R$${frete.frete}`}.`
+    : "";
+  if (delivery.today) {
+    return `Consigo entregar hoje sim, ${delivery.window}.${valores} Quer fechar a entrega?`;
+  }
+  if (delivery.label === "hoje") {
+    return `Consigo entregar hoje sim, ${delivery.window}.${valores} Quer fechar a entrega?`;
+  }
+  return `Hoje nao consigo mais encaixar na rota. Consigo entregar ${delivery.label}, ${delivery.window}.${valores} Quer deixar fechado?`;
+}
+
 function isTemporaryLid(body, numero) {
   return !!(
     body?.isTempId ||
@@ -1907,6 +1964,21 @@ async function handleIncomingMessage(agentId, body) {
     }
 
     if (!mensagem) return;
+
+    if (isDeliveryTimingQuestion(mensagem)) {
+      const convPrazo = db.getConversation(agentId, numero);
+      const prazoMsg = buildDeliveryTimingReply(agentId, numero);
+      convPrazo.msgs.push({ role: "user", content: sanitize(mensagem), timestamp: Date.now() });
+      convPrazo.msgs.push({ role: "assistant", content: sanitize(prazoMsg), timestamp: Date.now() });
+      convPrazo.ultimaMensagem = Date.now();
+      await sendText(agentId, numero, prazoMsg);
+      db.registerContact(numero, agentId);
+      db.state.metrics[agentId].atendimentos++;
+      db.addActivity(`${agentId}: ${numero} - prazo entrega respondido`);
+      db.save();
+      console.log(`${agent.name} [${numero}]: Prazo de entrega respondido deterministicamente`);
+      return;
+    }
 
     console.log(`${agent.name} [${numero}]: ${mensagem}`);
 
