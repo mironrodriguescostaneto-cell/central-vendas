@@ -10,7 +10,7 @@ const { CONFIG } = require('../config');
 const { callGemini, transcribeAudio } = require('../services');
 const { addMsg, getConv, isPaused, pausePhone, getInstrucao } = require('../database');
 const baileys = require('../baileys');
-const { sendTelegram } = require('../gestor');
+const { sendTelegram } = require('../notifier');
 
 const AGENT_ID = 'info';
 const _pending = new Set();
