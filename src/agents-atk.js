@@ -1593,10 +1593,18 @@ function scheduleFollowUp(agentId, numero) {
 
 function extractText(body) {
   return sanitize(
+    (typeof body.text === "string" ? body.text : "") ||
     body.text?.message ||
     body.text?.body ||
     body.message?.conversation ||
     body.message?.extendedTextMessage?.text ||
+    body.message?.interactiveMessage?.body?.text ||
+    body.message?.buttonsResponseMessage?.selectedDisplayText ||
+    body.message?.templateButtonReplyMessage?.selectedDisplayText ||
+    body.message?.listResponseMessage?.title ||
+    body.message?.listResponseMessage?.description ||
+    body.message?.imageMessage?.caption ||
+    body.message?.videoMessage?.caption ||
     body.body ||
     body.content ||
     body.caption ||
@@ -1960,6 +1968,14 @@ async function handleIncomingMessage(agentId, body) {
       // Se não conseguiu transcrever, pede pra escrever
       if (!mensagem) {
         mensagem = "[Cliente enviou audio que nao foi possivel transcrever]";
+      }
+    }
+
+    if (!mensagem && tempLid) {
+      const convSemTexto = db.getConversation(agentId, numero);
+      const semHistorico = !convSemTexto?.msgs || convSemTexto.msgs.length === 0;
+      if (semHistorico) {
+        mensagem = "[Cliente iniciou conversa pelo anuncio, mas o WhatsApp nao entregou texto legivel]";
       }
     }
 

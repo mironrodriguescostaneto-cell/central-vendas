@@ -165,8 +165,13 @@ function getConversation(agentId, numero) {
     if (conv.msgs && conv.msgs.length > 150) conv.msgs = conv.msgs.slice(-80);
     return conv;
   }
+  if (isLidFormat(numero)) {
+    map.set(numero, { msgs: [], ultimaMensagem: Date.now(), isTempId: true });
+    return map.get(numero);
+  }
   const last8 = numero.slice(-8);
   for (const [key, conv] of map) {
+    if (isLidFormat(key)) continue;
     if (key.slice(-8) === last8) {
       map.set(numero, conv);
       map.delete(key);
@@ -328,6 +333,7 @@ function isRemarketingPausado(agentId) { return !!(state.remarketingPausado?.[ag
 function isAgentNumber(numero) {
   const tel = numero.replace(/\D/g, '');
   if (!tel || tel.length < 8) return false;
+  if (isLidFormat(tel)) return false;
   return [PEDRO_NUMERO, RODRIGO_NUMERO]
     .filter(n => n.length >= 8)
     .some(n => tel.endsWith(n.slice(-8)) || n.endsWith(tel.slice(-8)));
@@ -398,9 +404,13 @@ function findAgentForNumber(numero) {
   for (const id of ['pedro','rodrigo']) { if (state.conversations[id].has(numero)) return id; }
   const alt = resolveLid(numero) || resolvePhone(numero);
   if (alt) { for (const id of ['pedro','rodrigo']) { if (state.conversations[id].has(alt)) return id; } }
+  if (isLidFormat(numero)) return null;
   const last8 = numero.slice(-8);
   for (const id of ['pedro','rodrigo']) {
-    for (const key of state.conversations[id].keys()) { if (key.slice(-8) === last8) return id; }
+    for (const key of state.conversations[id].keys()) {
+      if (isLidFormat(key)) continue;
+      if (key.slice(-8) === last8) return id;
+    }
   }
   return null;
 }
