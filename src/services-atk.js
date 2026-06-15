@@ -10,7 +10,13 @@
 const GEMINI_KEY     = () => process.env.GEMINI_API_KEY || '';
 const ANTHROPIC_KEY  = () => process.env.ANTHROPIC_API_KEY || '';
 const GROQ_KEY       = () => process.env.GROQ_API_KEY || '';
-const GEMINI_MODEL   = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
+function normalizeGeminiModel(model) {
+  const m = String(model || '').trim();
+  if (!m || m === 'gemini-2.0-flash') return GEMINI_FALLBACK_MODEL;
+  return m;
+}
+const GEMINI_MODEL   = () => normalizeGeminiModel(process.env.GEMINI_MODEL || GEMINI_FALLBACK_MODEL);
 const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
 const CLAUDE_TOKENS  = () => parseInt(process.env.CLAUDE_MAX_TOKENS || '800');
 const CLAUDE_TIMEOUT = () => parseInt(process.env.CLAUDE_TIMEOUT || '25000');
@@ -113,7 +119,7 @@ async function callGeminiDirect(systemPrompt, messages, { maxTokens, timeout } =
     );
     const data = await r.json();
     if (data.error) {
-      if (data.error.code === 429) openGeminiCircuit();
+      if (data.error.code === 429 || data.error.code === 404) openGeminiCircuit();
       console.error(`[ATK/AI] Gemini error ${data.error.code}: ${data.error.message}`);
       return null;
     }
@@ -393,6 +399,8 @@ module.exports = {
   zapiCircuit,
   getProvider,
   getLastSendError: () => null,
+  getGeminiModel: GEMINI_MODEL,
+  getClaudeModel: CLAUDE_MODEL,
   STORE_LAT,
   STORE_LNG,
 };

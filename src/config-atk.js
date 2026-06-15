@@ -26,7 +26,7 @@ const CONFIG = {
   PORT:            parseInt(env('PORT', '3000')),
 
   CLAUDE_MODEL:      env('CLAUDE_MODEL', 'claude-sonnet-4-20250514'),
-  GEMINI_MODEL:      env('GEMINI_MODEL', 'gemini-2.0-flash'),
+  GEMINI_MODEL:      env('GEMINI_MODEL', 'gemini-2.5-flash'),
   JARVIS_MODEL:      env('JARVIS_MODEL', 'claude-sonnet-4-20250514'),
   CLAUDE_MAX_TOKENS: parseInt(env('CLAUDE_MAX_TOKENS', '800')),
   CLAUDE_TIMEOUT:    parseInt(env('CLAUDE_TIMEOUT', '25000')),

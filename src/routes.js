@@ -1646,13 +1646,13 @@ router.get('/api/atk/eventos', auth, (req, res) => {
 
 // Teste real da API de IA — retorna resultado ou erro exato
 router.get('/api/atk/ai-test', auth, async (req, res) => {
-  const { callGeminiDirect, callClaudeDirect } = require('./services-atk');
+  const servicesAtk = require('./services-atk');
   const sys = 'Responda apenas: OK';
   const msgs = [{ role: 'user', content: 'teste' }];
   const geminiKey = !!(process.env.GEMINI_API_KEY);
   const claudeKey = !!(process.env.ANTHROPIC_API_KEY);
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const claudeModel = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
+  const geminiModel = servicesAtk.getGeminiModel();
+  const claudeModel = servicesAtk.getClaudeModel();
 
   let geminiResult = null, geminiError = null;
   let claudeResult = null, claudeError = null;
