@@ -17,7 +17,7 @@ function normalizeGeminiModel(model) {
   return m;
 }
 const GEMINI_MODEL   = () => normalizeGeminiModel(process.env.GEMINI_MODEL || GEMINI_FALLBACK_MODEL);
-const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL   = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
 const CLAUDE_TOKENS  = () => parseInt(process.env.CLAUDE_MAX_TOKENS || '800');
 const CLAUDE_TIMEOUT = () => parseInt(process.env.CLAUDE_TIMEOUT || '25000');
 
