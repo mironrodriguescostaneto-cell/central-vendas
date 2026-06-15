@@ -1656,6 +1656,7 @@ router.get('/api/atk/ai-test', auth, async (req, res) => {
 
   let geminiResult = null, geminiError = null;
   let claudeResult = null, claudeError = null;
+  let pipelineResult = null, pipelineError = null;
 
   if (geminiKey) {
     try {
@@ -1683,9 +1684,16 @@ router.get('/api/atk/ai-test', auth, async (req, res) => {
     } catch (e) { claudeError = e.message; }
   }
 
+  try {
+    pipelineResult = await servicesAtk.callClaude(sys, msgs, { maxTokens: 10, timeout: 10000 });
+  } catch (e) {
+    pipelineError = e.message;
+  }
+
   res.json({
     gemini: { key: geminiKey, model: geminiModel, result: geminiResult, error: geminiError },
     claude: { key: claudeKey, model: claudeModel, result: claudeResult, error: claudeError },
+    pipeline: { result: pipelineResult, error: pipelineError },
   });
 });
 

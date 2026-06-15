@@ -168,7 +168,8 @@ async function callClaudeDirect(systemPrompt, messages, { model, maxTokens, time
 async function callClaude(systemPrompt, messages, options = {}) {
   if (GEMINI_KEY() && !geminiCircuitOpen()) {
     const result = await callGeminiDirect(systemPrompt, messages, options);
-    if (result !== null) return result;
+    if (typeof result === 'string' && result.trim()) return result;
+    if (result !== null) console.warn('[ATK/AI] Gemini retornou vazio - usando Claude...');
     console.warn('[ATK/AI] Gemini falhou — usando Claude...');
   }
   const result = await callClaudeDirect(systemPrompt, messages, options);
