@@ -59,29 +59,31 @@ router.get('/api/health', (req, res) => {
 });
 
 router.get('/api/test-ai', async (req, res) => {
+  const services = require('./services');
   const gk = (process.env.GEMINI_API_KEY || '').trim();
   const ak = (process.env.ANTHROPIC_API_KEY || '').trim();
   const results = {};
   if (gk) {
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gk}`, {
+      const geminiModel = services.getGeminiModel();
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${gk}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'diga apenas: ok' }] }], generationConfig: { maxOutputTokens: 10 } }),
         signal: AbortSignal.timeout(10000)
       });
       const d = await r.json();
-      results.gemini = d.error ? `ERRO: ${d.error.code} ${d.error.message}` : `OK: ${d.candidates?.[0]?.content?.parts?.[0]?.text?.slice(0,20)}`;
+      results.gemini = d.error ? `ERRO ${geminiModel}: ${d.error.code} ${d.error.message}` : `OK ${geminiModel}: ${d.candidates?.[0]?.content?.parts?.[0]?.text?.slice(0,20)}`;
     } catch(e) { results.gemini = `EXCEPTION: ${e.message}`; }
   } else { results.gemini = 'KEY_MISSING'; }
   if (ak) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': ak, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'diga apenas: ok' }] }),
+        body: JSON.stringify({ model: services.getClaudeModel(), max_tokens: 10, messages: [{ role: 'user', content: 'diga apenas: ok' }] }),
         signal: AbortSignal.timeout(10000)
       });
       const d = await r.json();
-      results.anthropic = d.error ? `ERRO: ${d.error.type} ${d.error.message}` : `OK: ${d.content?.[0]?.text?.slice(0,20)}`;
+      results.anthropic = d.error ? `ERRO ${services.getClaudeModel()}: ${d.error.type} ${d.error.message}` : `OK ${services.getClaudeModel()}: ${d.content?.[0]?.text?.slice(0,20)}`;
     } catch(e) { results.anthropic = `EXCEPTION: ${e.message}`; }
   } else { results.anthropic = 'KEY_MISSING'; }
   res.json(results);

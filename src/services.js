@@ -4,6 +4,16 @@ const https = require('https');
 const http = require('http');
 const { CONFIG } = require('./config');
 
+const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
+function getGeminiModel() {
+  const raw = process.env.GEMINI_MODEL || GEMINI_FALLBACK_MODEL;
+  return raw === 'gemini-2.0-flash' ? GEMINI_FALLBACK_MODEL : raw;
+}
+
+function getClaudeModel() {
+  return process.env.CLAUDE_MODEL || 'claude-sonnet-4-5';
+}
+
 // ----- HTTP helper -----
 function httpRequest(url, options = {}, body = null) {
   return new Promise((resolve, reject) => {
@@ -41,14 +51,16 @@ async function callGemini(systemPrompt, messages, opts = {}) {
     },
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${CONFIG.geminiKey}`;
   const res = await httpRequest(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   }, body);
 
   if (res.status !== 200) throw new Error(`Gemini error ${res.status}: ${JSON.stringify(res.data)}`);
-  return res.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!text.trim()) throw new Error('Gemini retornou resposta sem texto');
+  return text;
 }
 
 // ----- Claude Sonnet (Gestor Jarvis) -----
@@ -66,7 +78,7 @@ async function callClaude(systemPrompt, messages, opts = {}) {
   const client = getAnthropicClient();
 
   const params = {
-    model: opts.model || 'claude-sonnet-4-20250514',
+    model: opts.model || getClaudeModel(),
     max_tokens: opts.maxTokens || 4096,
     system: systemPrompt,
     messages,
@@ -127,4 +139,6 @@ module.exports = {
   callClaudeText,
   transcribeAudio,
   httpRequest,
+  getGeminiModel,
+  getClaudeModel,
 };
