@@ -418,7 +418,7 @@ router.post('/api/conversas/:agentId/:phone/send', auth, async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'Agente inválido' });
 
   try {
-    const originalJid = db.state.phoneLidMap?.get(phone) || null;
+    const originalJid = resolveCommonAgentJid(phone);
     console.log(`[ROUTES] Envio manual → agente=${agentId} phone=${phone} jid=${originalJid || '(padrão)'}`);
     await baileys.sendText(sessionId, phone, text, originalJid);
     db.addMsg(agentId, phone, 'assistant', text);
@@ -428,6 +428,19 @@ router.post('/api/conversas/:agentId/:phone/send', auth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+function resolveCommonAgentJid(phone) {
+  if (!phone) return null;
+  const raw = String(phone);
+  if (raw.includes('@')) return raw;
+
+  const mapped = db.state.phoneLidMap?.get(raw);
+  if (mapped) return String(mapped).includes('@') ? mapped : `${mapped}@lid`;
+
+  const clean = raw.replace(/\D/g, '');
+  if (/^\d{12,}$/.test(clean) && !clean.startsWith('55')) return `${clean}@lid`;
+  return null;
+}
 
 // ----- Pedidos Logzz -----
 router.get('/api/pedidos', auth, (req, res) => {
@@ -611,7 +624,7 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
   try {
     const agentMap = { logzz: './agents/logzz', rafael: './agents/rafael', info: './agents/info-produtos' };
     const agent = require(agentMap[agentId]);
-    await agent.processMessage('received', { phone, body: message, pushName: 'Teste', isFromMe: false });
+    await agent.processMessage('received', { phone, body: message, pushName: 'Teste', isFromMe: false, _originalJid: resolveCommonAgentJid(phone) });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
