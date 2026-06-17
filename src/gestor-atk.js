@@ -178,6 +178,29 @@ function cleanRemarketingMsg(msg) {
   return clean || msg; // fallback para original se limpeza removeu tudo
 }
 
+function isBadRemarketingMsg(msg) {
+  const t = String(msg || "").trim();
+  if (!t) return true;
+  const normalized = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s]/g, "").trim();
+  if (/^(eai|oi|ola|opa|bom dia|boa tarde|boa noite|tudo bem|e ai)$/.test(normalized)) return true;
+  if (normalized.length < 18) return true;
+  if (t.length > 35 && !/[.!?)]$/.test(t)) return true;
+  return false;
+}
+
+function fallbackRemarketingMsg(agentId, prodInfo) {
+  if (agentId === "pedro") {
+    if (/s10/i.test(prodInfo?.product || "")) {
+      return "Oi! Ainda tenho o Uni TV S10 preto por R$400. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Quer que eu separe um pra voce?";
+    }
+    return "Oi! Ainda tenho o Uni TV V10 por R$360, sem mensalidade e pago so na entrega. Quer que eu veja a entrega pra voce?";
+  }
+  if (agentId === "rodrigo") {
+    return "Oi! Ainda tenho a Furadeira 48V por R$160, kit completo e pago so na entrega. Quer que eu veja a entrega pra voce?";
+  }
+  return `Oi! Ainda tenho ${prodInfo?.product || "o produto"} disponivel. Quer que eu te passe os detalhes?`;
+}
+
 // Mensagens fixas de remarketing 24h — determinísticas, sem IA
 const PEDRO_RM_24H_V10 = "Opa, tudo bem? passando para te falar que consegui um super desconto no Uni TV V10 para voce fechar comigo hoje. Ontem te passei por R$360, mas para fechar hoje consigo fazer R$330 a vista no PIX ou dinheiro. Esse valor e somente hoje. Posso separar o seu?";
 const PEDRO_RM_24H_S10 = "Opa, tudo bem? passando para te avisar que ainda tenho o Uni TV S10 preto, o modelo 2026 com ESPN, por R$400 a vista. Tambem parcela no cartao com a taxa da maquininha. Posso separar um pra voce?";
@@ -944,7 +967,11 @@ async function handleAslamChat(message, mediaUrl = null) {
         );
 
         if (remarkMsg) {
-          const cleanMsg = cleanRemarketingMsg(remarkMsg);
+          let cleanMsg = cleanRemarketingMsg(remarkMsg);
+          if (isBadRemarketingMsg(cleanMsg)) {
+            console.error(`[Remarketing] Mensagem ruim bloqueada (${contact.agente}/${contact.numero}): "${cleanMsg}"`);
+            cleanMsg = fallbackRemarketingMsg(contact.agente, prodInfo);
+          }
           await sendText(contact.agente, contact.numero, cleanMsg);
           if (conv) {
             conv.msgs.push({ role: "assistant", content: cleanMsg, timestamp: Date.now() });
@@ -1458,7 +1485,11 @@ Eventos recentes: ${db.state.events.slice(-5).map((e) => e.text).join("; ")}`;
             );
 
             if (rmMsg) {
-              const cleanMsg = cleanRemarketingMsg(rmMsg);
+              let cleanMsg = cleanRemarketingMsg(rmMsg);
+              if (isBadRemarketingMsg(cleanMsg)) {
+                console.error(`[RemarketingSafety] Mensagem ruim bloqueada (${rmAgent}/${numero}): "${cleanMsg}"`);
+                cleanMsg = fallbackRemarketingMsg(rmAgent, prodInfo);
+              }
               await sendText(rmAgent, numero, cleanMsg);
               conv.msgs.push({ role: "assistant", content: sanitize(cleanMsg), timestamp: Date.now() });
               conv.ultimaMensagem = Date.now();
@@ -2348,7 +2379,11 @@ async function runRemarketing() {
             if (db.isManuallyPaused(numero)) continue;
             if (db.state.paused[agentId]) db.state.paused[agentId].delete(numero);
 
-            const cleanMsg = cleanRemarketingMsg(rmMsg);
+            let cleanMsg = cleanRemarketingMsg(rmMsg);
+            if (isBadRemarketingMsg(cleanMsg)) {
+              console.error(`[RemarketingAuto] Mensagem ruim bloqueada (${agentId}/${numero}): "${cleanMsg}"`);
+              cleanMsg = fallbackRemarketingMsg(agentId, prodInfo);
+            }
             await sendText(agentId, numero, cleanMsg);
             db.state.lastRemarketing[rmKey] = now;
 

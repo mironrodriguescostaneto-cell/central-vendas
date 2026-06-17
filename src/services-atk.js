@@ -348,6 +348,16 @@ async function sendText(agentId, numero, texto, options = {}) {
       return;
     }
   }
+  const cleanText = String(texto || '').trim();
+  if (!cleanText) return;
+  const conv = db.getConversation(agentId, numero);
+  if (numero !== SEU_WHATSAPP && !options.allowDuplicate) {
+    const nowDup = Date.now();
+    if (conv?.lastOutboundText === cleanText && (nowDup - (conv.lastOutboundAt || 0)) < 2 * 60 * 1000) {
+      console.log(`[ATK/SEND DEDUP] ${agentId} -> ${numero}: texto repetido bloqueado`);
+      return;
+    }
+  }
   const baileys = require('./baileys');
   if (baileys.getState(agentId) !== 'connected') {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendText`);
@@ -355,9 +365,12 @@ async function sendText(agentId, numero, texto, options = {}) {
   }
   if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 60000);
   try {
-    const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;
-    await baileys.sendText(agentId, numero, texto, originalJid);
+    await baileys.sendText(agentId, numero, cleanText, originalJid);
+    if (numero !== SEU_WHATSAPP && !options.allowDuplicate && conv) {
+      conv.lastOutboundText = cleanText;
+      conv.lastOutboundAt = Date.now();
+    }
   } catch (e) {
     console.error(`[ATK/SEND] Erro sendText ${agentId} → ${numero}:`, e.message);
   }
@@ -367,18 +380,32 @@ async function sendText(agentId, numero, texto, options = {}) {
 async function sendMedia(agentId, numero, type, url, caption) {
   const db = require('./database-atk');
   const baileys = require('./baileys');
+  const conv = db.getConversation(agentId, numero);
+  const mediaKey = `${type}:${url}`;
+  if (numero !== SEU_WHATSAPP) {
+    const nowDup = Date.now();
+    if (conv?.lastOutboundMediaKey === mediaKey && (nowDup - (conv.lastOutboundMediaAt || 0)) < 10 * 60 * 1000) {
+      console.log(`[ATK/MEDIA DEDUP] ${agentId} -> ${numero}: midia repetida bloqueada (${type})`);
+      return false;
+    }
+  }
   if (baileys.getState(agentId) !== 'connected') {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendMedia`);
-    return;
+    return false;
   }
   if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 60000);
   try {
-    const conv = db.getConversation(agentId, numero);
     const originalJid = conv?._originalJid || null;
     await baileys.sendMedia(agentId, numero, type, url, caption, originalJid);
+    if (numero !== SEU_WHATSAPP && conv) {
+      conv.lastOutboundMediaKey = mediaKey;
+      conv.lastOutboundMediaAt = Date.now();
+    }
     console.log(`[ATK/MEDIA] OK: ${agentId} → ${numero} (${type})`);
+    return true;
   } catch (e) {
     console.error(`[ATK/MEDIA] Erro ${agentId} → ${numero}:`, e.message);
+    return false;
   }
 }
 

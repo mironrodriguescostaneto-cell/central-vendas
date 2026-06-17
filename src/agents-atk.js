@@ -208,6 +208,52 @@ function getProductContext(agentId, numero, currentText = "") {
   };
 }
 
+function getMediaKey(agentId, productCtx, type) {
+  const productKey = productCtx?.key || agentId;
+  return `${agentId}:${productKey}:${type}`;
+}
+
+function wasMediaSent(agentId, numero, productCtx, type) {
+  const conv = db.getConversation(agentId, numero);
+  const key = getMediaKey(agentId, productCtx, type);
+  return !!(conv?.mediaSent && conv.mediaSent[key]);
+}
+
+function markMediaSent(agentId, numero, productCtx, type) {
+  const conv = db.getConversation(agentId, numero);
+  if (!conv) return;
+  if (!conv.mediaSent) conv.mediaSent = {};
+  conv.mediaSent[getMediaKey(agentId, productCtx, type)] = Date.now();
+}
+
+function isLikelyTruncated(text) {
+  const t = String(text || "").trim();
+  if (t.length < 35) return false;
+  if (/[.!?)]$/.test(t)) return false;
+  if (/[,;:]$/.test(t)) return true;
+  if (/\b(?:o|a|os|as|de|do|da|dos|das|que|com|por|para|pra|e|ou)$/i.test(t)) return true;
+  if (/tenho dois modelos|modelo tradicional|lancamento 2026|fica R\$/i.test(t) && !/[.!?]$/.test(t)) return true;
+  return false;
+}
+
+function deterministicFallback(agentId, numero, clientMessage, currentText = "") {
+  if (agentId !== "pedro") return "";
+  const msg = normalizeTextBasic(clientMessage);
+  const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  if (/qual\s+valor|valor|preco|preco|quanto\s+(?:custa|fica)|eu\s+quero\s+saber\s+o\s+valor/.test(msg)) {
+    if (productCtx.key === "s10") return "O Uni TV S10 preto fica R$400 a vista. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Tambem parcela no cartao com a taxa da maquininha.";
+    if (productCtx.key === "v10" && !/s10|preto|espn/.test(msg)) return "O Uni TV V10 fica R$360 a vista. Se voce quiser o modelo com ESPN, ai e o Uni TV S10 preto por R$400.";
+    return "Eu tenho dois modelos: o Uni TV V10 fica R$360 e o Uni TV S10 preto fica R$400. O S10 e o unico com ESPN, tem 8K e processador mais rapido.";
+  }
+  if (/diferenca|diferen[cç]a|qual\s+melhor|espn|preto|s10/.test(msg)) {
+    return "A diferenca e essa: o V10 e o modelo tradicional por R$360. O S10 preto e o lancamento 2026 por R$400, tem ESPN, resolucao 8K e processador mais rapido.";
+  }
+  if (/^sim$|quero|pode|explica|me fala/.test(msg)) {
+    return "Tenho dois modelos: o V10 por R$360 e o S10 preto por R$400. O S10 e o lancamento 2026, tem ESPN, 8K e processador mais rapido. Qual voce prefere?";
+  }
+  return "";
+}
+
 // ============================================
 // CATALOGO AUTORIZADO — BLINDAGEM DE PRODUTO
 // Cada agente so pode mencionar o produto/modelo/spec listados aqui.
@@ -1098,9 +1144,14 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
     texto = texto.replace("ENVIAR_FOTO", "").trim();
     const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
     const fotoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Foto : media.foto1;
-    if (fotoUrl) {
-      await sendMedia(agentId, numero, "image", fotoUrl);
-      console.log(`Foto enviada para ${numero} via ${agentId} (${productCtx.name})`);
+    if (wasMediaSent(agentId, numero, productCtx, "image")) {
+      console.log(`Foto repetida bloqueada para ${numero} via ${agentId} (${productCtx.name})`);
+    } else if (fotoUrl) {
+      const sent = await sendMedia(agentId, numero, "image", fotoUrl);
+      if (sent) {
+        markMediaSent(agentId, numero, productCtx, "image");
+        console.log(`Foto enviada para ${numero} via ${agentId} (${productCtx.name})`);
+      }
     } else {
       console.error(`ENVIAR_FOTO: URL vazia para agente ${agentId} (${productCtx.name})`);
     }
@@ -1111,9 +1162,14 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
     texto = texto.replace("ENVIAR_VIDEO", "").trim();
     const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
     const videoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Video : media.video1;
-    if (videoUrl) {
-      await sendMedia(agentId, numero, "video", videoUrl);
-      console.log(`Video enviado para ${numero} via ${agentId} (${productCtx.name})`);
+    if (wasMediaSent(agentId, numero, productCtx, "video")) {
+      console.log(`Video repetido bloqueado para ${numero} via ${agentId} (${productCtx.name})`);
+    } else if (videoUrl) {
+      const sent = await sendMedia(agentId, numero, "video", videoUrl);
+      if (sent) {
+        markMediaSent(agentId, numero, productCtx, "video");
+        console.log(`Video enviado para ${numero} via ${agentId} (${productCtx.name})`);
+      }
     } else {
       console.error(`ENVIAR_VIDEO: URL vazia para agente ${agentId} (${productCtx.name})`);
     }
@@ -1543,6 +1599,13 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   texto = texto.replace(/^.*(?:CORRE[CÇ][AÃ]O NECESS[AÁ]RIA|RESPOSTA OK|RESPOSTA CORRIGIDA|MOTIVOS DA CORRECAO|ANALISE|VERIFICACAO|AVALIACAO|❌|✅|⚠️⚠️).*\n?/gim, "");
   texto = texto.replace(/^\s*(?:Nota:|Obs:|O agente |A resposta |Corrigido:).*\n?/gim, "");
   texto = texto.replace(/^\s*\n/gm, "").trim();
+  if (isLikelyTruncated(texto)) {
+    const fallback = deterministicFallback(agentId, numero, clientMessage, texto);
+    if (fallback) {
+      console.error(`RESPOSTA TRUNCADA BLOQUEADA ${agentId}/${numero}: "${texto.substring(0, 120)}"`);
+      texto = fallback;
+    }
+  }
 
   // Send the cleaned text (delay para parecer natural — humano digitando)
   if (texto.trim()) {

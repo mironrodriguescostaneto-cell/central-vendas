@@ -255,7 +255,12 @@ async function generateRetakeMessage({ agentId, agentName, clientName, profile, 
   );
 
   if (!raw) return null;
-  return sanitize(_cleanMsg(raw));
+  const clean = sanitize(_cleanMsg(raw));
+  const normalized = clean.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s]/g, "").trim();
+  if (/^(eai|oi|ola|opa|bom dia|boa tarde|boa noite|tudo bem|e ai)$/.test(normalized)) return null;
+  if (normalized.length < 18) return null;
+  if (clean.length > 35 && !/[.!?)]$/.test(clean.trim())) return null;
+  return clean;
 }
 
 // ── PROMPT BUILDER ───────────────────────────
