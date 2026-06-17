@@ -49,7 +49,7 @@ function registrarContingenciaEnviada(numero) {
  * @param {string} msg - mensagem original (lowercase aplicado internamente)
  */
 function detectaIntencaoRetirada(msg) {
-  const m = msg.toLowerCase();
+  const m = normalizeTextBasic(msg);
   // Palavras diretas de retirada
   if (/\bretirad[ao]?\b|\bretirar\b|\bretiro\b/.test(m)) return true;
   // "posso/vou/quero/consigo buscar"
@@ -78,6 +78,9 @@ function detectaIntencaoRetirada(msg) {
   if (/\bir\s+(?:buscar|pegar|retirar)\b/.test(m)) return true;
   // "tem loja?" / "tem loja fisica?" / "tem loja aí?"
   if (/\btem\s+loja\b/.test(m)) return true;
+  if (/\bonde\s+fica\s+(?:a\s+)?loja\b/.test(m)) return true;
+  if (/\bloja\s+fisica\b/.test(m)) return true;
+  if (/\bendereco\s+da\s+loja\b/.test(m)) return true;
   // "loja fisica" / "loja física"
   if (/\bloja\s+f[ií]sica\b/.test(m)) return true;
   // "libera retirada?" / "libera busca?"
@@ -101,6 +104,15 @@ function detectaIntencaoRetirada(msg) {
  * Cobre: "tenho claro", "uso claro", "minha internet é claro", "net claro", "funciona com claro", etc.
  * EXCLUSÃO: "claro que sim/não" (advérbio de certeza) — não disparar.
  */
+function detectaPerguntaForaGoiania(msg) {
+  const m = normalizeTextBasic(msg);
+  const mencionaFora = /\b(?:brasilia|entorno|distrito\s+federal|df|anapolis)\b/.test(m);
+  if (!mencionaFora) return false;
+  return /\b(?:voces?|vcs?|vc)\s+s(?:ao|e)\s+de\b/.test(m) ||
+    /\b(?:entrega|entregam|atende|atendem|fazem\s+entrega|como\s+que\s+e\s+a\s+entrega)\b/.test(m) ||
+    mencionaFora;
+}
+
 function detectaInternetClaro(msg) {
   const m = msg.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   // Excluir "claro que sim/nao" e "claro né" — advérbio de certeza, não a operadora
@@ -2363,7 +2375,7 @@ async function handleIncomingMessage(agentId, body) {
 
     // INTERCEPTAÇÃO RETIRADA — não fazemos retirada → informa cliente + pausa + notifica Miron
     if (detectaIntencaoRetirada(mensagem)) {
-      const retiradaMsg = `Não fazemos retirada, trabalhamos somente com entrega! 😊`;
+      const retiradaMsg = `A loja fisica nao esta aberta para retirada. A gente trabalha somente com entrega, e o pagamento e feito direto ao entregador na hora.`;
       await sendText(agentId, numero, retiradaMsg);
       conv.msgs.push({ role: "assistant", content: retiradaMsg, timestamp: Date.now() });
       conv.ultimaMensagem = Date.now();
@@ -2378,6 +2390,18 @@ async function handleIncomingMessage(agentId, body) {
     // INTERCEPTAÇÃO CLARO — apenas Pedro (Uni TV V10 não funciona com internet da Claro)
     // Também cobre resposta isolada "claro" quando a última mensagem do bot perguntou sobre internet
     if (agentId === "pedro") {
+      if (detectaPerguntaForaGoiania(mensagem)) {
+        const foraGoianiaMsg = `Somos de Goiania. Hoje o Pedro faz entrega somente em Goiania e regiao proxima, ate 30km. Brasilia e entorno ficam fora da nossa rota de entrega.`;
+        await sendText(agentId, numero, foraGoianiaMsg);
+        conv.msgs.push({ role: "assistant", content: foraGoianiaMsg, timestamp: Date.now() });
+        conv.ultimaMensagem = Date.now();
+        db.pauseAuto(numero, agentId);
+        db.addEvent(`fora_goiania_pergunta: ${agentId} ${numero}`);
+        await sendText(agentId, CONFIG.SEU_WHATSAPP, `*PEDRO - FORA DA ROTA*\n\nCliente: wa.me/${numero}\nMsg: "${mensagem}"\n\nCliente perguntou sobre Brasilia/entorno. Pedro informou que atende apenas Goiania/regiao ate 30km e pausou a conversa.`);
+        db.save();
+        console.log(`Pedro [${numero}]: Pergunta sobre Brasilia/entorno detectada - informado fora da rota e pausado`);
+        return;
+      }
       const _ultimaBotMsg = (conv.msgs || []).filter(m => m.role === "assistant").slice(-1)[0]?.content || "";
       const _perguntouInternet = /operadora|internet|qual\s+sua\s+rede|qual\s+sua\s+internet|claro.*vivo.*tim|oi.*claro.*vivo/i.test(_ultimaBotMsg);
       const _respostaEhClaro = /^\s*(claro|e\s+claro|eh\s+claro|[eé]\s+(a\s+)?claro|minha\s+[eé]\s+claro|net\s+claro|claro\s+mesmo|claro\s+net)\s*[!.,]?\s*$/i.test(mensagem);

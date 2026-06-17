@@ -1444,7 +1444,8 @@ router.post('/api/atk/conversas/:agentId/:numero/send', auth, async (req, res) =
   if (!['pedro', 'rodrigo'].includes(agentId)) return res.status(400).json({ error: 'Agente inválido' });
   try {
     const dbAtk = require('./database-atk');
-    await baileys.sendText(agentId, numero, text);
+    const { sendText: sendTextAtk } = require('./services-atk');
+    await sendTextAtk(agentId, numero, text, { bypassPause: true, allowDuplicate: true });
     const conv = dbAtk.getConversation(agentId, numero);
     if (conv) {
       conv.msgs.push({ role: 'assistant', content: text, timestamp: Date.now() });
