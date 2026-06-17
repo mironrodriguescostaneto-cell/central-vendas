@@ -251,7 +251,11 @@ function isLikelyTruncated(text) {
 function deterministicFallback(agentId, numero, clientMessage, currentText = "") {
   if (agentId !== "pedro") return "";
   const msg = normalizeTextBasic(clientMessage);
+  const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  if (/tenho dois modelos|uni tv v10|uni tv s10|que e o|modelo tradicional/.test(current)) {
+    return "Eu tenho dois modelos: o Uni TV V10 fica R$360 e e o modelo tradicional. O Uni TV S10 preto fica R$400, e o modelo 2026 com ESPN, 8K e processador mais rapido.";
+  }
   if (/qual\s+valor|valor|preco|preco|quanto\s+(?:custa|fica)|eu\s+quero\s+saber\s+o\s+valor/.test(msg)) {
     if (productCtx.key === "s10") return "O Uni TV S10 preto fica R$400 a vista. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Tambem parcela no cartao com a taxa da maquininha.";
     if (productCtx.key === "v10" && !/s10|preto|espn/.test(msg)) return "O Uni TV V10 fica R$360 a vista. Se voce quiser o modelo com ESPN, ai e o Uni TV S10 preto por R$400.";
@@ -260,7 +264,7 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   if (/diferenca|diferen[cç]a|qual\s+melhor|espn|preto|s10/.test(msg)) {
     return "A diferenca e essa: o V10 e o modelo tradicional por R$360. O S10 preto e o lancamento 2026 por R$400, tem ESPN, resolucao 8K e processador mais rapido.";
   }
-  if (/^sim$|quero|pode|explica|me fala/.test(msg)) {
+  if (/^sim$|^ok$|^certo$|entendi|quero|pode|explica|me fala/.test(msg)) {
     return "Tenho dois modelos: o V10 por R$360 e o S10 preto por R$400. O S10 e o lancamento 2026, tem ESPN, 8K e processador mais rapido. Qual voce prefere?";
   }
   return "";
@@ -1622,7 +1626,8 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   // Send the cleaned text (delay para parecer natural — humano digitando)
   if (texto.trim()) {
     await new Promise(r => setTimeout(r, CONFIG.DELAY_RESPOSTA));
-    await sendText(agentId, numero, texto.trim());
+    const sent = await sendText(agentId, numero, texto.trim());
+    if (!sent) return "";
   }
   // Retorna o texto final enviado ao cliente — caller usa para salvar no histórico
   return texto.trim();
@@ -1763,7 +1768,8 @@ function scheduleFollowUp(agentId, numero) {
       });
       if (!followMsg) return;
 
-      await sendText(agentId, numero, followMsg);
+      const sent = await sendText(agentId, numero, followMsg);
+      if (!sent) return;
       conv.msgs.push({ role: "assistant", content: sanitize(followMsg), timestamp: Date.now(), _type: "followup" });
       conv.ultimaMensagem = Date.now();
       db.save();

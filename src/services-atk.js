@@ -63,6 +63,16 @@ function sanitize(str) {
   }
 }
 
+function isLikelyIncompleteOutbound(text) {
+  const t = String(text || '').trim();
+  if (t.length < 35) return false;
+  if (/[.!?)]$/.test(t)) return false;
+  if (/[,;:]$/.test(t)) return true;
+  if (/\b(?:o|a|os|as|um|uma|de|do|da|dos|das|que|com|por|para|pra|e|ou|mas|porque|se|ele|ela|esse|essa|este|esta|meu|minha|nosso|nossa|modelo|produto)$/i.test(t)) return true;
+  if (/\b(?:que e o|que e a|eu tenho|o uni tv v10 que e o)$/i.test(t)) return true;
+  return false;
+}
+
 // --- Gemini: convert messages ---
 function convertMessagesToGemini(messages) {
   const contents = [];
@@ -345,23 +355,27 @@ async function sendText(agentId, numero, texto, options = {}) {
   if (!options.bypassPause && numero !== SEU_WHATSAPP) {
     if (db.isManuallyPaused(numero) || db.isPaused(agentId, numero)) {
       console.log(`[ATK/SEND BLOCKED] ${agentId} → ${numero}: pausado`);
-      return;
+      return false;
     }
   }
   const cleanText = String(texto || '').trim();
-  if (!cleanText) return;
+  if (!cleanText) return false;
+  if (numero !== SEU_WHATSAPP && !options.allowIncomplete && isLikelyIncompleteOutbound(cleanText)) {
+    console.error(`[ATK/SEND INCOMPLETE BLOCKED] ${agentId} -> ${numero}: "${cleanText.substring(0, 160)}"`);
+    return false;
+  }
   const conv = db.getConversation(agentId, numero);
   if (numero !== SEU_WHATSAPP && !options.allowDuplicate) {
     const nowDup = Date.now();
     if (conv?.lastOutboundText === cleanText && (nowDup - (conv.lastOutboundAt || 0)) < 2 * 60 * 1000) {
       console.log(`[ATK/SEND DEDUP] ${agentId} -> ${numero}: texto repetido bloqueado`);
-      return;
+      return false;
     }
   }
   const baileys = require('./baileys');
   if (baileys.getState(agentId) !== 'connected') {
     console.error(`[ATK/BAILEYS] ${agentId} não conectado — cancelando sendText`);
-    return;
+    return false;
   }
   if (db.state.botSending[agentId]) db.state.botSending[agentId].set(numero, Date.now() + 60000);
   try {
@@ -371,8 +385,10 @@ async function sendText(agentId, numero, texto, options = {}) {
       conv.lastOutboundText = cleanText;
       conv.lastOutboundAt = Date.now();
     }
+    return true;
   } catch (e) {
     console.error(`[ATK/SEND] Erro sendText ${agentId} → ${numero}:`, e.message);
+    return false;
   }
 }
 

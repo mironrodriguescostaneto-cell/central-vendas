@@ -22,6 +22,16 @@ const EXPLICIT_REFUSAL_RE =
  * @param {string} agentId - ID do agente (pedro, rodrigo)
  * @returns {Object} Perfil do cliente
  */
+function _isLikelyIncomplete(text) {
+  const t = String(text || "").trim();
+  if (t.length < 35) return false;
+  if (/[.!?)]$/.test(t)) return false;
+  if (/[,;:]$/.test(t)) return true;
+  if (/\b(?:o|a|os|as|um|uma|de|do|da|dos|das|que|com|por|para|pra|e|ou|mas|porque|se|ele|ela|esse|essa|este|esta|meu|minha|nosso|nossa|modelo|produto)$/i.test(t)) return true;
+  if (/\b(?:que e o|que e a|eu tenho|o uni tv v10 que e o)$/i.test(t)) return true;
+  return false;
+}
+
 function analyzeConversation(msgs, agentId) {
   if (!msgs || msgs.length === 0) return _emptyProfile();
 
@@ -259,7 +269,7 @@ async function generateRetakeMessage({ agentId, agentName, clientName, profile, 
   const normalized = clean.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s]/g, "").trim();
   if (/^(eai|oi|ola|opa|bom dia|boa tarde|boa noite|tudo bem|e ai)$/.test(normalized)) return null;
   if (normalized.length < 18) return null;
-  if (clean.length > 35 && !/[.!?)]$/.test(clean.trim())) return null;
+  if (_isLikelyIncomplete(clean)) return null;
   return clean;
 }
 
