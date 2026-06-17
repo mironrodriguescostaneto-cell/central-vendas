@@ -670,6 +670,14 @@ function _getRemarketingTempImage(imagemUrl) {
 }
 
 // Normaliza número para comparação: remove @sufixo, tenta resolver LID, pega últimos 10 dígitos
+function _normalizeMediaUrl(url) {
+  if (!url) return '';
+  const raw = String(url).trim();
+  const driveMatch = raw.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+  return raw;
+}
+
 function _canonicalPhone(numero, dbAtk) {
   if (!numero) return '';
   const raw = String(numero);
@@ -845,10 +853,15 @@ router.get('/api/remarketing/campanhas', auth, (req, res) => {
 });
 
 router.post('/api/remarketing/enviar', auth, async (req, res) => {
-  const { agente, numeros, texto, imagemUrl, pausarAposEnvio, nomeCampanha } = req.body;
+  const { agente, numeros, texto, textos, imagemUrl, pausarAposEnvio, nomeCampanha } = req.body;
+  const mediaType = req.body.mediaType === 'video' ? 'video' : 'image';
+  const delayMs = Math.max(3000, Number(req.body.delayMs || 3000));
+  const textosValidos = Array.isArray(textos) ? textos.map(t => String(t || '').trim()).filter(Boolean) : [];
+  const textoPrincipal = textosValidos.length ? textosValidos[0] : texto;
+  const mediaUrl = imagemUrl ? _normalizeMediaUrl(imagemUrl) : '';
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
-  if (!texto && !imagemUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
+  if (!textoPrincipal && !mediaUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
 
   const isAtk = ATK_REMARK_AGENTS.includes(agente);
@@ -874,8 +887,8 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     remarketingCampaign = dbAtkForDedup.createRemarketingCampaign({
       agentId: agente,
       name: nomeCampanha,
-      text: texto,
-      imageUrl: imagemUrl,
+      text: textoPrincipal,
+      imageUrl: mediaUrl,
       pauseAfterSend: pausarAposEnvio,
       total: numerosParaEnvio.length,
       recipients: numerosParaEnvio,
@@ -887,7 +900,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   res.json({ ok: true, total: numerosParaEnvio.length, campanhaId: remarketingCampaign?.id || null });
 
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
-  const TIMEOUT_ENVIO = 18000;
+  const TIMEOUT_ENVIO = mediaType === 'video' ? 60000 : 18000;
 
   function isOwnAgentJid(jid) {
     if (!jid) return false;
@@ -930,6 +943,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   (async () => {
     let consecutiveTimeouts = 0;
     const _sentCanonical = new Set(); // anti-duplicata por sessão de envio
+    let envioIndex = 0;
     for (const numero of numerosParaEnvio) {
       // Bloqueia duplicata: mesmo número com chaves diferentes no Map
       const canon = _canonicalPhone(numero, isAtk ? require('./database-atk') : null);
@@ -954,12 +968,14 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       }
       try {
         const originalJid = resolveJid(numero);
-        const tempImage = _getRemarketingTempImage(imagemUrl);
-        const sendFn = imagemUrl
+        const textoAtual = textosValidos.length ? textosValidos[envioIndex % textosValidos.length] : textoPrincipal;
+        envioIndex++;
+        const tempImage = mediaType === 'image' ? _getRemarketingTempImage(mediaUrl) : null;
+        const sendFn = mediaUrl
           ? () => tempImage
-            ? baileys.sendMediaBuffer(sessionId, numero, 'image', tempImage.buffer, texto || '', originalJid, tempImage.mimetype)
-            : baileys.sendMedia(sessionId, numero, 'image', imagemUrl, texto || '', originalJid)
-          : () => baileys.sendText(sessionId, numero, texto, originalJid);
+            ? baileys.sendMediaBuffer(sessionId, numero, 'image', tempImage.buffer, textoAtual || '', originalJid, tempImage.mimetype)
+            : baileys.sendMedia(sessionId, numero, mediaType, mediaUrl, textoAtual || '', originalJid)
+          : () => baileys.sendText(sessionId, numero, textoAtual, originalJid);
         await Promise.race([
           sendFn(),
           new Promise((_, rej) => setTimeout(() => rej(new Error('__timeout__')), TIMEOUT_ENVIO)),
@@ -971,7 +987,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           if (pausarAposEnvio) dbAtk.pauseManual(numero, agente);
           const conv = dbAtk.getConversation(agente, numero);
           if (conv) {
-            conv.msgs.push({ role: 'assistant', content: texto || '[imagem]', timestamp: sentAt });
+            conv.msgs.push({ role: 'assistant', content: textoAtual || (mediaType === 'video' ? '[video]' : '[imagem]'), timestamp: sentAt });
             conv.ultimaMensagem = sentAt;
             conv.remarketingEnviadoEm = sentAt;
             conv.remarketingRespondidoEm = 0;
@@ -982,13 +998,13 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           dbAtk.save();
         } else {
           if (pausarAposEnvio) db.pausePhone(agente, numero);
-          db.addMsg(agente, numero, 'assistant', texto || '[imagem]');
+          db.addMsg(agente, numero, 'assistant', textoAtual || (mediaType === 'video' ? '[video]' : '[imagem]'));
           const convCvn = db.state.conversations[agente]?.get(numero);
           if (convCvn) convCvn.remarketingEnviadoEm = sentAt;
           _markCanonicalRemarketingSent(agente, numero, sentAt, null);
-          if (texto) {
+          if (textoAtual) {
             const convState = db.state.conversations[agente]?.get(numero);
-            if (convState) convState.remarketingContexto = texto;
+            if (convState) convState.remarketingContexto = textoAtual;
           }
         }
         state.enviados++;
@@ -1007,7 +1023,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         }
         console.error(`[Remarketing] Erro ${numero}:`, e.message);
       }
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, delayMs));
     }
     state.ativo = false;
     state.atual = '';
