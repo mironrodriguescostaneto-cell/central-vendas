@@ -168,12 +168,32 @@ function detectPedroProductKey(text) {
   return null;
 }
 
-function getPedroProductContext(numero, currentText = "") {
+function rememberPedroProductChoice(numero, text) {
+  const key = detectPedroProductKey(text);
+  if (!key) return null;
+  const conv = db.getConversation("pedro", numero);
+  if (conv) conv.pedroProductKey = key;
+  return key;
+}
+
+function getPedroProductContext(numero, currentText = "", opts = {}) {
+  const { useAssistantHistory = false } = opts;
   const current = detectPedroProductKey(currentText);
   if (current) return PEDRO_PRODUCT_OPTIONS[current];
 
   const conv = db.getConversation("pedro", numero);
-  const history = conv?.msgs ? conv.msgs.slice(-12).map(m => m.content || "").join("\n") : "";
+  if (conv?.pedroProductKey && PEDRO_PRODUCT_OPTIONS[conv.pedroProductKey]) {
+    return PEDRO_PRODUCT_OPTIONS[conv.pedroProductKey];
+  }
+
+  const historyMsgs = conv?.msgs
+    ? conv.msgs
+        .filter(m => useAssistantHistory || m.role === "user")
+        .slice(-12)
+        .map(m => m.content || "")
+        .join("\n")
+    : "";
+  const history = historyMsgs.replace(/\[Cliente enviou localizacao:[^\]]+\]|\[Cliente informou distancia:[^\]]+\]/gi, "");
   const fromHistory = detectPedroProductKey(history);
   return PEDRO_PRODUCT_OPTIONS[fromHistory || "v10"];
 }
@@ -225,11 +245,17 @@ function checkProductBlindage(agentId, texto) {
 
   for (const pattern of cat.nomes_proibidos) {
     if (pattern.test(texto)) {
+      if (agentId === "pedro") {
+        return { violacao: "nome_produto", correcao: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. O S10 e o modelo com ESPN. Qual dos dois voce quer ver?" };
+      }
       return { violacao: "nome_produto", correcao: `Tenho sim o ${cat.nome_oficial}! E o modelo que trabalho aqui na Atacadao. Quer ver como funciona? ENVIAR_FOTO` };
     }
   }
   for (const pattern of cat.specs_proibidas) {
     if (pattern.test(texto)) {
+      if (agentId === "pedro") {
+        return { violacao: "spec_inventada", correcao: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. O S10 tem 8K, ESPN e processador mais rapido. Qual dos dois voce quer ver?" };
+      }
       return { violacao: "spec_inventada", correcao: `Tenho sim o ${cat.nome_oficial}! E o modelo que trabalho aqui na Atacadao. Quer ver como funciona? ENVIAR_FOTO` };
     }
   }
@@ -271,11 +297,13 @@ ETAPA 1 — ABERTURA (primeiro contato):
 "Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Hoje tenho o Uni TV V10 e o Uni TV S10 preto. Voce quer que eu te explique rapidinho a diferenca entre eles?"
 
 ETAPA 2 — APRESENTACAO:
-Enviar o video do produto. Escreva a tag: ENVIAR_VIDEO
+Se o cliente ainda NAO escolheu V10 ou S10: apresente os dois em texto e pergunte qual prefere. NAO escreva ENVIAR_VIDEO nem ENVIAR_FOTO ainda.
+Se o cliente escolheu V10 ou S10: enviar o video do modelo escolhido. Escreva a tag: ENVIAR_VIDEO
 "Olha nesse video como ele funciona na pratica. Ele transforma qualquer TV em smart, libera varios aplicativos e canais, e voce paga uma vez so, sem mensalidade."
 
 ETAPA 3 — REFORCO VISUAL:
-Enviar foto do produto. Escreva a tag: ENVIAR_FOTO
+Para V10: enviar foto do produto. Escreva a tag: ENVIAR_FOTO.
+Para S10: NAO escreva ENVIAR_FOTO enquanto nao houver foto oficial do S10 cadastrada. Use apenas ENVIAR_VIDEO para mostrar o S10.
 Apos a foto, mova direto para o proximo passo — NAO pergunte "ficou com alguma duvida?". Assuma o interesse e avance:
 Se ja sabe o preco que cliente quer → va para ETAPA 4. Se nao → "Me manda sua localizacao que eu calculo o frete e te passo o total certinho." Assumptive close — nao abra espaco para hesitacao.
 
@@ -1068,24 +1096,26 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   // ENVIAR_FOTO
   if (texto.includes("ENVIAR_FOTO")) {
     texto = texto.replace("ENVIAR_FOTO", "").trim();
-    const fotoUrl = media.foto1;
+    const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
+    const fotoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Foto : media.foto1;
     if (fotoUrl) {
       await sendMedia(agentId, numero, "image", fotoUrl);
-      console.log(`Foto enviada para ${numero} via ${agentId}`);
+      console.log(`Foto enviada para ${numero} via ${agentId} (${productCtx.name})`);
     } else {
-      console.error(`ENVIAR_FOTO: URL vazia para agente ${agentId}`);
+      console.error(`ENVIAR_FOTO: URL vazia para agente ${agentId} (${productCtx.name})`);
     }
   }
 
   // ENVIAR_VIDEO
   if (texto.includes("ENVIAR_VIDEO")) {
     texto = texto.replace("ENVIAR_VIDEO", "").trim();
-    const videoUrl = media.video1;
+    const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
+    const videoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Video : media.video1;
     if (videoUrl) {
       await sendMedia(agentId, numero, "video", videoUrl);
-      console.log(`Video enviado para ${numero} via ${agentId}`);
+      console.log(`Video enviado para ${numero} via ${agentId} (${productCtx.name})`);
     } else {
-      console.error(`ENVIAR_VIDEO: URL vazia para agente ${agentId}`);
+      console.error(`ENVIAR_VIDEO: URL vazia para agente ${agentId} (${productCtx.name})`);
     }
   }
 
@@ -1973,10 +2003,36 @@ async function handleIncomingMessage(agentId, body) {
     }
 
     let mensagem = texto || null;
+    if (agentId === "pedro" && mensagem) {
+      const escolhaPedro = rememberPedroProductChoice(numero, mensagem);
+      if (escolhaPedro) db.save();
+    }
+
+    const precisaEscolherProdutoPedro = () => {
+      if (agentId !== "pedro") return false;
+      const convPedro = db.getConversation("pedro", numero);
+      return !convPedro?.pedroProductKey;
+    };
+
+    async function pedirEscolhaProdutoPedro() {
+      const convPedro = db.getConversation("pedro", numero);
+      const msg = "Perfeito. Antes de eu calcular certinho, me confirma qual modelo voce quer: o Uni TV V10 por R$360 ou o Uni TV S10 preto por R$400 com ESPN?";
+      if (convPedro) {
+        convPedro.msgs.push({ role: "user", content: sanitize(mensagem || "[localizacao]"), timestamp: Date.now() });
+        convPedro.msgs.push({ role: "assistant", content: msg, timestamp: Date.now() });
+        convPedro.ultimaMensagem = Date.now();
+      }
+      db.save();
+      await sendText(agentId, numero, msg);
+    }
 
     // Handle location (pin on map) — ENVIA DIRETO PRO CLIENTE, SEM PASSAR PELA IA
     const loc = extractLocation(body);
     if (loc) {
+      if (precisaEscolherProdutoPedro()) {
+        await pedirEscolhaProdutoPedro();
+        return;
+      }
       const fr = calcFreight(loc.lat, loc.lng);
       if (fr.frete !== null) {
         const productCtxGps = getProductContext(agentId, numero, mensagem || "");
@@ -2339,6 +2395,10 @@ async function handleIncomingMessage(agentId, body) {
     // GUARD: se frete ja foi calculado via GPS, NAO recalcular por texto — evita sobrescrever freteCalculado correto
     const freteJaCalculadoAntes = !!(conv.freteCalculado && conv.freteCalculado.total);
     if (kmMatch && indicaDistanciaParaFrete(mensagem) && !freteJaCalculadoAntes) {
+      if (precisaEscolherProdutoPedro()) {
+        await pedirEscolhaProdutoPedro();
+        return;
+      }
       const distKm = parseFloat(kmMatch[1].replace(",", "."));
       if (distKm > 0) {
         const fr = calcFreightByKm(distKm);
