@@ -152,6 +152,42 @@ function calcInstallmentsWhatsApp(valorBase, maxParcelas = 10) {
   return lines.join('\n');
 }
 
+const PEDRO_PRODUCT_OPTIONS = {
+  v10: { key: "v10", name: "Uni TV V10", price: 360, floor: 340 },
+  s10: { key: "s10", name: "Uni TV S10", price: 400, floor: 400 },
+};
+
+function normalizeTextBasic(text) {
+  return String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function detectPedroProductKey(text) {
+  const t = normalizeTextBasic(text);
+  if (/\b(?:s\s*10|s10|preto|espn|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
+  if (/\b(?:v\s*10|v10|branc[ao]|mais\s+barat[ao]|menor\s+valor)\b/.test(t)) return "v10";
+  return null;
+}
+
+function getPedroProductContext(numero, currentText = "") {
+  const current = detectPedroProductKey(currentText);
+  if (current) return PEDRO_PRODUCT_OPTIONS[current];
+
+  const conv = db.getConversation("pedro", numero);
+  const history = conv?.msgs ? conv.msgs.slice(-12).map(m => m.content || "").join("\n") : "";
+  const fromHistory = detectPedroProductKey(history);
+  return PEDRO_PRODUCT_OPTIONS[fromHistory || "v10"];
+}
+
+function getProductContext(agentId, numero, currentText = "") {
+  if (agentId === "pedro") return getPedroProductContext(numero, currentText);
+  return {
+    key: agentId,
+    name: db.getAgentProductName(agentId),
+    price: db.getAgentPrice(agentId),
+    floor: db.getAgentPiso(agentId),
+  };
+}
+
 // ============================================
 // CATALOGO AUTORIZADO — BLINDAGEM DE PRODUTO
 // Cada agente so pode mencionar o produto/modelo/spec listados aqui.
@@ -159,10 +195,11 @@ function calcInstallmentsWhatsApp(valorBase, maxParcelas = 10) {
 // ============================================
 const AUTHORIZED_CATALOG = {
   pedro: {
-    nome_oficial: "Uni TV V10",
+    nome_oficial: "Uni TV V10 ou Uni TV S10",
     nomes_proibidos: [
       /tv\s*box/i,                                                              // "TV Box", "TV Box basico", etc.
       /uni\s*tv\s*v(?!10\b)\d+/i,                                              // "Uni TV V9", "Uni TV V11", etc.
+      /uni\s*tv\s*s(?!10\b)\d+/i,                                              // "Uni TV S9", "Uni TV S11", etc.
       /uni\s*tv\s+(basico|basic|premium|plus|pro|lite|standard|ultra|max|master|entry|advanced)/i,
     ],
     specs_proibidas: [
@@ -204,20 +241,34 @@ function checkProductBlindage(agentId, texto) {
 // ============================================
 
 function buildPromptPedro() {
-  const preco = db.getAgentPrice("pedro");
-  const piso  = db.getAgentPiso("pedro");
-  return `Voce e Pedro, vendedor da Atacadao Variedades. Simpatico e direto. Seu unico produto e o Uni TV V10.
+  const preco = PEDRO_PRODUCT_OPTIONS.v10.price;
+  const piso  = PEDRO_PRODUCT_OPTIONS.v10.floor;
+  const precoS10 = PEDRO_PRODUCT_OPTIONS.s10.price;
+  return `Voce e Pedro, vendedor da Atacadao Variedades. Simpatico e direto. Voce vende DOIS aparelhos: Uni TV V10 e Uni TV S10.
 
-PRODUTO: Uni TV V10 (cor BRANCA, unica disponivel)
-Transforma qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay, futebol ao vivo — TUDO incluso, SEM mensalidade, SEM conta de streaming. Encaixa no HDMI, Wi-Fi, pronto em 5 min. Atualiza automaticamente.
-ESPN/Disney+ NAO disponiveis (removidos pela propria emissora de TODOS os aparelhos do mercado).
+CATALOGO DO PEDRO:
+1) Uni TV V10 (branco) — R$${preco} a vista. Modelo principal/custo-beneficio.
+2) Uni TV S10 (preto) — R$${precoS10} a vista. Modelo mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
+
+REGRA DE ESCOLHA DO PRODUTO:
+- Se o cliente falar de ESPN, responda que SOMENTE o Uni TV S10 possui ESPN. Nunca diga que o V10 tem ESPN.
+- Se o cliente pedir aparelho preto, modelo mais recente, lancamento, 2026, 8K ou processador mais rapido: apresente o Uni TV S10.
+- Se o cliente perguntar genericamente "como funciona", "valor" ou "tem aparelho", apresente os dois de forma simples: V10 por R$${preco} e S10 preto por R$${precoS10}; depois pergunte qual ele prefere.
+- Se o cliente ja escolheu um modelo, mantenha aquele modelo ate ele pedir comparacao ou trocar.
+
+RESUMO CURTO PARA APRESENTAR OS DOIS:
+"Eu tenho dois modelos: o Uni TV V10, que e o modelo tradicional por R$${preco}, e o Uni TV S10 preto, que e o lancamento 2026 por R$${precoS10}. O S10 tem ESPN, resolucao 8K e processador mais rapido. Qual voce prefere que eu te mostre?"
+
+BASE COMUM DOS DOIS:
+Transformam qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay, futebol ao vivo — TUDO incluso, SEM mensalidade, SEM conta de streaming. Encaixa no HDMI, Wi-Fi, pronto em 5 min. Atualiza automaticamente.
+ESPN: somente no Uni TV S10. O Uni TV V10 nao possui ESPN.
 Instabilidade pode acontecer — aparelho funciona ha mais de 3 anos e ninguem conseguiu derrubar. Nunca prometa que nunca cai.
-Especificacoes em GB/TB: NUNCA mencione. O Uni TV V10 nao tem armazenamento citavel.
+Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento citavel.
 
 === FLUXO OFICIAL — SIGA NESTA ORDEM ===
 
 ETAPA 1 — ABERTURA (primeiro contato):
-"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Voce ja conhece o Uni TV V10 ou quer que eu te explique rapidinho como ele funciona?"
+"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Hoje tenho o Uni TV V10 e o Uni TV S10 preto. Voce quer que eu te explique rapidinho a diferenca entre eles?"
 
 ETAPA 2 — APRESENTACAO:
 Enviar o video do produto. Escreva a tag: ENVIAR_VIDEO
@@ -231,7 +282,10 @@ Se ja sabe o preco que cliente quer → va para ETAPA 4. Se nao → "Me manda su
 ETAPA 4 — PRECO:
 QUANDO USAR: (a) cliente perguntou diretamente o valor ("quanto?", "preco?", "valor?", "quanto custa?") OU (b) etapas 2+3 ja concluidas.
 PROIBIDO: NAO use se cliente perguntou so "como funciona?", "o que e?", "tenho interesse" ou assunto informativo sem pedir preco — nesses casos execute ETAPA 2 primeiro.
-Informe o preco com urgencia real de rota: "O Uni TV V10 fica R$${preco}, pago na entrega direto ao entregador. Ainda tenho entrega disponivel essa semana na sua regiao — me manda sua localizacao que eu calculo o frete e te passo o total certinho."
+Informe o preco conforme o modelo:
+- V10: "O Uni TV V10 fica R$${preco}, pago na entrega direto ao entregador. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
+- S10: "O Uni TV S10 preto fica R$${precoS10}, pago na entrega direto ao entregador. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
+- Se ainda nao escolheu: "O V10 fica R$${preco} e o S10 preto fica R$${precoS10}. O S10 e o unico com ESPN, tem 8K e processador mais rapido. Qual deles voce quer?"
 
 ETAPA 5 — FRETE E SIMULACAO:
 Pedir pin de localizacao no mapa. O sistema calcula o frete automaticamente.
@@ -257,14 +311,17 @@ Acima de 7 km: distancia em km x 2
 Limite 30km. Regiao Goiania. Fora da area: TRANSFERIR_HUMANO para o Miron.
 
 === REGRA ABSOLUTA — INTERNET CLARO (MAIS IMPORTANTE) ===
-O Uni TV V10 NAO FUNCIONA com internet da Claro. Isso e INVIOLAVEL.
+Os aparelhos Uni TV V10 e Uni TV S10 NAO FUNCIONAM com internet da Claro. Isso e INVIOLAVEL.
 Se o cliente mencionar Claro em qualquer contexto de internet (usa Claro, tem Claro, pergunta se Claro funciona, responde "Claro" quando perguntado sobre a operadora):
 DIGA EXATAMENTE: "Olha, infelizmente eu nao vou conseguir te vender e nem te atender, porque a internet da Claro queima esses aparelhos."
 PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode funcionar. NAO minimize o problema. NAO diga "provavelmente funciona" ou "nao deve ter problema". ENCERRE o atendimento.
 
 === REGRAS INVIOLAVEIS ===
-- Vende SOMENTE o Uni TV V10. NUNCA mencione outro produto, modelo ou versao.
-- Preco padrao: R$${preco}. Piso: R$${piso}. NUNCA abaixo de R$${piso}.
+- Vende SOMENTE Uni TV V10 e Uni TV S10. NUNCA mencione outro produto, modelo ou versao.
+- Preco V10: R$${preco}. Piso V10: R$${piso}. NUNCA abaixo de R$${piso} sem autorizacao.
+- Preco S10: R$${precoS10}. Nao ofereca desconto no S10 sem autorizacao do dono.
+- O S10 e o unico modelo com ESPN. O V10 nao possui ESPN.
+- Diferenca oficial: S10 e mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
 - Pagamento SEMPRE na entrega, direto ao entregador. Aceita PIX, dinheiro e cartao na maquininha. NUNCA PIX antecipado (antes da entrega).
 - Se cliente perguntar "aceita PIX?" ou disser "Pix": confirme que sim, o entregador aceita PIX na entrega.
 - Parcelamento SOMENTE no cartao de credito (maquininha na entrega). Sempre calcular sobre produto + frete.
@@ -277,11 +334,12 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 === FECHAMENTO E DESCONTO ===
 - Seja persuasivo para fechar a venda.
 - NAO ofereça desconto espontaneamente em nenhuma hipotese.
-- NAO autoriza desconto: "tem mais barata?", "tem versao mais barata?", "quanto custa?", "qual o preco?", "tem desconto?", "consegue baixar?". Para qualquer dessas perguntas: informe o preco padrao R$${preco} sem oferecer desconto.
+- NAO autoriza desconto: "tem mais barata?", "tem versao mais barata?", "quanto custa?", "qual o preco?", "tem desconto?", "consegue baixar?". Para qualquer dessas perguntas: informe o preco do modelo escolhido sem oferecer desconto.
 - SO abra negociacao de preco se o cliente JA CONHECE O PRECO e disser explicitamente: "ta caro", "nao consigo pagar isso", "nao tenho esse dinheiro", "nao vou fechar por esse valor", "muito alto", "fora do orcamento", "nao da esse valor pra mim" — ou recusar o preco de forma clara.
 - Pergunta permitida (so apos objec ao explicita de preco): "Olha, se eu te der um desconto, voce fecha comigo hoje?"
-- Se frete <= R$15,00: pode retirar o frete (produto R$${preco}) OU baixar produto para R$${piso} mantendo frete de R$15. NUNCA os dois descontos ao mesmo tempo.
-- Se frete > R$15,00: cobrar frete corretamente. Se cliente travar, desconto somente no produto, minimo R$${piso}.
+- Para V10: se frete <= R$15,00, pode retirar o frete (produto R$${preco}) OU baixar produto para R$${piso} mantendo frete de R$15. NUNCA os dois descontos ao mesmo tempo.
+- Para V10: se frete > R$15,00, cobrar frete corretamente. Se cliente travar, desconto somente no produto, minimo R$${piso}.
+- Para S10: nao aplique piso/desconto sem autorizacao especifica do dono.
 
 === SPIN — OBJECAO DE TIMING (use quando cliente disser "vou pensar", "depois vejo", "agora nao", "semana que vem") ===
 Ative SOMENTE quando o cliente sinalizar adiamento. Use UMA pergunta por mensagem. Tom de conversa — nunca interrogatorio.
@@ -289,14 +347,15 @@ Ative SOMENTE quando o cliente sinalizar adiamento. Use UMA pergunta por mensage
 S — Situacao: "Entendo! So pra eu entender melhor — voce usa mais a TV pra ver filmes e series ou pra acompanhar jogo ao vivo?"
 P — Problema: "E hoje sua TV nao e smart, ne? Voce usa algum aparelho ou ainda e so a TV mesmo?"
 I — Implicacao: "Faz sentido. Uma conta de Netflix + outro streaming facil passa de R$60 por mes — e voce nao tem isso hoje porque a TV nao tem suporte..."
-N — Necessidade: "Se voce pudesse ter tudo isso por R$${preco} uma vez so, sem mensalidade, pagando so na entrega ao entregador — valeria fechar ainda essa semana?"
+N — Necessidade: "Se voce pudesse ter tudo isso pagando uma vez so, sem mensalidade, e direto na entrega ao entregador — valeria fechar ainda essa semana?"
 
 Apos N: se cliente aceitar → retome fluxo normal de fechamento. Se recusar → respeite e use AGENDAR se ele der uma data, ou encerre cordialmente.
 
 === RESPOSTAS OFICIAIS POR CENARIO ===
-OUTRAS MARCAS/MODELOS: "Eu trabalho so com o Uni TV V10. Se voce quiser, eu posso te mostrar como ele funciona."
-TEM MAIS BARATA / VERSAO BASICA: "Eu trabalho so com o Uni TV V10! Posso te mostrar como ele funciona?"
-ESPN OU DISNEY+: "Esses canais foram removidos pelas proprias emissoras de todos os aparelhos. Por enquanto nao estao disponiveis em nenhum aparelho. A tendencia e que no futuro voltem de outra forma, mas hoje nao estao funcionando."
+OUTRAS MARCAS/MODELOS: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. Se voce quiser, eu te explico a diferenca rapidinho."
+TEM MAIS BARATA / VERSAO BASICA: "O modelo de menor valor aqui e o Uni TV V10 por R$${preco}. O S10 preto fica R$${precoS10} porque e o lancamento 2026 com ESPN, 8K e processador mais rapido."
+ESPN: "ESPN somente no Uni TV S10 preto. O V10 nao possui ESPN. O S10 fica R$${precoS10} a vista e tambem parcela no cartao com a taxa da maquininha."
+DIFERENCA ENTRE V10 E S10: "O V10 e o modelo tradicional por R$${preco}. O S10 e o mais recente, lancado em 2026, e preto, possui ESPN, resolucao 8K e processador mais rapido. O S10 fica R$${precoS10}."
 RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais de televisao corre esse risco em algum momento, do mais barato ao mais caro. Mas esse e um risco que vale a pena, porque o aparelho esta funcionando ha mais de 3 anos e ate hoje ninguem conseguiu derrubar."
 GARANTIA: "A garantia e de 30 dias contra defeito de fabrica."
 NOTA FISCAL: "Nao fazemos emissao de nota fiscal."
@@ -640,6 +699,9 @@ Use R$${ofertaAtiva.precoDesconto} em todas as respostas comerciais.${ofertaAtiv
 O preço padrão é o preço TABELADO do produto. Use esse preço SEMPRE.
 NUNCA ofereça frete grátis por conta própria — frete grátis só existe quando o dono autorizar uma campanha.`}
 ${["pedro","rodrigo"].map(id => {
+  if (id === "pedro" && !ofertaAtiva) {
+    return `- Pedro (Uni TV V10): R$${PEDRO_PRODUCT_OPTIONS.v10.price} (pago na entrega)\n- Pedro (Uni TV S10 preto): R$${PEDRO_PRODUCT_OPTIONS.s10.price} (pago na entrega, unico com ESPN)`;
+  }
   const pr = (id === agentId && ofertaAtiva) ? ofertaAtiva.precoDesconto : db.getAgentPrice(id);
   const tag = (id === agentId && ofertaAtiva) ? ` ← PRECO DESTE CLIENTE (AUTORIZADO PELO DONO)` : "";
   return `- ${CONFIG.AGENTS[id].name} (${db.getAgentProductName(id)}): R$${pr} (pago na entrega)${tag}`;
@@ -1039,7 +1101,10 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   }
 
   function getProductLabel(aid) {
-    if (aid === "pedro") return `${db.getAgentProductName("pedro")} R$${db.getAgentPrice("pedro")} PIX`;
+    if (aid === "pedro") {
+      const productCtx = getProductContext("pedro", numero, `${clientMessage || ""}\n${texto || ""}`);
+      return `${productCtx.name} R$${productCtx.price} PIX`;
+    }
     if (aid === "rodrigo") return `${db.getAgentProductName("rodrigo")} R$${db.getAgentPrice("rodrigo")} PIX`;
     return agent.product;
   }
@@ -1200,18 +1265,30 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
 
   // TRAVA ANTI-MANIPULACAO: Detectar preco errado (abaixo do piso OU preco de outro produto)
   // Leitura de db.agentCatalog — fonte única e persistida, reflete mudancas sem restart
-  const getPrecoAgente = (id) => ({
-    preco:   db.getAgentPrice(id),
-    piso:    db.getAgentPiso(id),
-    produto: db.getAgentProductName(id),
-  });
-  const getPrecosValidos = (id) => [db.getAgentPrice(id), db.getAgentPiso(id)];
+  const getPrecoAgente = (id, num = numero, msgAtual = texto) => {
+    const productCtx = getProductContext(id, num, msgAtual);
+    return {
+      preco: productCtx.price,
+      piso: productCtx.floor,
+      produto: productCtx.name,
+    };
+  };
+  const getPrecosValidos = (id) => {
+    if (id === "pedro") return [
+      PEDRO_PRODUCT_OPTIONS.v10.price,
+      PEDRO_PRODUCT_OPTIONS.v10.floor,
+      PEDRO_PRODUCT_OPTIONS.s10.price,
+    ];
+    return [db.getAgentPrice(id), db.getAgentPiso(id)];
+  };
 
   // Gerar parcelas validas para o preco base (sem frete) de cada agente — pra nao travar se IA mencionar
   function getValidPricesWithInstallments(agentId, numero) {
     const basePrices = getPrecosValidos(agentId) ? [...getPrecosValidos(agentId)] : [];
-    const basePrice = getPrecoAgente(agentId)?.preco;
-    if (basePrice) {
+    const baseProductPrices = agentId === "pedro"
+      ? [PEDRO_PRODUCT_OPTIONS.v10.price, PEDRO_PRODUCT_OPTIONS.s10.price]
+      : [getPrecoAgente(agentId)?.preco].filter(Boolean);
+    for (const basePrice of baseProductPrices) {
       // Adicionar parcelas sobre preco base (sem frete)
       for (let i = 1; i <= 10; i++) {
         const taxa = TAXAS_PARCELA[i];
@@ -1220,6 +1297,9 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
         basePrices.push(valorParcela + 1); // margem de arredondamento
       }
       // Incluir preço com desconto ativo como válido (evita trava bloquear desconto autorizado)
+    }
+    const basePrice = getPrecoAgente(agentId)?.preco;
+    if (basePrice) {
       const ofertaDesc = db.getActiveOffer(agentId, numero);
       if (ofertaDesc) {
         const precoDesc = ofertaDesc.precoDesconto;
@@ -1557,11 +1637,12 @@ function scheduleFollowUp(agentId, numero) {
       }
 
       // ── ENGINE: geração personalizada da mensagem ──
-      const prodInfo   = { product: db.getAgentProductName(agentId), price: db.getAgentPrice(agentId) };
       const agentName  = CONFIG.AGENTS[agentId].name;
       const lastMsgsText = conv.msgs.slice(-10).map(m =>
         `${m.role === "user" ? "Cliente" : agentName}: ${(m.content || "").slice(0, 150)}`
       ).join("\n");
+      const followProduct = getProductContext(agentId, numero, lastMsgsText);
+      const prodInfo   = { product: followProduct.name, price: followProduct.price };
       let instrucaoBonus = (db.state.instructions[agentId] || [])
         .map(inst => typeof inst === "string" ? inst : (inst.regras || ""))
         .filter(txt => /desconto|promo|oferta|preco\s*especial/i.test(txt))
@@ -1898,8 +1979,9 @@ async function handleIncomingMessage(agentId, body) {
     if (loc) {
       const fr = calcFreight(loc.lat, loc.lng);
       if (fr.frete !== null) {
-        let productPrice = db.getAgentPrice(agentId);
-        let productName = db.getAgentProductName(agentId);
+        const productCtxGps = getProductContext(agentId, numero, mensagem || "");
+        let productPrice = productCtxGps.price;
+        let productName = productCtxGps.name;
         // Verificar oferta ativa (desconto de preço e/ou frete grátis autorizado)
         const ofertaGps = db.getActiveOffer(agentId, numero);
         if (ofertaGps && ofertaGps.precoDesconto < productPrice) {
@@ -2261,8 +2343,9 @@ async function handleIncomingMessage(agentId, body) {
       if (distKm > 0) {
         const fr = calcFreightByKm(distKm);
         if (fr.frete !== null) {
-          let productPrice = db.getAgentPrice(agentId);
-          let productName = db.getAgentProductName(agentId);
+          const productCtxKm = getProductContext(agentId, numero, mensagem || "");
+          let productPrice = productCtxKm.price;
+          let productName = productCtxKm.name;
           // Verificar oferta ativa (desconto de preço e/ou frete grátis autorizado)
           const ofertaKm = db.getActiveOffer(agentId, numero);
           if (ofertaKm && ofertaKm.precoDesconto < productPrice) {

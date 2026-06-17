@@ -54,13 +54,21 @@ IMPORTANTE: Se o Miron pedir qualquer coisa que envolva mudar o comportamento de
 
 CATALOGO DE PRODUTOS — PRECOS ATUAIS (fonte: CONFIG em runtime):
 
-== PRODUTO 1: ${pedro.product} (Pedro vende) ==
+== PRODUTO 1A: Uni TV V10 (Pedro vende) ==
 - Aparelho streaming Android, transforma qualquer TV em smart TV
 - Sem mensalidade, paga uma vez
 - Netflix, Prime, HBO Max, Globoplay, Apple TV+, futebol ao vivo
 - PRECO: R$${pedroPreco} (pago na entrega ao entregador) | PISO: R$${pedroPiso} (minimo absoluto)
 - Parcelas: calculadas dinamicamente pelo sistema (cartao de credito, maquininha na entrega)
 - Entrega: Goiania e regiao (frete = km x 2, min R$15 ate 7km, max 30km)
+
+== PRODUTO 1B: Uni TV S10 preto (Pedro vende) ==
+- Modelo mais recente, lancado em 2026
+- Possui ESPN; o V10 nao possui ESPN
+- Resolucao 8K e processador mais rapido
+- PRECO: R$400 (pago na entrega ao entregador)
+- Parcelas: calculadas dinamicamente pelo sistema (cartao de credito, maquininha na entrega)
+- Entrega: mesma regra do V10
 
 == PRODUTO 2: ${rodrigo.product} (Rodrigo vende) ==
 - Furadeira profissional sem fio 48V, 2 baterias, maleta, acessorios
@@ -1751,7 +1759,7 @@ ${descontoAntiRegressao}- Resposta deve ser UMA UNICA mensagem (nunca dividida, 
 - Se o agente calculou frete a partir de endereco escrito (sem pin no mapa ou mensagem do sistema): corrija para pedir o pin no mapa.
 - Se o agente aceitou endereco de OUTRO ESTADO (fora de Goias): corrija para informar que entregamos apenas na regiao de Goiania.
 ${retiradaRule}${infoIntentRule}
-- PRODUTO INVENTADO ABSOLUTAMENTE PROIBIDO: Pedro vende SOMENTE "Uni TV V10". Rodrigo vende SOMENTE "Furadeira 48V". Se o agente mencionou "TV Box", "TV Box basico", "Uni TV V9", "Uni TV premium", "versao basica", "modelo plus", "512GB", "256GB", ou qualquer nome/variacao/spec nao autorizada: CORRIJA para "Tenho sim o [nome oficial]! Me manda sua localizacao que calculo o frete pra voce!" ${descontoInfo ? "EXCECAO: Se ha DESCONTO ATIVO (ver acima), o preco com desconto e CORRETO — NAO corrija." : `Se o agente mencionou um preco que NAO seja o preco oficial ou piso autorizado do produto (ex: Pedro disse R$149, R$199 para o Uni TV V10 que custa R$360): CORRIJA para o preco oficial.`}
+- PRODUTO INVENTADO ABSOLUTAMENTE PROIBIDO: Pedro vende SOMENTE "Uni TV V10" e "Uni TV S10". Rodrigo vende SOMENTE "Furadeira 48V". O S10 e preto, lancamento 2026, possui ESPN, resolucao 8K e processador mais rapido. Se o agente mencionou "TV Box", "TV Box basico", "Uni TV V9", "Uni TV V11", "Uni TV premium", "versao basica", "modelo plus", "512GB", "256GB", ou qualquer nome/variacao/spec nao autorizada: CORRIJA para "Tenho sim o [nome oficial]! Me manda sua localizacao que calculo o frete pra voce!" ${descontoInfo ? "EXCECAO: Se ha DESCONTO ATIVO (ver acima), o preco com desconto e CORRETO — NAO corrija." : `Se Pedro mencionou um preco que NAO seja R$360/R$340 para V10 ou R$400 para S10, corrija para o preco oficial do modelo correto. Se Rodrigo mencionou preco errado, corrija para o preco oficial da furadeira.`}
 - R$48 PROIBIDO PARA RODRIGO: A "Furadeira 48V" tem 48V de VOLTAGEM, nao preco. Se Rodrigo disser "R$48" por qualquer motivo (debito, pix, desconto, pergunta), CORRIJA IMEDIATAMENTE para o preco real: "A Furadeira 48V sai por R$${db.getAgentPrice("rodrigo")}. O 48V é a voltagem da ferramenta, não o preço!"
 ${freteContext}
 

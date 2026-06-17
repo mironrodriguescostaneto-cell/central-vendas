@@ -44,7 +44,7 @@ const CONFIG = {
   AGENTS: {
     pedro: {
       name: 'Pedro',
-      product: 'Uni TV V10',
+      product: 'Uni TV V10 / Uni TV S10',
       price: 360,
       floorPrice: 340,
       get provider() { return env('PEDRO_PROVIDER', 'baileys'); },
