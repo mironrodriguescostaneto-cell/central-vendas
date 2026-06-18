@@ -26,6 +26,7 @@ function _isLikelyIncomplete(text) {
   const t = String(text || "").trim();
   if (t.length < 35) return false;
   if (/[.!?)]$/.test(t)) return false;
+  if (t.length > 55) return true;
   if (/[,;:]$/.test(t)) return true;
   if (/\b(?:o|a|os|as|um|uma|de|do|da|dos|das|que|com|por|para|pra|e|ou|mas|porque|se|ele|ela|esse|essa|este|esta|meu|minha|nosso|nossa|modelo|produto)$/i.test(t)) return true;
   if (/\b(?:que e o|que e a|eu tenho|o uni tv v10 que e o)$/i.test(t)) return true;

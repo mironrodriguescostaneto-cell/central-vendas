@@ -242,8 +242,9 @@ function isLikelyTruncated(text) {
   const t = String(text || "").trim();
   if (t.length < 35) return false;
   if (/[.!?)]$/.test(t)) return false;
+  if (t.length > 55) return true;
   if (/[,;:]$/.test(t)) return true;
-  if (/\b(?:o|a|os|as|de|do|da|dos|das|que|com|por|para|pra|e|ou)$/i.test(t)) return true;
+  if (/\b(?:o|a|os|as|um|uma|de|do|da|dos|das|que|com|por|para|pra|e|ou|mas|porque|se|ele|ela|esse|essa|este|esta|meu|minha|nosso|nossa|modelo|produto)$/i.test(t)) return true;
   if (/tenho dois modelos|modelo tradicional|lancamento 2026|fica R\$/i.test(t) && !/[.!?]$/.test(t)) return true;
   return false;
 }
@@ -253,6 +254,9 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  if (/garantia|instala|instalar|configurad|suporte|nao entendo|meu menino|esse de 400|400.*melhor/.test(msg)) {
+    return "Sim, o Uni TV S10 preto e o melhor modelo: ele tem ESPN, resolucao 8K e processador mais rapido. A garantia e de 30 dias contra defeito de fabrica. A gente nao instala na casa: ele ja vai pronto e configurado, e e so ligar na TV e conectar na internet. Se tiver duvida, eu auxilio pelo WhatsApp.";
+  }
   if (/tenho dois modelos|uni tv v10|uni tv s10|que e o|modelo tradicional/.test(current)) {
     return "Eu tenho dois modelos: o Uni TV V10 fica R$360 e e o modelo tradicional. O Uni TV S10 preto fica R$400, e o modelo 2026 com ESPN, 8K e processador mais rapido.";
   }
