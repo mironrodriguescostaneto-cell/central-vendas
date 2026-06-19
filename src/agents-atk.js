@@ -249,13 +249,34 @@ function isLikelyTruncated(text) {
   return false;
 }
 
+function buildPedroChannelReply(text) {
+  const msg = normalizeTextBasic(text);
+  const asksEspn = /\bespn\b/.test(msg);
+  const asksDisney = /disney\s*(?:\+|plus)?/.test(msg);
+  const asksProgramming = /programacao|grade\s+(?:de\s+)?(?:canais|tv)|o\s+que\s+passa|quais\s+canais/.test(msg);
+  if (!asksEspn && !asksDisney && !asksProgramming) return "";
+
+  if (asksEspn && asksDisney) {
+    return "Sobre esses canais: o Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN. Disney+ nao esta disponivel em nenhum dos dois aparelhos.";
+  }
+  if (asksEspn) {
+    return "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN.";
+  }
+  if (asksDisney) {
+    return "Disney+ nao esta disponivel em nenhum dos dois aparelhos.";
+  }
+  return "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+.";
+}
+
 function deterministicFallback(agentId, numero, clientMessage, currentText = "") {
   if (agentId !== "pedro") return "";
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  const channelReply = buildPedroChannelReply(clientMessage);
+  if (channelReply) return channelReply;
   if (/canal|canais|aberto|fechado|esporte|espn/.test(msg)) {
-    return "Sim. Os dois modelos liberam canais abertos e fechados. Se voce quer ESPN, escolha o Uni TV S10 preto, porque somente ele possui ESPN. O S10 custa R$400 a vista.";
+    return "A lista de canais pode variar. O que posso confirmar e que somente o Uni TV S10 preto possui ESPN, com 1 canal. O V10 nao possui ESPN e nenhum dos dois possui Disney+.";
   }
   if (/garantia|instala|instalar|configurad|suporte|nao entendo|meu menino|esse de 400|400.*melhor/.test(msg)) {
     return "Sim, o Uni TV S10 preto e o melhor modelo: ele tem ESPN, resolucao 8K e processador mais rapido. A garantia e de 30 dias contra defeito de fabrica. A gente nao instala na casa: ele ja vai pronto e configurado, e e so ligar na TV e conectar na internet. Se tiver duvida, eu auxilio pelo WhatsApp.";
@@ -357,6 +378,9 @@ RESUMO CURTO PARA APRESENTAR OS DOIS:
 BASE COMUM DOS DOIS:
 Transformam qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay, futebol ao vivo — TUDO incluso, SEM mensalidade, SEM conta de streaming. Encaixa no HDMI, Wi-Fi, pronto em 5 min. Atualiza automaticamente.
 ESPN: somente no Uni TV S10. O Uni TV V10 nao possui ESPN.
+QUANTIDADE ESPN: o Uni TV S10 possui exatamente 1 canal da ESPN.
+DISNEY+: nao esta disponivel no Uni TV V10 nem no Uni TV S10.
+PROGRAMACAO/GRADE AO VIVO: pode mudar. Voce nao consulta a grade em tempo real e nunca inventa programas, jogos ou horarios.
 Instabilidade pode acontecer — aparelho funciona ha mais de 3 anos e ninguem conseguiu derrubar. Nunca prometa que nunca cai.
 Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento citavel.
 
@@ -418,6 +442,9 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - Preco V10: R$${preco}. Piso V10: R$${piso}. NUNCA abaixo de R$${piso} sem autorizacao.
 - Preco S10: R$${precoS10}. Nao ofereca desconto no S10 sem autorizacao do dono.
 - O S10 e o unico modelo com ESPN. O V10 nao possui ESPN.
+- O S10 possui exatamente 1 canal da ESPN. Nunca diga que possui mais de um.
+- Disney+ nao esta disponivel em nenhum dos dois aparelhos.
+- Nunca invente programacao, jogos, eventos ou horarios. Se perguntarem pela grade, diga que ela pode mudar e que voce nao consulta a programacao ao vivo.
 - Diferenca oficial: S10 e mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
 - Pagamento SEMPRE na entrega, direto ao entregador. Aceita PIX, dinheiro e cartao na maquininha. NUNCA PIX antecipado (antes da entrega).
 - Se cliente perguntar "aceita PIX?" ou disser "Pix": confirme que sim, o entregador aceita PIX na entrega.
@@ -452,6 +479,9 @@ Apos N: se cliente aceitar → retome fluxo normal de fechamento. Se recusar →
 OUTRAS MARCAS/MODELOS: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. Se voce quiser, eu te explico a diferenca rapidinho."
 TEM MAIS BARATA / VERSAO BASICA: "O modelo de menor valor aqui e o Uni TV V10 por R$${preco}. O S10 preto fica R$${precoS10} porque e o lancamento 2026 com ESPN, 8K e processador mais rapido."
 ESPN: "ESPN somente no Uni TV S10 preto. O V10 nao possui ESPN. O S10 fica R$${precoS10} a vista e tambem parcela no cartao com a taxa da maquininha."
+QUANTIDADE ESPN: "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN."
+DISNEY+: "Disney+ nao esta disponivel em nenhum dos dois aparelhos."
+PROGRAMACAO/GRADE: "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+."
 DIFERENCA ENTRE V10 E S10: "O V10 e o modelo tradicional por R$${preco}. O S10 e o mais recente, lancado em 2026, e preto, possui ESPN, resolucao 8K e processador mais rapido. O S10 fica R$${precoS10}."
 RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais de televisao corre esse risco em algum momento, do mais barato ao mais caro. Mas esse e um risco que vale a pena, porque o aparelho esta funcionando ha mais de 3 anos e ate hoje ninguem conseguiu derrubar."
 GARANTIA: "A garantia e de 30 dias contra defeito de fabrica."
@@ -2388,6 +2418,27 @@ async function handleIncomingMessage(agentId, body) {
     const systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
     const conv = db.getConversation(agentId, numero);
 
+    // Perguntas consecutivas sobre canais devem ser respondidas juntas e sem depender da IA.
+    if (agentId === "pedro") {
+      const pendingClientMessages = [];
+      for (let i = conv.msgs.length - 1; i >= 0; i--) {
+        const item = conv.msgs[i];
+        if (item.role === "assistant") break;
+        if (item.role === "user") pendingClientMessages.unshift(item.content || "");
+      }
+      const channelReply = buildPedroChannelReply(pendingClientMessages.join("\n"));
+      if (channelReply) {
+        const sent = await sendText(agentId, numero, channelReply);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: channelReply, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`programacao_canais_respondida: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
+      }
+    }
+
     // INTERCEPTAÇÃO RETIRADA — não fazemos retirada → informa cliente + pausa + notifica Miron
     if (detectaIntencaoRetirada(mensagem)) {
       const retiradaMsg = `A loja fisica nao esta aberta para retirada. A gente trabalha somente com entrega, e o pagamento e feito direto ao entregador na hora.`;
@@ -2778,6 +2829,7 @@ module.exports = {
   SEEDED_KNOWLEDGE,
   processTags,
   scheduleFollowUp,
+  buildPedroChannelReply,
   extractKnowledge,
   notifyLara,
   seedKnowledge,
