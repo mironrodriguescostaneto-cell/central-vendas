@@ -254,6 +254,9 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  if (/canal|canais|aberto|fechado|esporte|espn/.test(msg)) {
+    return "Sim. Os dois modelos liberam canais abertos e fechados. Se voce quer ESPN, escolha o Uni TV S10 preto, porque somente ele possui ESPN. O S10 custa R$400 a vista.";
+  }
   if (/garantia|instala|instalar|configurad|suporte|nao entendo|meu menino|esse de 400|400.*melhor/.test(msg)) {
     return "Sim, o Uni TV S10 preto e o melhor modelo: ele tem ESPN, resolucao 8K e processador mais rapido. A garantia e de 30 dias contra defeito de fabrica. A gente nao instala na casa: ele ja vai pronto e configurado, e e so ligar na TV e conectar na internet. Se tiver duvida, eu auxilio pelo WhatsApp.";
   }
@@ -2370,10 +2373,12 @@ async function handleIncomingMessage(agentId, body) {
           targetRespostaFinal = targetResposta;
         }
 
-        const _targetTextoEnviado = await processTags(targetAgentId, numero, targetRespostaFinal);
-        targetConv.msgs.push({ role: "assistant", content: sanitize(_targetTextoEnviado || targetRespostaFinal), timestamp: Date.now() });
-        scheduleFollowUp(targetAgentId, numero);
-        extractKnowledge(targetAgentId, mensagem, targetRespostaFinal).catch(() => {});
+        const _targetTextoEnviado = await processTags(targetAgentId, numero, targetRespostaFinal, mensagem);
+        if (_targetTextoEnviado) {
+          targetConv.msgs.push({ role: "assistant", content: sanitize(_targetTextoEnviado), timestamp: Date.now() });
+          scheduleFollowUp(targetAgentId, numero);
+          extractKnowledge(targetAgentId, mensagem, targetRespostaFinal).catch(() => {});
+        }
       }
 
       return; // Don't let original agent respond
@@ -2672,9 +2677,16 @@ async function handleIncomingMessage(agentId, body) {
     // Process tags (send media, notifications, text) — returns final text sent to client
     const _textoEnviado = await processTags(agentId, numero, respostaFinal, mensagem);
 
+    if (!_textoEnviado) {
+      console.error(`[ATK/NOT SENT] ${agentId}/${numero}: resposta nao foi enviada e nao sera salva no dashboard`);
+      db.addEvent(`resposta_nao_enviada: ${agentId} ${numero}`);
+      db.save();
+      return;
+    }
+
     // Save to history AFTER processTags — garante que o CRM reflete exatamente o que foi enviado,
     // incluindo correcoes de TRAVA, guardrails e PIX dentro de processTags.
-    conv.msgs.push({ role: "assistant", content: sanitize(_textoEnviado || respostaFinal), timestamp: Date.now() });
+    conv.msgs.push({ role: "assistant", content: sanitize(_textoEnviado), timestamp: Date.now() });
 
     // Schedule follow-up (unless AGENDAR was used)
     if (!/AGENDAR:\d{2}\/\d{2}\/\d{4}/.test(respostaFinal)) {

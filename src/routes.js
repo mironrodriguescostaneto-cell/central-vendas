@@ -1445,7 +1445,10 @@ router.post('/api/atk/conversas/:agentId/:numero/send', auth, async (req, res) =
   try {
     const dbAtk = require('./database-atk');
     const { sendText: sendTextAtk } = require('./services-atk');
-    await sendTextAtk(agentId, numero, text, { bypassPause: true, allowDuplicate: true });
+    const sent = await sendTextAtk(agentId, numero, text, { bypassPause: true, allowDuplicate: true });
+    if (!sent) {
+      return res.status(502).json({ error: 'WhatsApp nao confirmou o envio. A mensagem nao foi salva no dashboard.' });
+    }
     const conv = dbAtk.getConversation(agentId, numero);
     if (conv) {
       conv.msgs.push({ role: 'assistant', content: text, timestamp: Date.now() });
