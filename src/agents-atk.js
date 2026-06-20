@@ -289,11 +289,30 @@ function buildPedroChannelReply(text) {
   return "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+.";
 }
 
+function buildPedroContentTransparencyReply(currentText, contextText = "") {
+  const current = normalizeTextBasic(currentText);
+  const context = normalizeTextBasic(contextText);
+  const asksTransparency = /transparen|clareza|sincer|verdade|direto|enrol/.test(current);
+  const asksPremiere = /premiere/.test(current) || (asksTransparency && /premiere/.test(context));
+  const asksMovies = /filme|serie/.test(current) || (asksTransparency && /filme|serie/.test(context));
+  if (!asksTransparency && !asksPremiere && !asksMovies) return "";
+
+  const parts = [];
+  if (asksTransparency) parts.push("Voce tem razao em pedir mais transparencia. Vou responder de forma direta:");
+  if (asksPremiere) parts.push("eu nao tenho confirmacao segura de Premiere no S10 e nao vou afirmar que tem sem ter certeza.");
+  if (asksMovies) parts.push("Filmes e series tem, com conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade.");
+  if (asksTransparency || asksPremiere) parts.push("O que esta confirmado no S10 e 1 canal ESPN; Disney+ nao esta disponivel.");
+  parts.push("A disponibilidade do conteudo pode mudar e pode haver instabilidade.");
+  return parts.join(" ");
+}
+
 function deterministicFallback(agentId, numero, clientMessage, currentText = "") {
   if (agentId !== "pedro") return "";
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  const transparencyReply = buildPedroContentTransparencyReply(clientMessage, currentText);
+  if (transparencyReply) return transparencyReply;
   const channelReply = buildPedroChannelReply(clientMessage);
   if (channelReply) return channelReply;
   if (/canal|canais|aberto|fechado|esporte|espn/.test(msg)) {
@@ -402,6 +421,9 @@ ESPN: somente no Uni TV S10. O Uni TV V10 nao possui ESPN.
 QUANTIDADE ESPN: o Uni TV S10 possui exatamente 1 canal da ESPN.
 DISNEY+: nao esta disponivel no Uni TV V10 nem no Uni TV S10.
 PROGRAMACAO/GRADE AO VIVO: pode mudar. Voce nao consulta a grade em tempo real e nunca inventa programas, jogos ou horarios.
+PREMIERE: nao existe confirmacao segura no catalogo. Nunca afirme que tem. Diga claramente que nao consegue confirmar Premiere.
+FILMES E SERIES: confirmado. Ha conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade.
+TRANSPARENCIA: se o cliente pedir transparencia, clareza ou disser que voce esta enrolando, reconheca a preocupacao e responda diretamente o assunto anterior. Nao repita catalogo, preco ou diferencas. Nao peca localizacao antes de esclarecer.
 Instabilidade pode acontecer — aparelho funciona ha mais de 3 anos e ninguem conseguiu derrubar. Nunca prometa que nunca cai.
 Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento citavel.
 
@@ -468,6 +490,9 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - O S10 possui exatamente 1 canal da ESPN. Nunca diga que possui mais de um.
 - Disney+ nao esta disponivel em nenhum dos dois aparelhos.
 - Nunca invente programacao, jogos, eventos ou horarios. Se perguntarem pela grade, diga que ela pode mudar e que voce nao consulta a programacao ao vivo.
+- Premiere nao esta confirmado. Nunca diga que tem Premiere sem confirmacao oficial.
+- Filmes e series estao disponiveis com conteudo de Netflix, Prime, HBO e Globoplay, mas a disponibilidade pode mudar.
+- Pedido de transparencia e objecao de confianca: reconheca, responda os fatos diretamente e nao faca pressao comercial na mesma mensagem.
 - Diferenca oficial: S10 e mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
 - Pagamento SEMPRE na entrega, direto ao entregador. Aceita PIX, dinheiro e cartao na maquininha. NUNCA PIX antecipado (antes da entrega).
 - Se cliente perguntar "aceita PIX?" ou disser "Pix": confirme que sim, o entregador aceita PIX na entrega.
@@ -507,6 +532,8 @@ ESPN: "ESPN somente no Uni TV S10 preto. O V10 nao possui ESPN. O S10 fica R$${p
 QUANTIDADE ESPN: "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN."
 DISNEY+: "Disney+ nao esta disponivel em nenhum dos dois aparelhos."
 PROGRAMACAO/GRADE: "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+."
+PREMIERE + FILMES/SERIES: "Para ser transparente: eu nao tenho confirmacao segura de Premiere no S10 e nao vou afirmar que tem sem ter certeza. Filmes e series tem, com conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade. O que esta confirmado no S10 e 1 canal ESPN; Disney+ nao esta disponivel. A disponibilidade pode mudar e pode haver instabilidade."
+PEDIDO DE TRANSPARENCIA: reconheca que o cliente tem razao, retome a pergunta anterior e diga somente o que esta confirmado. Nao repita modelos/precos e nao peca localizacao nessa resposta.
 PARCELAMENTO ANTES DO FRETE: "Sim, parcelamos no cartao de credito. Para eu fazer a simulacao correta, preciso somar o aparelho com o frete e aplicar a taxa da maquininha. Me manda sua localizacao que eu calculo tudo e te passo as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento; a simulacao e feita por nos."
 DIFERENCA ENTRE V10 E S10: "O V10 e o modelo tradicional por R$${preco}. O S10 e o mais recente, lancado em 2026, e preto, possui ESPN, resolucao 8K e processador mais rapido. O S10 fica R$${precoS10}."
 RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais de televisao corre esse risco em algum momento, do mais barato ao mais caro. Mas esse e um risco que vale a pena, porque o aparelho esta funcionando ha mais de 3 anos e ate hoje ninguem conseguiu derrubar."
@@ -2478,6 +2505,25 @@ async function handleIncomingMessage(agentId, body) {
         }
         return;
       }
+      const recentClientContext = conv.msgs
+        .slice(-8)
+        .filter(item => item.role === "user")
+        .map(item => item.content || "")
+        .join("\n");
+      const transparencyReply = buildPedroContentTransparencyReply(
+        pendingClientMessages.join("\n"),
+        recentClientContext
+      );
+      if (transparencyReply) {
+        const sent = await sendText(agentId, numero, transparencyReply);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: transparencyReply, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`transparencia_conteudo_respondida: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
+      }
     }
 
     // INTERCEPTAÇÃO RETIRADA — não fazemos retirada → informa cliente + pausa + notifica Miron
@@ -2872,6 +2918,7 @@ module.exports = {
   scheduleFollowUp,
   buildPedroChannelReply,
   buildPedroInstallmentReply,
+  buildPedroContentTransparencyReply,
   extractKnowledge,
   notifyLara,
   seedKnowledge,
