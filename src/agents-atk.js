@@ -175,6 +175,7 @@ function normalizeTextBasic(text) {
 
 function detectPedroProductKey(text) {
   const t = normalizeTextBasic(text);
+  if (/\b(?:esse|aparelho|modelo)\s+(?:de\s+)?(?:r\$\s*)?400\b/.test(t)) return "s10";
   if (/\b(?:s\s*10|s10|preto|espn|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
   if (/\b(?:v\s*10|v10|branc[ao]|mais\s+barat[ao]|menor\s+valor)\b/.test(t)) return "v10";
   return null;
@@ -218,6 +219,26 @@ function getProductContext(agentId, numero, currentText = "") {
     price: db.getAgentPrice(agentId),
     floor: db.getAgentPiso(agentId),
   };
+}
+
+function isInstallmentQuestion(text) {
+  const msg = normalizeTextBasic(text);
+  return /parcel|divide|dividir|quantas\s+vezes|em\s+quantas|prestacao|prestacoes/.test(msg) ||
+    (/forma\s+de\s+pagamento/.test(msg) && /cartao|credito|400|s\s*10|s10/.test(msg));
+}
+
+function buildPedroInstallmentReply(numero, text = "") {
+  if (!isInstallmentQuestion(text)) return "";
+  const product = getPedroProductContext(numero, text);
+  const conv = db.getConversation("pedro", numero);
+  const freight = conv?.freteCalculado;
+  const hasMatchingFreight = freight?.total && (!freight.produtoPreco || freight.produtoPreco === product.price);
+
+  if (hasMatchingFreight) {
+    return `Sim, parcelamos o ${product.name} no cartao de credito. O total com frete fica R$${freight.total}. A simulacao feita por nos e:\n${calcInstallmentsWhatsApp(freight.total)}\nO pagamento e feito somente na entrega, por PIX, dinheiro ou cartao na maquininha. O entregador apenas leva a maquininha e recebe o pagamento.`;
+  }
+
+  return `Sim, parcelamos o ${product.name} de R$${product.price} no cartao de credito. Para eu fazer a simulacao correta, preciso somar o aparelho com o frete e aplicar a taxa da maquininha. Me manda sua localizacao pelo WhatsApp que eu calculo tudo e te passo as parcelas antes da entrega. O pagamento e feito somente na entrega, por PIX, dinheiro ou cartao. O entregador apenas leva a maquininha e recebe o pagamento; a simulacao e feita por nos.`;
 }
 
 function getMediaKey(agentId, productCtx, type) {
@@ -412,6 +433,8 @@ ETAPA 5 — FRETE E SIMULACAO:
 Pedir pin de localizacao no mapa. O sistema calcula o frete automaticamente.
 Se frete ja calculado: use EXATAMENTE esse valor do historico. Nao recalcule. Nao invente.
 Modelo: "O frete para sua regiao fica em R$XX,00. Entao o total a vista fica em R$XXX,00, pago na entrega ao entregador. Aceita PIX, dinheiro ou cartao na maquininha."
+Se perguntarem se parcela ANTES da localizacao: confirme que parcela no cartao e peca a localizacao para NOS fazermos a simulacao sobre produto + frete. NUNCA diga que o entregador simula.
+RESPONSABILIDADES: Pedro/sistema faz a simulacao e informa todas as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento na entrega.
 
 ETAPA 6 — CONFIRMACAO DA INTERNET (ANTES dos dados — qualificar primeiro):
 "Qual operadora de internet voce usa? Oi, Claro, Vivo, Tim ou internet de bairro?"
@@ -449,6 +472,8 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - Pagamento SEMPRE na entrega, direto ao entregador. Aceita PIX, dinheiro e cartao na maquininha. NUNCA PIX antecipado (antes da entrega).
 - Se cliente perguntar "aceita PIX?" ou disser "Pix": confirme que sim, o entregador aceita PIX na entrega.
 - Parcelamento SOMENTE no cartao de credito (maquininha na entrega). Sempre calcular sobre produto + frete.
+- A SIMULACAO E FEITA POR NOS antes da entrega. NUNCA diga que o entregador calcula ou simula parcelas.
+- O entregador apenas leva a maquininha e recebe o pagamento na entrega.
 - Frete: NUNCA invente. NUNCA calcule voce mesmo. Aguarde o sistema calcular via pin.
 - Horario de entrega: Seg-Sex 10:00-16:30. Sabado 09:00-13:00. Domingos e feriados: sem entrega.
 - So pedir dados depois que o cliente confirmar a compra.
@@ -482,6 +507,7 @@ ESPN: "ESPN somente no Uni TV S10 preto. O V10 nao possui ESPN. O S10 fica R$${p
 QUANTIDADE ESPN: "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN."
 DISNEY+: "Disney+ nao esta disponivel em nenhum dos dois aparelhos."
 PROGRAMACAO/GRADE: "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+."
+PARCELAMENTO ANTES DO FRETE: "Sim, parcelamos no cartao de credito. Para eu fazer a simulacao correta, preciso somar o aparelho com o frete e aplicar a taxa da maquininha. Me manda sua localizacao que eu calculo tudo e te passo as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento; a simulacao e feita por nos."
 DIFERENCA ENTRE V10 E S10: "O V10 e o modelo tradicional por R$${preco}. O S10 e o mais recente, lancado em 2026, e preto, possui ESPN, resolucao 8K e processador mais rapido. O S10 fica R$${precoS10}."
 RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais de televisao corre esse risco em algum momento, do mais barato ao mais caro. Mas esse e um risco que vale a pena, porque o aparelho esta funcionando ha mais de 3 anos e ate hoje ninguem conseguiu derrubar."
 GARANTIA: "A garantia e de 30 dias contra defeito de fabrica."
@@ -1652,6 +1678,10 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   texto = texto.replace(/^.*(?:CORRE[CÇ][AÃ]O NECESS[AÁ]RIA|RESPOSTA OK|RESPOSTA CORRIGIDA|MOTIVOS DA CORRECAO|ANALISE|VERIFICACAO|AVALIACAO|❌|✅|⚠️⚠️).*\n?/gim, "");
   texto = texto.replace(/^\s*(?:Nota:|Obs:|O agente |A resposta |Corrigido:).*\n?/gim, "");
   texto = texto.replace(/^\s*\n/gm, "").trim();
+  if (agentId === "pedro" && isInstallmentQuestion(clientMessage) && /entregador.{0,40}simul|simul.{0,40}entregador/i.test(texto)) {
+    console.error(`[PARCELAMENTO CORRIGIDO] Pedro/${numero}: simulacao atribuida ao entregador`);
+    texto = buildPedroInstallmentReply(numero, clientMessage);
+  }
   if (isLikelyTruncated(texto)) {
     const fallback = deterministicFallback(agentId, numero, clientMessage, texto);
     if (fallback) {
@@ -2437,6 +2467,17 @@ async function handleIncomingMessage(agentId, body) {
         }
         return;
       }
+      const installmentReply = buildPedroInstallmentReply(numero, pendingClientMessages.join("\n"));
+      if (installmentReply) {
+        const sent = await sendText(agentId, numero, installmentReply);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: installmentReply, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`parcelamento_respondido: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
+      }
     }
 
     // INTERCEPTAÇÃO RETIRADA — não fazemos retirada → informa cliente + pausa + notifica Miron
@@ -2830,6 +2871,7 @@ module.exports = {
   processTags,
   scheduleFollowUp,
   buildPedroChannelReply,
+  buildPedroInstallmentReply,
   extractKnowledge,
   notifyLara,
   seedKnowledge,
