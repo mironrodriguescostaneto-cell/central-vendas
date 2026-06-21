@@ -55,7 +55,13 @@ router.get('/api/health', (req, res) => {
     anthropic: ak ? ak.slice(0,20)+'...' : false,
     groq: !!(process.env.GROQ_API_KEY || '').trim(),
   };
-  res.json({ ok: true, agents: status, keys, ts: Date.now() });
+  res.json({
+    ok: true,
+    agents: status,
+    keys,
+    deployment: (process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || '').slice(0, 7) || null,
+    ts: Date.now(),
+  });
 });
 
 router.get('/api/test-ai', async (req, res) => {
@@ -72,7 +78,12 @@ router.get('/api/test-ai', async (req, res) => {
         signal: AbortSignal.timeout(10000)
       });
       const d = await r.json();
-      results.gemini = d.error ? `ERRO ${geminiModel}: ${d.error.code} ${d.error.message}` : `OK ${geminiModel}: ${d.candidates?.[0]?.content?.parts?.[0]?.text?.slice(0,20)}`;
+      const geminiText = (d.candidates?.[0]?.content?.parts || [])
+        .filter(part => typeof part.text === 'string')
+        .map(part => part.text)
+        .join('')
+        .trim();
+      results.gemini = d.error ? `ERRO ${geminiModel}: ${d.error.code} ${d.error.message}` : `OK ${geminiModel}: ${geminiText.slice(0,20)}`;
     } catch(e) { results.gemini = `EXCEPTION: ${e.message}`; }
   } else { results.gemini = 'KEY_MISSING'; }
   if (ak) {
