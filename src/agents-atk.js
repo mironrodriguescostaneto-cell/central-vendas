@@ -270,6 +270,35 @@ function isLikelyTruncated(text) {
   return false;
 }
 
+const PEDRO_INTERNET_QUESTION = "Antes de eu te mostrar os modelos, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?";
+const PEDRO_CLARO_MESSAGE = "Infelizmente o aparelho nao e compativel com a rede da Claro. Por seguranca, nao realizamos a venda para clientes dessa operadora.";
+
+function pedroAskedInternetProvider(conv) {
+  const lastAssistant = (conv?.msgs || []).filter(item => item.role === "assistant").slice(-1)[0]?.content || "";
+  return /operadora|qual\s+(?:e\s+)?(?:a\s+)?sua\s+internet|internet\s+voce\s+usa|claro.*vivo.*tim|vivo.*oi.*tim.*claro/i.test(lastAssistant);
+}
+
+function detectPedroNonClaroProvider(msg, wasAsked = false) {
+  const m = normalizeTextBasic(msg || "").trim();
+  if (!m || detectaInternetClaro(msg || "") || /\bclaro\b/.test(m)) return null;
+
+  if (/\bvivo\b/.test(m)) return "Vivo";
+  if (/\btim\b/.test(m)) return "TIM";
+  if (/\b(?:starlink|brisanet|algar|vero|unifique|desktop)\b/.test(m)) return "Outra";
+  if (/\b(?:internet|provedor)\s+(?:de\s+)?bairro\b|\bprovedor\s+local\b/.test(m)) return "Internet de bairro";
+
+  // "Oi" so conta como operadora quando Pedro acabou de perguntar; fora desse
+  // contexto, quase sempre e apenas uma saudacao.
+  if (wasAsked && /^(?:e\s+|eh\s+|a\s+|da\s+)?oi(?:\s+fibra)?[.!]?$/i.test(m)) return "Oi";
+
+  // Permite provedores regionais informados como resposta explicita, sem tentar
+  // adivinhar a partir de uma mensagem comum do cliente.
+  const regional = m.match(/\b(?:minha\s+internet|internet\s+aqui|eu\s+uso|meu\s+provedor|a\s+operadora)\s+(?:e|eh|da|do)?\s*([a-z0-9][a-z0-9 -]{1,24})\b/i);
+  if (regional && !/\b(?:nao\s+sei|qual|quanto|como)\b/.test(regional[1])) return regional[1].trim();
+
+  return null;
+}
+
 function buildPedroChannelReply(text) {
   const msg = normalizeTextBasic(text);
   const asksEspn = /\bespn\b/.test(msg);
@@ -429,10 +458,13 @@ Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento ci
 
 === FLUXO OFICIAL — SIGA NESTA ORDEM ===
 
-ETAPA 1 — ABERTURA (primeiro contato):
-"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Hoje tenho o Uni TV V10 e o Uni TV S10 preto. Voce quer que eu te explique rapidinho a diferenca entre eles?"
+ETAPA 1 — ABERTURA E QUALIFICACAO OBRIGATORIA:
+"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Antes de eu te mostrar os modelos, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?"
+NAO apresente produto, NAO informe preco e NAO escreva ENVIAR_VIDEO ou ENVIAR_FOTO enquanto a operadora nao estiver confirmada.
+SE CLARO: informe que o aparelho nao e compativel e encerre completamente.
+SE OUTRA OPERADORA: avance imediatamente para a apresentacao, sem perguntar a operadora novamente.
 
-ETAPA 2 — APRESENTACAO:
+ETAPA 2 — APRESENTACAO (somente depois de confirmar que NAO e Claro):
 Se o cliente ainda NAO escolheu V10 ou S10: apresente os dois em texto e pergunte qual prefere. NAO escreva ENVIAR_VIDEO nem ENVIAR_FOTO ainda.
 Se o cliente escolheu V10 ou S10: enviar o video do modelo escolhido. Escreva a tag: ENVIAR_VIDEO
 "Olha nesse video como ele funciona na pratica. Ele transforma qualquer TV em smart, libera varios aplicativos e canais, e voce paga uma vez so, sem mensalidade."
@@ -458,15 +490,10 @@ Modelo: "O frete para sua regiao fica em R$XX,00. Entao o total a vista fica em 
 Se perguntarem se parcela ANTES da localizacao: confirme que parcela no cartao e peca a localizacao para NOS fazermos a simulacao sobre produto + frete. NUNCA diga que o entregador simula.
 RESPONSABILIDADES: Pedro/sistema faz a simulacao e informa todas as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento na entrega.
 
-ETAPA 6 — CONFIRMACAO DA INTERNET (ANTES dos dados — qualificar primeiro):
-"Qual operadora de internet voce usa? Oi, Claro, Vivo, Tim ou internet de bairro?"
-SE CLARO: "Olha, infelizmente eu nao vou conseguir te vender e nem te atender, porque a internet da Claro queima esses aparelhos." PARE COMPLETAMENTE. Nao continue o atendimento. Nao oferte alternativa. Nao colete dados.
-SE OUTRA: "Perfeito. Eu so te perguntei porque esses aparelhos nao podem ser conectados na rede da Claro, e e so para prevenir. Como a sua internet nao e da Claro, vai dar tudo certo."
-
-ETAPA 7 — COLETA DE DADOS (so apos confirmar que NAO e Claro):
+ETAPA 6 — COLETA DE DADOS (so apos confirmar a compra):
 "Perfeito. Para eu organizar sua entrega, me passa por favor: seu nome, nome da rua, quadra, lote, numero da casa e ate que horario voce esta no local para receber."
 
-ETAPA 8 — CONFIRMACAO FINAL:
+ETAPA 7 — CONFIRMACAO FINAL:
 "Perfeito, vou mandar para o entregador e, assim que sair, eu te aviso."
 Depois desta frase: escreva NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE. Nao mande mais nenhuma mensagem ao cliente.
 
@@ -479,7 +506,7 @@ Limite 30km. Regiao Goiania. Fora da area: TRANSFERIR_HUMANO para o Miron.
 === REGRA ABSOLUTA — INTERNET CLARO (MAIS IMPORTANTE) ===
 Os aparelhos Uni TV V10 e Uni TV S10 NAO FUNCIONAM com internet da Claro. Isso e INVIOLAVEL.
 Se o cliente mencionar Claro em qualquer contexto de internet (usa Claro, tem Claro, pergunta se Claro funciona, responde "Claro" quando perguntado sobre a operadora):
-DIGA EXATAMENTE: "Olha, infelizmente eu nao vou conseguir te vender e nem te atender, porque a internet da Claro queima esses aparelhos."
+DIGA EXATAMENTE: "${PEDRO_CLARO_MESSAGE}"
 PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode funcionar. NAO minimize o problema. NAO diga "provavelmente funciona" ou "nao deve ter problema". ENCERRE o atendimento.
 
 === REGRAS INVIOLAVEIS ===
@@ -503,7 +530,7 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - Horario de entrega: Seg-Sex 10:00-16:30. Sabado 09:00-13:00. Domingos e feriados: sem entrega.
 - So pedir dados depois que o cliente confirmar a compra.
 - Depois dos dados: nao continue vendendo, nao repita preco.
-- Depois da frase final (etapa 8): NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE completamente.
+- Depois da frase final (etapa 7): NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE completamente.
 
 === FECHAMENTO E DESCONTO ===
 - Seja persuasivo para fechar a venda.
@@ -540,7 +567,7 @@ RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais 
 GARANTIA: "A garantia e de 30 dias contra defeito de fabrica."
 NOTA FISCAL: "Nao fazemos emissao de nota fiscal."
 INSTALACAO: "A gente nao faz a instalacao na casa. O aparelho ja vai pronto e configurado. Chegando ai, e so ligar na televisao e conectar na internet. Se voce ficar com duvida, e so mandar mensagem que a gente te auxilia pelo WhatsApp. O entregador so faz a entrega."
-CLARO (INTERNET): "Olha, infelizmente eu nao vou conseguir te vender e nem te atender, porque a internet da Claro queima esses aparelhos." (e PARE o atendimento)
+CLARO (INTERNET): "${PEDRO_CLARO_MESSAGE}" (e PARE o atendimento)
 DESCONFIANCA: "Voce paga na entrega, direto ao entregador — zero risco antecipado. Instagram: instagram.com/atacadaovariedadess/"
 RETIRADA / BUSCAR NA LOJA: "Nao fazemos retirada, trabalhamos somente com entrega! O pagamento e feito direto ao entregador na entrega." (REGRA INVIOLAVEL: NUNCA ofereça retirada — responda isso e PARE)
 FORA DA AREA: "Vou te passar pro Miron pra ver uma alternativa pra voce!" + TRANSFERIR_HUMANO
@@ -861,6 +888,13 @@ Toda resposta comercial DEVE usar R$${ofertaAtiva.precoDesconto}. Ignorar = demi
   }
 
   prompt += basePrompt;
+
+  if (agentId === "pedro" && numero) {
+    const pedroConv = db.getConversation("pedro", numero);
+    prompt += pedroConv?.pedroInternetQualified
+      ? `\n\nOPERADORA JA CONFIRMADA: ${pedroConv.pedroInternetProvider || "nao Claro"}. Nao pergunte novamente. Pode seguir o fluxo comercial.`
+      : `\n\nBLOQUEIO DE QUALIFICACAO: a operadora ainda nao foi confirmada. Pergunte a operadora antes de apresentar modelos, informar preco, pedir localizacao ou usar ENVIAR_VIDEO/ENVIAR_FOTO.`;
+  }
 
   prompt += `
 
@@ -2204,6 +2238,21 @@ async function handleIncomingMessage(agentId, body) {
     // Handle location (pin on map) — ENVIA DIRETO PRO CLIENTE, SEM PASSAR PELA IA
     const loc = extractLocation(body);
     if (loc) {
+      if (agentId === "pedro") {
+        const convPedro = db.getConversation("pedro", numero);
+        if (!convPedro?.pedroInternetQualified) {
+          const msg = PEDRO_INTERNET_QUESTION;
+          await sendText(agentId, numero, msg);
+          if (convPedro) {
+            convPedro.msgs.push({ role: "user", content: "[Cliente enviou localizacao antes de confirmar a operadora]", timestamp: Date.now() });
+            convPedro.msgs.push({ role: "assistant", content: msg, timestamp: Date.now() });
+            convPedro.ultimaMensagem = Date.now();
+          }
+          db.addEvent(`localizacao_antes_operadora: pedro ${numero}`);
+          db.save();
+          return;
+        }
+      }
       if (precisaEscolherProdutoPedro()) {
         await pedirEscolhaProdutoPedro();
         return;
@@ -2472,8 +2521,50 @@ async function handleIncomingMessage(agentId, body) {
     }
 
     // Build prompt and call Claude (msg já salva no historico pelo debounce, 5s de espera já feito)
-    const systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
+    let systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
     const conv = db.getConversation(agentId, numero);
+
+    // Pedro so inicia a apresentacao depois de validar a operadora. Esta trava e
+    // deterministica para impedir que prompt, follow-up ou modelo pulem a etapa.
+    if (agentId === "pedro" && !conv.pedroInternetQualified) {
+      const askedProvider = pedroAskedInternetProvider(conv);
+      const isolatedClaro = askedProvider && /^\s*(?:e\s+|eh\s+|[eé]\s+(?:a\s+)?|minha\s+[eé]\s+)?claro\s*[!.,]?\s*$/i.test(mensagem);
+
+      if (detectaInternetClaro(mensagem) || isolatedClaro) {
+        await sendText(agentId, numero, PEDRO_CLARO_MESSAGE);
+        conv.msgs.push({ role: "assistant", content: PEDRO_CLARO_MESSAGE, timestamp: Date.now() });
+        conv.ultimaMensagem = Date.now();
+        db.pauseManual(numero, agentId);
+        await sendText(agentId, CONFIG.SEU_WHATSAPP, `🔴 *CLARO* — Pedro\nCliente wa.me/${numero} usa internet da Claro. Atendimento encerrado, conversa pausada.`);
+        db.addEvent(`claro_internet: pedro ${numero}`);
+        db.save();
+        return;
+      }
+
+      const provider = detectPedroNonClaroProvider(mensagem, askedProvider);
+      if (provider) {
+        conv.pedroInternetQualified = true;
+        conv.pedroInternetProvider = provider;
+        db.addEvent(`internet_qualificada: pedro ${numero} ${provider}`);
+        db.save();
+        // O prompt inicial foi montado antes da qualificacao desta mensagem.
+        // Reconstruir evita que a IA receba o bloqueio antigo e pergunte de novo.
+        systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
+      } else {
+        const hasPreviousAssistant = conv.msgs.some(item => item.role === "assistant");
+        const qualificationMsg = hasPreviousAssistant
+          ? PEDRO_INTERNET_QUESTION
+          : `Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. ${PEDRO_INTERNET_QUESTION}`;
+        const sent = await sendText(agentId, numero, qualificationMsg);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: qualificationMsg, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`operadora_solicitada: pedro ${numero}`);
+          db.save();
+        }
+        return;
+      }
+    }
 
     // Perguntas consecutivas sobre canais devem ser respondidas juntas e sem depender da IA.
     if (agentId === "pedro") {
@@ -2559,7 +2650,7 @@ async function handleIncomingMessage(agentId, body) {
       const _perguntouInternet = /operadora|internet|qual\s+sua\s+rede|qual\s+sua\s+internet|claro.*vivo.*tim|oi.*claro.*vivo/i.test(_ultimaBotMsg);
       const _respostaEhClaro = /^\s*(claro|e\s+claro|eh\s+claro|[eé]\s+(a\s+)?claro|minha\s+[eé]\s+claro|net\s+claro|claro\s+mesmo|claro\s+net)\s*[!.,]?\s*$/i.test(mensagem);
       if (detectaInternetClaro(mensagem) || (_perguntouInternet && _respostaEhClaro)) {
-        const claroMsg = `Olha, infelizmente eu não vou conseguir te vender e nem te atender, porque a internet da Claro queima esses aparelhos.`;
+        const claroMsg = PEDRO_CLARO_MESSAGE;
         await sendText(agentId, numero, claroMsg);
         conv.msgs.push({ role: "assistant", content: claroMsg, timestamp: Date.now() });
         conv.ultimaMensagem = Date.now();
