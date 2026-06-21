@@ -238,6 +238,10 @@ function buildPedroInstallmentReply(numero, text = "") {
     return `Sim, parcelamos o ${product.name} no cartao de credito. O total com frete fica R$${freight.total}. A simulacao feita por nos e:\n${calcInstallmentsWhatsApp(freight.total)}\nO pagamento e feito somente na entrega, por PIX, dinheiro ou cartao na maquininha. O entregador apenas leva a maquininha e recebe o pagamento.`;
   }
 
+  if (!conv?.pedroInternetQualified) {
+    return `Sim, parcelamos o ${product.name} de R$${product.price} no cartao de credito. A simulacao e feita por nos sobre o aparelho mais o frete, e o pagamento acontece somente na entrega. ${PEDRO_INTERNET_QUESTION}`;
+  }
+
   return `Sim, parcelamos o ${product.name} de R$${product.price} no cartao de credito. Para eu fazer a simulacao correta, preciso somar o aparelho com o frete e aplicar a taxa da maquininha. Me manda sua localizacao pelo WhatsApp que eu calculo tudo e te passo as parcelas antes da entrega. O pagamento e feito somente na entrega, por PIX, dinheiro ou cartao. O entregador apenas leva a maquininha e recebe o pagamento; a simulacao e feita por nos.`;
 }
 
@@ -270,7 +274,7 @@ function isLikelyTruncated(text) {
   return false;
 }
 
-const PEDRO_INTERNET_QUESTION = "Antes de eu te mostrar os modelos, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?";
+const PEDRO_INTERNET_QUESTION = "Para eu confirmar a compatibilidade antes de calcular a entrega, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?";
 const PEDRO_CLARO_MESSAGE = "Infelizmente o aparelho nao e compativel com a rede da Claro. Por seguranca, nao realizamos a venda para clientes dessa operadora.";
 
 function pedroAskedInternetProvider(conv) {
@@ -458,24 +462,28 @@ Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento ci
 
 === FLUXO OFICIAL — SIGA NESTA ORDEM ===
 
-ETAPA 1 — ABERTURA E QUALIFICACAO OBRIGATORIA:
-"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Antes de eu te mostrar os modelos, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?"
-NAO apresente produto, NAO informe preco e NAO escreva ENVIAR_VIDEO ou ENVIAR_FOTO enquanto a operadora nao estiver confirmada.
-SE CLARO: informe que o aparelho nao e compativel e encerre completamente.
-SE OUTRA OPERADORA: avance imediatamente para a apresentacao, sem perguntar a operadora novamente.
+ETAPA 1 — ABERTURA E RESPOSTA AO INTERESSE:
+"Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. Claro, te explico rapidinho como funciona."
+O cliente deve receber informacao e perceber valor antes de qualquer pergunta de qualificacao. NUNCA pergunte a operadora na primeira mensagem.
 
-ETAPA 2 — APRESENTACAO (somente depois de confirmar que NAO e Claro):
+ETAPA 2 — APRESENTACAO E VIDEO:
 Se o cliente ainda NAO escolheu V10 ou S10: apresente os dois em texto e pergunte qual prefere. NAO escreva ENVIAR_VIDEO nem ENVIAR_FOTO ainda.
 Se o cliente escolheu V10 ou S10: enviar o video do modelo escolhido. Escreva a tag: ENVIAR_VIDEO
 "Olha nesse video como ele funciona na pratica. Ele transforma qualquer TV em smart, libera varios aplicativos e canais, e voce paga uma vez so, sem mensalidade."
+Depois de enviar o video, pergunte: "${PEDRO_INTERNET_QUESTION}"
 
-ETAPA 3 — REFORCO VISUAL:
+ETAPA 3 — CONFIRMACAO DA INTERNET (DEPOIS DO VIDEO, ANTES DO FRETE):
+SE CLARO: informe que o aparelho nao e compativel e encerre completamente.
+SE OUTRA OPERADORA: siga o atendimento sem perguntar novamente.
+Se o cliente fizer uma pergunta junto com a resposta, responda primeiro e depois avance.
+
+ETAPA 4 — REFORCO VISUAL:
 Para V10: enviar foto do produto. Escreva a tag: ENVIAR_FOTO.
 Para S10: NAO escreva ENVIAR_FOTO enquanto nao houver foto oficial do S10 cadastrada. Use apenas ENVIAR_VIDEO para mostrar o S10.
 Apos a foto, mova direto para o proximo passo — NAO pergunte "ficou com alguma duvida?". Assuma o interesse e avance:
 Se ja sabe o preco que cliente quer → va para ETAPA 4. Se nao → "Me manda sua localizacao que eu calculo o frete e te passo o total certinho." Assumptive close — nao abra espaco para hesitacao.
 
-ETAPA 4 — PRECO:
+ETAPA 5 — PRECO:
 QUANDO USAR: (a) cliente perguntou diretamente o valor ("quanto?", "preco?", "valor?", "quanto custa?") OU (b) etapas 2+3 ja concluidas.
 PROIBIDO: NAO use se cliente perguntou so "como funciona?", "o que e?", "tenho interesse" ou assunto informativo sem pedir preco — nesses casos execute ETAPA 2 primeiro.
 Informe o preco conforme o modelo:
@@ -483,17 +491,17 @@ Informe o preco conforme o modelo:
 - S10: "O Uni TV S10 preto fica R$${precoS10}, pago na entrega direto ao entregador. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
 - Se ainda nao escolheu: "O V10 fica R$${preco} e o S10 preto fica R$${precoS10}. O S10 e o unico com ESPN, tem 8K e processador mais rapido. Qual deles voce quer?"
 
-ETAPA 5 — FRETE E SIMULACAO:
+ETAPA 6 — FRETE E SIMULACAO:
 Pedir pin de localizacao no mapa. O sistema calcula o frete automaticamente.
 Se frete ja calculado: use EXATAMENTE esse valor do historico. Nao recalcule. Nao invente.
 Modelo: "O frete para sua regiao fica em R$XX,00. Entao o total a vista fica em R$XXX,00, pago na entrega ao entregador. Aceita PIX, dinheiro ou cartao na maquininha."
 Se perguntarem se parcela ANTES da localizacao: confirme que parcela no cartao e peca a localizacao para NOS fazermos a simulacao sobre produto + frete. NUNCA diga que o entregador simula.
 RESPONSABILIDADES: Pedro/sistema faz a simulacao e informa todas as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento na entrega.
 
-ETAPA 6 — COLETA DE DADOS (so apos confirmar a compra):
+ETAPA 7 — COLETA DE DADOS (so apos confirmar a compra):
 "Perfeito. Para eu organizar sua entrega, me passa por favor: seu nome, nome da rua, quadra, lote, numero da casa e ate que horario voce esta no local para receber."
 
-ETAPA 7 — CONFIRMACAO FINAL:
+ETAPA 8 — CONFIRMACAO FINAL:
 "Perfeito, vou mandar para o entregador e, assim que sair, eu te aviso."
 Depois desta frase: escreva NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE. Nao mande mais nenhuma mensagem ao cliente.
 
@@ -530,7 +538,7 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - Horario de entrega: Seg-Sex 10:00-16:30. Sabado 09:00-13:00. Domingos e feriados: sem entrega.
 - So pedir dados depois que o cliente confirmar a compra.
 - Depois dos dados: nao continue vendendo, nao repita preco.
-- Depois da frase final (etapa 7): NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE completamente.
+- Depois da frase final (etapa 8): NOTIFICAR_ENTREGA TRANSFERIR_HUMANO e PARE completamente.
 
 === FECHAMENTO E DESCONTO ===
 - Seja persuasivo para fechar a venda.
@@ -891,9 +899,16 @@ Toda resposta comercial DEVE usar R$${ofertaAtiva.precoDesconto}. Ignorar = demi
 
   if (agentId === "pedro" && numero) {
     const pedroConv = db.getConversation("pedro", numero);
-    prompt += pedroConv?.pedroInternetQualified
-      ? `\n\nOPERADORA JA CONFIRMADA: ${pedroConv.pedroInternetProvider || "nao Claro"}. Nao pergunte novamente. Pode seguir o fluxo comercial.`
-      : `\n\nBLOQUEIO DE QUALIFICACAO: a operadora ainda nao foi confirmada. Pergunte a operadora antes de apresentar modelos, informar preco, pedir localizacao ou usar ENVIAR_VIDEO/ENVIAR_FOTO.`;
+    const pedroVideoSent = Object.entries(pedroConv?.mediaSent || {}).some(([key, sentAt]) =>
+      key.startsWith("pedro:") && key.endsWith(":video") && !!sentAt
+    );
+    if (pedroConv?.pedroInternetQualified) {
+      prompt += `\n\nOPERADORA JA CONFIRMADA: ${pedroConv.pedroInternetProvider || "nao Claro"}. Nao pergunte novamente. Pode seguir o fluxo comercial.`;
+    } else if (pedroVideoSent) {
+      prompt += `\n\nOPERADORA AINDA NAO CONFIRMADA: o video ja foi enviado. Responda primeiro qualquer pergunta atual e depois pergunte a operadora. Nao peca localizacao, nao calcule frete e nao colete dados antes da resposta.`;
+    } else {
+      prompt += `\n\nORDEM DE CONVERSAO: entregue valor primeiro. Apresente os modelos e envie o video do modelo escolhido antes de perguntar a operadora. NUNCA abra o atendimento perguntando a operadora. Ao enviar o video, termine perguntando a operadora. Nao peca localizacao, nao calcule frete e nao colete dados antes de confirma-la.`;
+    }
   }
 
   prompt += `
@@ -2524,8 +2539,8 @@ async function handleIncomingMessage(agentId, body) {
     let systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
     const conv = db.getConversation(agentId, numero);
 
-    // Pedro so inicia a apresentacao depois de validar a operadora. Esta trava e
-    // deterministica para impedir que prompt, follow-up ou modelo pulem a etapa.
+    // Registra a operadora quando o cliente responder. A apresentacao e o video
+    // podem acontecer antes; frete e fechamento continuam bloqueados sem ela.
     if (agentId === "pedro" && !conv.pedroInternetQualified) {
       const askedProvider = pedroAskedInternetProvider(conv);
       const isolatedClaro = askedProvider && /^\s*(?:e\s+|eh\s+|[eé]\s+(?:a\s+)?|minha\s+[eé]\s+)?claro\s*[!.,]?\s*$/i.test(mensagem);
@@ -2550,19 +2565,6 @@ async function handleIncomingMessage(agentId, body) {
         // O prompt inicial foi montado antes da qualificacao desta mensagem.
         // Reconstruir evita que a IA receba o bloqueio antigo e pergunte de novo.
         systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
-      } else {
-        const hasPreviousAssistant = conv.msgs.some(item => item.role === "assistant");
-        const qualificationMsg = hasPreviousAssistant
-          ? PEDRO_INTERNET_QUESTION
-          : `Oi! Tudo bem? Eu sou o Pedro da Atacadao Variedades. ${PEDRO_INTERNET_QUESTION}`;
-        const sent = await sendText(agentId, numero, qualificationMsg);
-        if (sent) {
-          conv.msgs.push({ role: "assistant", content: qualificationMsg, timestamp: Date.now() });
-          conv.ultimaMensagem = Date.now();
-          db.addEvent(`operadora_solicitada: pedro ${numero}`);
-          db.save();
-        }
-        return;
       }
     }
 
@@ -2823,6 +2825,28 @@ async function handleIncomingMessage(agentId, body) {
     }
     if (resposta.includes("ENVIAR_VIDEO") && !respostaFinal.includes("ENVIAR_VIDEO")) {
       console.error(`ASLAM REMOVEU ENVIAR_VIDEO de ${agent.name}/${numero}!`);
+    }
+
+    // Antes da operadora, Pedro pode apresentar e enviar video, mas nao pode
+    // avancar para localizacao/frete. Ao enviar o video, a pergunta entra depois
+    // da midia, quando o cliente ja recebeu valor.
+    if (agentId === "pedro") {
+      const guardConv = db.getConversation("pedro", numero);
+      if (!guardConv?.pedroInternetQualified) {
+        const pedeLocalizacao = /(?:(?:me\s+)?(?:mand[ae]r?|envi[ae]r?|pass[ae]r?|compartilh[ae]r?)\s[^.!?\n]*(?:localizac|pin\b|gps))|(?:(?:preciso|necessito|quero|pede)\s[^.!?\n]*(?:localizac|pin\b))|(?:pin\s+no\s+(?:mapa|google))|(?:sua\s+localizac)/i.test(respostaFinal);
+        if (pedeLocalizacao) {
+          respostaFinal = respostaFinal
+            .replace(/[^.!?\n]*(?:(?:me\s+)?(?:mand[ae]r?|envi[ae]r?|pass[ae]r?|compartilh[ae]r?)\s[^.!?\n]*(?:localizac|pin\b|gps)|(?:preciso|necessito|quero|pede)\s[^.!?\n]*(?:localizac|pin\b)|pin\s+no\s+(?:mapa|google)|sua\s+localizac)[^.!?\n]*[.!?]?\s*/gi, "")
+            .trim();
+          db.addEvent(`localizacao_bloqueada_sem_operadora: pedro ${numero}`);
+        }
+
+        const enviaraVideo = respostaFinal.includes("ENVIAR_VIDEO");
+        const jaPerguntaOperadora = /operadora|qual\s+(?:e\s+)?(?:a\s+)?sua\s+internet|internet\s+voce\s+usa/i.test(respostaFinal);
+        if ((enviaraVideo || pedeLocalizacao) && !jaPerguntaOperadora) {
+          respostaFinal = `${respostaFinal}\n\n${PEDRO_INTERNET_QUESTION}`.trim();
+        }
+      }
     }
 
     // GUARD DETERMINISTICO ANTI-LOOP: se frete ja calculado e resposta pede localizacao, bloquear
