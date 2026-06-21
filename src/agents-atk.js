@@ -176,9 +176,26 @@ function normalizeTextBasic(text) {
 function detectPedroProductKey(text) {
   const t = normalizeTextBasic(text);
   if (/\b(?:esse|aparelho|modelo)\s+(?:de\s+)?(?:r\$\s*)?400\b/.test(t)) return "s10";
-  if (/\b(?:s\s*10|s10|preto|espn|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
+  if (/\b(?:s\s*10|s10|preto|espn|lancamento|novidade|modelo\s+(?:mais\s+)?novo|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
   if (/\b(?:v\s*10|v10|branc[ao]|mais\s+barat[ao]|menor\s+valor)\b/.test(t)) return "v10";
   return null;
+}
+
+function asksAboutPedroLaunch(text) {
+  const t = normalizeTextBasic(text);
+  return /\b(?:lancamento|novidade|modelo\s+(?:mais\s+)?novo|mais\s+recente|modelo\s+2026)\b/.test(t);
+}
+
+function buildPedroLaunchReply(numero, text = "") {
+  if (!asksAboutPedroLaunch(text)) return "";
+  const product = PEDRO_PRODUCT_OPTIONS.s10;
+  const alreadySent = wasMediaSent("pedro", numero, product, "video");
+  const videoPart = alreadySent
+    ? "Esse e o modelo que eu te mostrei no video."
+    : "Vou te mandar agora o video dele funcionando. ENVIAR_VIDEO";
+  const conv = db.getConversation("pedro", numero);
+  const providerPart = conv?.pedroInternetQualified ? "" : `\n\n${PEDRO_INTERNET_QUESTION}`;
+  return `O lancamento e o Uni TV S10 preto, modelo 2026. Ele fica R$${product.price} a vista, possui 1 canal ESPN, resolucao 8K e processador mais rapido que o V10. ${videoPart}${providerPart}`;
 }
 
 function rememberPedroProductChoice(numero, text) {
@@ -899,6 +916,11 @@ Toda resposta comercial DEVE usar R$${ofertaAtiva.precoDesconto}. Ignorar = demi
 
   if (agentId === "pedro" && numero) {
     const pedroConv = db.getConversation("pedro", numero);
+    if (pedroConv?.pedroProductKey === "s10") {
+      prompt += `\n\nMODELO ESCOLHIDO PELO CLIENTE: Uni TV S10 preto, lancamento 2026, R$400. Fale e envie midia SOMENTE do S10, salvo se o cliente pedir comparacao. Nao volte para o V10 por conta propria.`;
+    } else if (pedroConv?.pedroProductKey === "v10") {
+      prompt += `\n\nMODELO ESCOLHIDO PELO CLIENTE: Uni TV V10 branco, R$360. Mantenha o V10, salvo se o cliente pedir comparacao ou trocar de modelo.`;
+    }
     const pedroVideoSent = Object.entries(pedroConv?.mediaSent || {}).some(([key, sentAt]) =>
       key.startsWith("pedro:") && key.endsWith(":video") && !!sentAt
     );
@@ -2576,6 +2598,17 @@ async function handleIncomingMessage(agentId, body) {
         if (item.role === "assistant") break;
         if (item.role === "user") pendingClientMessages.unshift(item.content || "");
       }
+      const launchReply = buildPedroLaunchReply(numero, pendingClientMessages.join("\n"));
+      if (launchReply) {
+        const sentText = await processTags(agentId, numero, launchReply, pendingClientMessages.join("\n"));
+        if (sentText) {
+          conv.msgs.push({ role: "assistant", content: sentText, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`lancamento_s10_respondido: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
+      }
       const channelReply = buildPedroChannelReply(pendingClientMessages.join("\n"));
       if (channelReply) {
         const sent = await sendText(agentId, numero, channelReply);
@@ -3032,6 +3065,8 @@ module.exports = {
   processTags,
   scheduleFollowUp,
   buildPedroChannelReply,
+  buildPedroLaunchReply,
+  detectPedroProductKey,
   buildPedroInstallmentReply,
   buildPedroContentTransparencyReply,
   extractKnowledge,
