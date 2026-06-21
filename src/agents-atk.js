@@ -186,16 +186,26 @@ function asksAboutPedroLaunch(text) {
   return /\b(?:lancamento|novidade|modelo\s+(?:mais\s+)?novo|mais\s+recente|modelo\s+2026)\b/.test(t);
 }
 
+function asksGenericPedroInfo(text) {
+  const t = normalizeTextBasic(text);
+  const genericInterest = /\b(?:tenho\s+interesse|queria\s+(?:mais\s+)?informacoes|quero\s+(?:mais\s+)?informacoes|mais\s+informacoes|me\s+explica|como\s+funciona)\b/.test(t);
+  const specificProduct = detectPedroProductKey(t);
+  return genericInterest && !specificProduct;
+}
+
+function buildPedroInitialReply(text = "") {
+  if (!asksGenericPedroInfo(text)) return "";
+  return "Oi! Sou o Pedro. Tenho o V10 por R$360 e o novo S10 por R$400. Quer ver o tradicional ou o lancamento?";
+}
+
 function buildPedroLaunchReply(numero, text = "") {
   if (!asksAboutPedroLaunch(text)) return "";
   const product = PEDRO_PRODUCT_OPTIONS.s10;
   const alreadySent = wasMediaSent("pedro", numero, product, "video");
-  const videoPart = alreadySent
-    ? "Esse e o modelo que eu te mostrei no video."
-    : "Vou te mandar agora o video dele funcionando. ENVIAR_VIDEO";
+  const videoPart = alreadySent ? "Esse e o modelo do video." : "ENVIAR_VIDEO";
   const conv = db.getConversation("pedro", numero);
   const providerPart = conv?.pedroInternetQualified ? "" : `\n\n${PEDRO_INTERNET_QUESTION}`;
-  return `O lancamento e o Uni TV S10 preto, modelo 2026. Ele fica R$${product.price} a vista, possui 1 canal ESPN, resolucao 8K e processador mais rapido que o V10. ${videoPart}${providerPart}`;
+  return `O S10 preto e o lancamento 2026: R$${product.price}, com ESPN e processador mais rapido. ${videoPart}${providerPart}`;
 }
 
 function rememberPedroProductChoice(numero, text) {
@@ -291,7 +301,7 @@ function isLikelyTruncated(text) {
   return false;
 }
 
-const PEDRO_INTERNET_QUESTION = "Para eu confirmar a compatibilidade antes de calcular a entrega, qual operadora de internet voce usa: Vivo, Oi, TIM, Claro ou internet de bairro?";
+const PEDRO_INTERNET_QUESTION = "Qual internet voce usa: Vivo, Oi, TIM, Claro ou de bairro?";
 const PEDRO_CLARO_MESSAGE = "Infelizmente o aparelho nao e compativel com a rede da Claro. Por seguranca, nao realizamos a venda para clientes dessa operadora.";
 
 function pedroAskedInternetProvider(conv) {
@@ -463,7 +473,7 @@ REGRA DE ESCOLHA DO PRODUTO:
 - Se o cliente ja escolheu um modelo, mantenha aquele modelo ate ele pedir comparacao ou trocar.
 
 RESUMO CURTO PARA APRESENTAR OS DOIS:
-"Eu tenho dois modelos: o Uni TV V10, que e o modelo tradicional por R$${preco}, e o Uni TV S10 preto, que e o lancamento 2026 por R$${precoS10}. O S10 tem ESPN, resolucao 8K e processador mais rapido. Qual voce prefere que eu te mostre?"
+"Tenho o V10 por R$${preco} e o novo S10 por R$${precoS10}. Quer ver o tradicional ou o lancamento?"
 
 BASE COMUM DOS DOIS:
 Transformam qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay, futebol ao vivo — TUDO incluso, SEM mensalidade, SEM conta de streaming. Encaixa no HDMI, Wi-Fi, pronto em 5 min. Atualiza automaticamente.
@@ -486,7 +496,7 @@ O cliente deve receber informacao e perceber valor antes de qualquer pergunta de
 ETAPA 2 — APRESENTACAO E VIDEO:
 Se o cliente ainda NAO escolheu V10 ou S10: apresente os dois em texto e pergunte qual prefere. NAO escreva ENVIAR_VIDEO nem ENVIAR_FOTO ainda.
 Se o cliente escolheu V10 ou S10: enviar o video do modelo escolhido. Escreva a tag: ENVIAR_VIDEO
-"Olha nesse video como ele funciona na pratica. Ele transforma qualquer TV em smart, libera varios aplicativos e canais, e voce paga uma vez so, sem mensalidade."
+"Vou te mostrar o modelo funcionando."
 Depois de enviar o video, pergunte: "${PEDRO_INTERNET_QUESTION}"
 
 ETAPA 3 — CONFIRMACAO DA INTERNET (DEPOIS DO VIDEO, ANTES DO FRETE):
@@ -604,7 +614,7 @@ ENVIAR_FOTO | ENVIAR_VIDEO | ENVIAR_AUDIO | NOTIFICAR_ENTREGA | TRANSFERIR_HUMAN
 Follow-up: cliente diz "depois" → pergunte a data → AGENDAR.
 Dia futuro de entrega: incluir CONFIRMAR_DIA:DD/MM/YYYY.
 
-ESTILO: Responda sempre a pergunta do cliente antes de fazer a sua. Nao repita informacao ja dada. Uma mensagem por vez, sem excessos.`;
+ESTILO: Responda sempre a pergunta do cliente antes de fazer a sua. Nao repita informacao ja dada. Em respostas comuns, use no maximo 160 caracteres, 2 frases curtas e 1 pergunta. So detalhe quando o cliente pedir comparacao, parcelas ou informacoes especificas. Uma mensagem por vez.`;
 }
 
 function buildPromptRodrigo() {
@@ -2598,6 +2608,17 @@ async function handleIncomingMessage(agentId, body) {
         if (item.role === "assistant") break;
         if (item.role === "user") pendingClientMessages.unshift(item.content || "");
       }
+      const initialReply = buildPedroInitialReply(pendingClientMessages.join("\n"));
+      if (initialReply && !conv.pedroProductKey) {
+        const sent = await sendText(agentId, numero, initialReply);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: initialReply, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`abertura_curta_pedro: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
+      }
       const launchReply = buildPedroLaunchReply(numero, pendingClientMessages.join("\n"));
       if (launchReply) {
         const sentText = await processTags(agentId, numero, launchReply, pendingClientMessages.join("\n"));
@@ -3066,6 +3087,7 @@ module.exports = {
   scheduleFollowUp,
   buildPedroChannelReply,
   buildPedroLaunchReply,
+  buildPedroInitialReply,
   detectPedroProductKey,
   buildPedroInstallmentReply,
   buildPedroContentTransparencyReply,
