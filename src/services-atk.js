@@ -30,12 +30,13 @@ function openGeminiCircuit() {
 }
 
 // Diagnóstico de keys na inicialização
-setTimeout(() => {
+const keyDiagnosticTimer = setTimeout(() => {
   const gk = GEMINI_KEY();
   const ak = ANTHROPIC_KEY();
   console.log(`[ATK/AI] Keys configuradas — Gemini: ${gk ? 'SIM (' + gk.slice(0,8) + '...)' : 'NAO'} | Anthropic: ${ak ? 'SIM (' + ak.slice(0,8) + '...)' : 'NAO'}`);
   if (!gk && !ak) console.error('[ATK/AI] ATENCAO: Nenhuma API key configurada! Agentes vao responder com instabilidade.');
 }, 5000);
+keyDiagnosticTimer.unref?.();
 const STORE_LAT      = parseFloat(process.env.STORE_LAT || '-16.6939');
 const STORE_LNG      = parseFloat(process.env.STORE_LNG || '-49.2648');
 const SEU_WHATSAPP   = process.env.SEU_WHATSAPP || '5562991819645';
@@ -134,7 +135,8 @@ async function callGeminiDirect(systemPrompt, messages, { maxTokens, timeout } =
       console.error(`[ATK/AI] Gemini error ${data.error.code}: ${data.error.message}`);
       return null;
     }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    return parts.filter(part => typeof part.text === 'string').map(part => part.text).join('').trim();
   } catch (e) {
     if (e.name === 'AbortError') console.error('[ATK/AI] Gemini timeout');
     else console.error('[ATK/AI] Gemini erro:', e.message);
@@ -167,7 +169,7 @@ async function callClaudeDirect(systemPrompt, messages, { model, maxTokens, time
     });
     const data = await r.json();
     if (data.error) { console.error(`[ATK/AI] Claude error [${data.error.type}]: ${data.error.message}`); return null; }
-    return data.content?.[0]?.text || '';
+    return (data.content || []).filter(block => block.type === 'text' && typeof block.text === 'string').map(block => block.text).join('').trim();
   } catch (e) {
     if (e.name === 'AbortError') console.error('[ATK/AI] Claude timeout');
     else console.error('[ATK/AI] Claude erro:', e.message);
@@ -192,7 +194,7 @@ async function callClaudeWithRetry(systemPrompt, messages, options = {}) {
   const maxRetries = options.maxRetries || 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const result = await callClaude(systemPrompt, messages, options);
-    if (result !== null) return result;
+    if (typeof result === 'string' && result.trim()) return result;
     if (attempt === maxRetries) return null;
     await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt - 1), 8000)));
   }

@@ -58,7 +58,8 @@ async function callGemini(systemPrompt, messages, opts = {}) {
   }, body);
 
   if (res.status !== 200) throw new Error(`Gemini error ${res.status}: ${JSON.stringify(res.data)}`);
-  const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const parts = res.data?.candidates?.[0]?.content?.parts || [];
+  const text = parts.filter(part => typeof part.text === 'string').map(part => part.text).join('').trim();
   if (!text.trim()) throw new Error('Gemini retornou resposta sem texto');
   return text;
 }

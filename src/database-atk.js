@@ -932,7 +932,8 @@ function cleanupOldData() {
   cleanExpiredOffers();
   if (total > 0) save();
 }
-setInterval(cleanupOldData, 60 * 60 * 1000);
+const cleanupTimer = setInterval(cleanupOldData, 60 * 60 * 1000);
+cleanupTimer.unref?.();
 
 function getMemoryStats() {
   let totalConversations = 0, totalMessages = 0;
@@ -1072,7 +1073,8 @@ async function load() {
 }
 
 // Auto-save a cada 30s
-setInterval(() => save(), 30000);
+const autosaveTimer = setInterval(() => save(), 30000);
+autosaveTimer.unref?.();
 
 module.exports = {
   state,

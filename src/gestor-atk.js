@@ -1905,22 +1905,23 @@ function monitorLeads() {
             }));
 
             const agentsModule = require("./agents-atk");
-            const monitorSystemPrompt = agentsModule.buildSystemPrompt(agentId, numero);
-            const response = await callClaude(
-              monitorSystemPrompt,
+            const lastClientMsg = recentMsgs.filter(m => m.role === "user").slice(-1)[0];
+            const clientText = lastClientMsg?.content || "";
+            const response = await agentsModule.generateValidatedResponse(
+              agentId,
+              numero,
+              clientText,
               recentMsgs,
-              { maxTokens: 300, timeout: 15000 }
+              { maxTokens: 400, timeout: 20000 }
             );
 
             if (response) {
-              // Passar pelo filtro de qualidade — mesmo gate do fluxo normal
-              let filteredResponse = response;
-              try {
-                const lastClientMsg = recentMsgs.filter(m => m.role === "user").slice(-1)[0];
-                filteredResponse = await filterResponse(agentId, numero, lastClientMsg?.content || "", response);
-              } catch (eFilter) { /* fallback silencioso */ }
-              await sendText(agentId, numero, filteredResponse);
-              conv.msgs.push({ role: "assistant", content: filteredResponse, timestamp: Date.now() });
+              const sentText = await agentsModule.processTags(agentId, numero, response, clientText);
+              if (!sentText) {
+                db.addEvent(`Monitor: ${agentId} falhou ao enviar para ${numero}`);
+                continue;
+              }
+              conv.msgs.push({ role: "assistant", content: sentText, timestamp: Date.now() });
               conv.ultimaMensagem = Date.now();
               db.addEvent(`Monitor: ${agentId} respondeu ${numero} (intervencao automatica)`);
               db.addActivity(`Lead monitor: ${agentId} -> ${numero}`);
@@ -1985,16 +1986,20 @@ function dailySweep() {
         }));
 
         const agentsModuleSweep = require("./agents-atk");
-        const sweepSystemPrompt = agentsModuleSweep.buildSystemPrompt(item.agentId, item.numero);
-        const response = await callClaude(
-          sweepSystemPrompt,
+        const lastClientMsg = recentMsgs.filter(m => m.role === "user").slice(-1)[0];
+        const clientText = lastClientMsg?.content || "";
+        const response = await agentsModuleSweep.generateValidatedResponse(
+          item.agentId,
+          item.numero,
+          clientText,
           recentMsgs,
-          { maxTokens: 300, timeout: 15000 }
+          { maxTokens: 400, timeout: 20000 }
         );
 
         if (response) {
-          await sendText(item.agentId, item.numero, response);
-          item.conv.msgs.push({ role: "assistant", content: response, timestamp: Date.now() });
+          const sentText = await agentsModuleSweep.processTags(item.agentId, item.numero, response, clientText);
+          if (!sentText) continue;
+          item.conv.msgs.push({ role: "assistant", content: sentText, timestamp: Date.now() });
           item.conv.ultimaMensagem = Date.now();
           sent++;
           await new Promise((r) => setTimeout(r, 2000));

@@ -25,6 +25,24 @@ const MAX_RETRIES = 5;
 // Estado por sessão
 const sessions = {};
 
+function unwrapMessageContent(message) {
+  let current = message || {};
+  const wrappers = [
+    'ephemeralMessage',
+    'viewOnceMessage',
+    'viewOnceMessageV2',
+    'viewOnceMessageV2Extension',
+    'documentWithCaptionMessage',
+    'editedMessage',
+  ];
+  for (let depth = 0; depth < 6; depth++) {
+    const wrapper = wrappers.find(key => current?.[key]?.message);
+    if (!wrapper) break;
+    current = current[wrapper].message;
+  }
+  return current || {};
+}
+
 function getSession(sessionId) {
   if (!sessions[sessionId]) {
     sessions[sessionId] = {
@@ -322,16 +340,17 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         if (!phone) continue;
 
-        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.interactiveMessage?.body?.text || msg.message?.buttonsResponseMessage?.selectedDisplayText || msg.message?.templateButtonReplyMessage?.selectedDisplayText || '';
+        const content = unwrapMessageContent(msg.message);
+        const text = content?.conversation || content?.extendedTextMessage?.text || content?.interactiveMessage?.body?.text || content?.buttonsResponseMessage?.selectedDisplayText || content?.templateButtonReplyMessage?.selectedDisplayText || content?.listResponseMessage?.title || content?.listResponseMessage?.description || content?.imageMessage?.caption || content?.videoMessage?.caption || '';
         const pushName = msg.pushName || '';
 
-        const locMsg = msg.message?.locationMessage;
+        const locMsg = content?.locationMessage;
         const location = locMsg
           ? { latitude: locMsg.degreesLatitude, longitude: locMsg.degreesLongitude }
           : undefined;
 
         let audio;
-        if (msg.message?.audioMessage) {
+        if (content?.audioMessage) {
           try {
             const stream = await downloadMediaMessage(msg, 'buffer', {});
             const buffer = Buffer.isBuffer(stream) ? stream : Buffer.from(stream);
@@ -344,20 +363,20 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         // Imagem — baixa completa; fallback para thumbnail embutido
         let image;
-        if (msg.message?.imageMessage) {
+        if (content?.imageMessage) {
           try {
             const stream = await downloadMediaMessage(msg, 'buffer', {});
             const buffer = Buffer.isBuffer(stream) ? stream : Buffer.from(stream);
             image = {
               base64: buffer.toString('base64'),
-              mimetype: msg.message.imageMessage.mimetype || 'image/jpeg',
-              caption: msg.message.imageMessage.caption || '',
+              mimetype: content.imageMessage.mimetype || 'image/jpeg',
+              caption: content.imageMessage.caption || '',
             };
             console.log(`[BAILEYS:${sessionId}] Imagem baixada: ${buffer.length} bytes`);
           } catch (e) {
-            const thumb = msg.message.imageMessage.jpegThumbnail;
+            const thumb = content.imageMessage.jpegThumbnail;
             if (thumb) {
-              image = { base64: Buffer.from(thumb).toString('base64'), mimetype: 'image/jpeg', caption: msg.message.imageMessage.caption || '' };
+              image = { base64: Buffer.from(thumb).toString('base64'), mimetype: 'image/jpeg', caption: content.imageMessage.caption || '' };
               console.log(`[BAILEYS:${sessionId}] Imagem: usando thumbnail (${thumb.length} bytes)`);
             }
             console.error(`[BAILEYS:${sessionId}] Erro ao baixar imagem:`, e.message);
@@ -366,13 +385,13 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
 
         // Vídeo — Claude não processa vídeo, mas usa thumbnail JPEG embutido
         let videoThumb;
-        if (msg.message?.videoMessage) {
-          const thumb = msg.message.videoMessage.jpegThumbnail;
+        if (content?.videoMessage) {
+          const thumb = content.videoMessage.jpegThumbnail;
           if (thumb) {
             videoThumb = {
               base64: Buffer.from(thumb).toString('base64'),
               mimetype: 'image/jpeg',
-              caption: msg.message.videoMessage.caption || '',
+              caption: content.videoMessage.caption || '',
             };
             console.log(`[BAILEYS:${sessionId}] Thumbnail de vídeo extraído: ${thumb.length} bytes`);
           }
@@ -383,7 +402,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
           isFromMe: false,
           text: { message: text },
           body: text,
-          caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || '',
+          caption: content?.imageMessage?.caption || content?.videoMessage?.caption || '',
           location,
           audio,
           image,

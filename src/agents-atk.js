@@ -188,7 +188,7 @@ function asksAboutPedroLaunch(text) {
 
 function asksGenericPedroInfo(text) {
   const t = normalizeTextBasic(text);
-  const genericInterest = /\b(?:tenho\s+interesse|queria\s+(?:mais\s+)?informacoes|quero\s+(?:mais\s+)?informacoes|mais\s+informacoes|me\s+explica|como\s+funciona)\b/.test(t);
+  const genericInterest = /\b(?:tenho\s+interesse|queria\s+(?:mais\s+)?informacoes|quero\s+(?:mais\s+)?informacoes|mais\s+informacoes|me\s+explica|como\s+funciona|iniciou\s+conversa\s+pelo\s+anuncio)\b/.test(t);
   const specificProduct = detectPedroProductKey(t);
   return genericInterest && !specificProduct;
 }
@@ -196,6 +196,75 @@ function asksGenericPedroInfo(text) {
 function buildPedroInitialReply(text = "") {
   if (!asksGenericPedroInfo(text)) return "";
   return "Oi! Sou o Pedro. Tenho o V10 por R$360 e o novo S10 por R$400. Quer ver o tradicional ou o lancamento?";
+}
+
+function asksPedroPrice(text) {
+  const t = normalizeTextBasic(text);
+  return /\b(?:quanto\s+(?:(?:esta|ta)\s+)?(?:custa|custando|fica|e)|qual\s+(?:o\s+)?valor|preco|valor|custa\s+quanto|outro\s+de\s+quanto)\b/.test(t);
+}
+
+function asksPedroInstallation(text) {
+  const t = normalizeTextBasic(text);
+  return /\b(?:instala|instalar|instalacao|monta|montagem)\b/.test(t) && /\b(?:casa|residencia|local|ai|vem|faz|monta|instala)\b/.test(t);
+}
+
+function asksPedroGuarantee(text) {
+  return /\bgarantia\b/.test(normalizeTextBasic(text));
+}
+
+function isPedroThanksOnly(text) {
+  const t = normalizeTextBasic(text).replace(/^\[audio\]:\s*/, "").trim();
+  return /^(?:obrigad[ao]|muito\s+obrigad[ao]|valeu|agradeco)(?:[,.!\s]|$)/.test(t) && !asksPedroPrice(t);
+}
+
+function buildPedroPriceReply(numero, text = "") {
+  if (!asksPedroPrice(text)) return "";
+  const t = normalizeTextBasic(text);
+  const conv = db.getConversation("pedro", numero);
+  const selected = detectPedroProductKey(t) || conv?.pedroProductKey || null;
+  const comparesBoth = /\b(?:um\s+de\s+360|outro\s+de\s+quanto|dois\s+modelos|cada\s+um)\b/.test(t);
+  if (selected === "s10" && !comparesBoth) return "O Uni TV S10 preto custa R$400 a vista.";
+  if (selected === "v10" && !comparesBoth) return "O Uni TV V10 custa R$360 a vista.";
+  return "O V10 custa R$360 e o S10 preto custa R$400 a vista.";
+}
+
+function buildPedroFaqReply(numero, text = "") {
+  if (asksPedroInstallation(text)) {
+    return "Nao fazemos instalacao na residencia. O aparelho vai configurado; e so ligar na TV e conectar a internet.";
+  }
+  if (asksPedroGuarantee(text)) {
+    return "A garantia e de 30 dias contra defeito de fabrica.";
+  }
+  const priceReply = buildPedroPriceReply(numero, text);
+  if (priceReply) return priceReply;
+  if (isPedroThanksOnly(text)) return "Por nada! Se decidir continuar, e so me chamar.";
+  return "";
+}
+
+function repairPedroCatalogPrices(numero, clientMessage, response) {
+  let text = String(response || "").trim();
+  if (!text) return text;
+
+  const explicitPriceQuestion = buildPedroPriceReply(numero, clientMessage);
+  if (explicitPriceQuestion) return explicitPriceQuestion;
+
+  const normalized = normalizeTextBasic(text);
+  const hasInstallmentContext = /\b(?:parcela|parcelado|vezes|entrada|frete|total)\b/.test(normalized);
+  if (hasInstallmentContext) return text;
+
+  const wrongS10 = /(?:s\s*10|s10)[^.!?\n]{0,60}(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!400\b)\d{1,5}|(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!400\b)\d{1,5}[^.!?\n]{0,60}(?:s\s*10|s10)/i.test(normalized);
+  const wrongV10 = /(?:v\s*10|v10)[^.!?\n]{0,60}(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!360\b)\d{1,5}|(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!360\b)\d{1,5}[^.!?\n]{0,60}(?:v\s*10|v10)/i.test(normalized);
+  const selected = db.getConversation("pedro", numero)?.pedroProductKey;
+  const offered = normalized.match(/\b(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(\d{1,5})\b/i);
+  const wrongSelected = offered && (
+    (selected === "s10" && Number(offered[1]) !== PEDRO_PRODUCT_OPTIONS.s10.price) ||
+    (selected === "v10" && Number(offered[1]) !== PEDRO_PRODUCT_OPTIONS.v10.price)
+  );
+  if (wrongS10 || wrongV10 || wrongSelected) {
+    db.addEvent(`preco_catalogo_corrigido: pedro ${numero}`);
+    return "O V10 custa R$360 e o S10 preto custa R$400 a vista.";
+  }
+  return text;
 }
 
 function buildPedroLaunchReply(numero, text = "") {
@@ -301,6 +370,52 @@ function isLikelyTruncated(text) {
   return false;
 }
 
+function isAgentResponseComplete(agentId, numero, clientMessage, response) {
+  const text = String(response || "").trim();
+  if (!text || isLikelyTruncated(text)) return false;
+  if (/r\$\s*\d{1,2}\s*$/i.test(text)) return false;
+  if (/\b(?:pra|para|porque|que|com|e|ou|mas|modelo|produto|novo)\s*$/i.test(normalizeTextBasic(text))) return false;
+
+  if (agentId === "pedro") {
+    if (asksPedroPrice(clientMessage)) {
+      const expected = buildPedroPriceReply(numero, clientMessage);
+      const expectedPrices = expected.match(/R\$\d+/g) || [];
+      if (!expectedPrices.every(price => text.includes(price))) return false;
+    }
+    if (asksPedroInstallation(clientMessage) && !/nao\s+(?:fazemos|realizamos).*instal|nao\s+instalamos|vai\s+configurad/i.test(normalizeTextBasic(text))) return false;
+    if (asksPedroGuarantee(clientMessage) && !/30\s+dias/.test(normalizeTextBasic(text))) return false;
+  }
+  return true;
+}
+
+function buildSafeAgentFallback(agentId, numero, clientMessage) {
+  if (agentId === "pedro") {
+    return buildPedroFaqReply(numero, clientMessage) ||
+      buildPedroInitialReply(clientMessage) ||
+      "Desculpe, minha resposta saiu incompleta. Pode repetir a pergunta?";
+  }
+  return "Desculpe, minha resposta saiu incompleta. Pode repetir a pergunta?";
+}
+
+async function generateValidatedResponse(agentId, numero, clientMessage, messages, options = {}) {
+  const prompt = buildSystemPrompt(agentId, numero, clientMessage);
+  const maxAttempts = options.maxAttempts || 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const raw = await callClaude(prompt, messages, {
+      maxTokens: options.maxTokens || 600,
+      timeout: options.timeout || 25000,
+    });
+    if (!raw) continue;
+    const candidate = agentId === "pedro"
+      ? repairPedroCatalogPrices(numero, clientMessage, raw)
+      : String(raw).trim();
+    if (isAgentResponseComplete(agentId, numero, clientMessage, candidate)) return candidate;
+    console.error(`[AI/INCOMPLETA] ${agentId}/${numero}: tentativa ${attempt}/${maxAttempts}: "${String(candidate).slice(0, 140)}"`);
+  }
+  db.addEvent(`fallback_resposta_segura: ${agentId} ${numero}`);
+  return buildSafeAgentFallback(agentId, numero, clientMessage);
+}
+
 const PEDRO_INTERNET_QUESTION = "Qual internet voce usa: Vivo, Oi, TIM, Claro ou de bairro?";
 const PEDRO_CLARO_MESSAGE = "Infelizmente o aparelho nao e compativel com a rede da Claro. Por seguranca, nao realizamos a venda para clientes dessa operadora.";
 
@@ -371,18 +486,14 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
   const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
+  const faqReply = buildPedroFaqReply(numero, clientMessage);
+  if (faqReply) return faqReply;
   const transparencyReply = buildPedroContentTransparencyReply(clientMessage, currentText);
   if (transparencyReply) return transparencyReply;
   const channelReply = buildPedroChannelReply(clientMessage);
   if (channelReply) return channelReply;
   if (/canal|canais|aberto|fechado|esporte|espn/.test(msg)) {
     return "A lista de canais pode variar. O que posso confirmar e que somente o Uni TV S10 preto possui ESPN, com 1 canal. O V10 nao possui ESPN e nenhum dos dois possui Disney+.";
-  }
-  if (/garantia|instala|instalar|configurad|suporte|nao entendo|meu menino|esse de 400|400.*melhor/.test(msg)) {
-    return "Sim, o Uni TV S10 preto e o melhor modelo: ele tem ESPN, resolucao 8K e processador mais rapido. A garantia e de 30 dias contra defeito de fabrica. A gente nao instala na casa: ele ja vai pronto e configurado, e e so ligar na TV e conectar na internet. Se tiver duvida, eu auxilio pelo WhatsApp.";
-  }
-  if (/tenho dois modelos|uni tv v10|uni tv s10|que e o|modelo tradicional/.test(current)) {
-    return "Eu tenho dois modelos: o Uni TV V10 fica R$360 e e o modelo tradicional. O Uni TV S10 preto fica R$400, e o modelo 2026 com ESPN, 8K e processador mais rapido.";
   }
   if (/qual\s+valor|valor|preco|preco|quanto\s+(?:custa|fica)|eu\s+quero\s+saber\s+o\s+valor/.test(msg)) {
     if (productCtx.key === "s10") return "O Uni TV S10 preto fica R$400 a vista. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Tambem parcela no cartao com a taxa da maquininha.";
@@ -391,9 +502,6 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   }
   if (/diferenca|diferen[cç]a|qual\s+melhor|espn|preto|s10/.test(msg)) {
     return "A diferenca e essa: o V10 e o modelo tradicional por R$360. O S10 preto e o lancamento 2026 por R$400, tem ESPN, resolucao 8K e processador mais rapido.";
-  }
-  if (/^sim$|^ok$|^certo$|entendi|quero|pode|explica|me fala/.test(msg)) {
-    return "Tenho dois modelos: o V10 por R$360 e o S10 preto por R$400. O S10 e o lancamento 2026, tem ESPN, 8K e processador mais rapido. Qual voce prefere?";
   }
   return "";
 }
@@ -1537,6 +1645,14 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   }
 
   // TRAVA ANTI-MANIPULACAO: Detectar preco errado (abaixo do piso OU preco de outro produto)
+  if (agentId === "pedro" && texto.trim()) {
+    const repaired = repairPedroCatalogPrices(numero, clientMessage, texto);
+    if (repaired !== texto) {
+      console.error(`[CATALOGO/PRECO] Pedro/${numero}: resposta corrigida antes do envio`);
+      texto = repaired;
+    }
+  }
+
   // Leitura de db.agentCatalog — fonte única e persistida, reflete mudancas sem restart
   const getPrecoAgente = (id, num = numero, msgAtual = texto) => {
     const productCtx = getProductContext(id, num, msgAtual);
@@ -1791,11 +1907,9 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
     texto = buildPedroInstallmentReply(numero, clientMessage);
   }
   if (isLikelyTruncated(texto)) {
-    const fallback = deterministicFallback(agentId, numero, clientMessage, texto);
-    if (fallback) {
-      console.error(`RESPOSTA TRUNCADA BLOQUEADA ${agentId}/${numero}: "${texto.substring(0, 120)}"`);
-      texto = fallback;
-    }
+    const fallback = deterministicFallback(agentId, numero, clientMessage, texto) || buildSafeAgentFallback(agentId, numero, clientMessage);
+    console.error(`RESPOSTA TRUNCADA BLOQUEADA ${agentId}/${numero}: "${texto.substring(0, 120)}"`);
+    texto = fallback;
   }
 
   // Send the cleaned text (delay para parecer natural — humano digitando)
@@ -2120,7 +2234,7 @@ async function handleIncomingMessage(agentId, body) {
     db.state._debugIncoming.push({ ts: Date.now(), agentId, phone: numero, pushName: body.pushName || "", phoneLen: numero.length, isOwner, texto: (texto || "").slice(0, 50) });
     if (db.state._debugIncoming.length > 20) db.state._debugIncoming = db.state._debugIncoming.slice(-20);
     if (isOwner) {
-      // Transcrever audio do Miron antes de processar (Aslam entende audio)
+      // Transcrever audio do Miron antes de processar no gestor operacional.
       let textoOwner = texto;
       if (!textoOwner && body.audio?.audioUrl) {
         try {
@@ -2142,11 +2256,11 @@ async function handleIncomingMessage(agentId, body) {
         db.save();
         return;
       }
-      // Any other message from Miron goes to Aslam
+      // Qualquer outra mensagem do Miron segue para o gestor operacional.
       if (textoOwner && textoOwner.trim()) {
         try {
-          const aslam = require("./aslam");
-          const resposta = await aslam.handleAslamChat(textoOwner);
+          const gestor = require("./gestor-atk");
+          const resposta = await gestor.handleAslamChat(textoOwner);
           if (resposta) {
             // Salvar _originalJid temporariamente para o sendText usar via conv
             // Isso garante que a resposta vai pro LID correto quando Baileys usa @lid
@@ -2159,7 +2273,7 @@ async function handleIncomingMessage(agentId, body) {
             await sendText(agentId, numero, resposta, { bypassPause: true });
           }
         } catch (e) {
-          console.error(`Erro Aslam via ${agent.name}:`, e.message);
+          console.error(`Erro gestor via ${agent.name}:`, e.message);
         }
       }
       return;
@@ -2547,14 +2661,9 @@ async function handleIncomingMessage(agentId, body) {
       const targetResposta = await callClaudeWithRetry(targetSystemPrompt, targetMsgs, { maxTokens: 600 });
 
       if (targetResposta) {
-        // Filter through Aslam
-        let targetRespostaFinal;
-        try {
-          const aslam = require("./aslam");
-          targetRespostaFinal = await aslam.filterResponse(targetAgentId, numero, mensagem, targetResposta);
-        } catch (eAslam) {
-          targetRespostaFinal = targetResposta;
-        }
+        const targetRespostaFinal = targetAgentId === "pedro"
+          ? repairPedroCatalogPrices(numero, mensagem, targetResposta)
+          : targetResposta;
 
         const _targetTextoEnviado = await processTags(targetAgentId, numero, targetRespostaFinal, mensagem);
         if (_targetTextoEnviado) {
@@ -2567,8 +2676,7 @@ async function handleIncomingMessage(agentId, body) {
       return; // Don't let original agent respond
     }
 
-    // Build prompt and call Claude (msg já salva no historico pelo debounce, 5s de espera já feito)
-    let systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
+    // Mensagem ja foi salva no historico pelo debounce.
     const conv = db.getConversation(agentId, numero);
 
     // Registra a operadora quando o cliente responder. A apresentacao e o video
@@ -2594,9 +2702,6 @@ async function handleIncomingMessage(agentId, body) {
         conv.pedroInternetProvider = provider;
         db.addEvent(`internet_qualificada: pedro ${numero} ${provider}`);
         db.save();
-        // O prompt inicial foi montado antes da qualificacao desta mensagem.
-        // Reconstruir evita que a IA receba o bloqueio antigo e pergunte de novo.
-        systemPrompt = buildSystemPrompt(agentId, numero, mensagem);
       }
     }
 
@@ -2607,6 +2712,17 @@ async function handleIncomingMessage(agentId, body) {
         const item = conv.msgs[i];
         if (item.role === "assistant") break;
         if (item.role === "user") pendingClientMessages.unshift(item.content || "");
+      }
+      const faqReply = buildPedroFaqReply(numero, pendingClientMessages.join("\n"));
+      if (faqReply) {
+        const sent = await sendText(agentId, numero, faqReply);
+        if (sent) {
+          conv.msgs.push({ role: "assistant", content: faqReply, timestamp: Date.now() });
+          conv.ultimaMensagem = Date.now();
+          db.addEvent(`faq_pedro_respondida: ${agentId} ${numero}`);
+          db.save();
+        }
+        return;
       }
       const initialReply = buildPedroInitialReply(pendingClientMessages.join("\n"));
       if (initialReply && !conv.pedroProductKey) {
@@ -2843,9 +2959,14 @@ async function handleIncomingMessage(agentId, body) {
       }
     }
 
-    // Usa retry com backoff (3 tentativas, 1s/2s/4s)
     const contextSize = 20;
-    let resposta = await callClaudeWithRetry(systemPrompt, conv.msgs.slice(-contextSize), { maxTokens: 600 });
+    let resposta = await generateValidatedResponse(
+      agentId,
+      numero,
+      mensagem,
+      conv.msgs.slice(-contextSize),
+      { maxTokens: 600, timeout: 25000 }
+    );
 
     if (!resposta) {
       console.error(`[AI] ${agent.name}: FALHA TOTAL DA IA para ${numero} após 3 tentativas — Gemini e Anthropic indisponíveis`);
@@ -2863,17 +2984,11 @@ async function handleIncomingMessage(agentId, body) {
       return;
     }
 
-    // Pass through Aslam filter (require at runtime to avoid circular deps)
-    let respostaFinal;
-    try {
-      const aslam = require("./aslam");
-      respostaFinal = await aslam.filterResponse(agentId, numero, mensagem, resposta);
-    } catch (eAslam) {
-      console.error(`filterResponse ${agent.name} falhou, usando resposta bruta:`, eAslam.message);
-      respostaFinal = resposta;
-    }
+    let respostaFinal = agentId === "pedro"
+      ? repairPedroCatalogPrices(numero, mensagem, resposta)
+      : resposta;
 
-    // Log if Aslam removed media tags
+    // Diagnostico de preservacao das tags de midia.
     if (resposta.includes("ENVIAR_FOTO") && !respostaFinal.includes("ENVIAR_FOTO")) {
       console.error(`ASLAM REMOVEU ENVIAR_FOTO de ${agent.name}/${numero}!`);
     }
@@ -3088,7 +3203,13 @@ module.exports = {
   buildPedroChannelReply,
   buildPedroLaunchReply,
   buildPedroInitialReply,
+  buildPedroFaqReply,
+  buildPedroPriceReply,
+  repairPedroCatalogPrices,
+  isAgentResponseComplete,
+  generateValidatedResponse,
   detectPedroProductKey,
+  rememberPedroProductChoice,
   buildPedroInstallmentReply,
   buildPedroContentTransparencyReply,
   extractKnowledge,
