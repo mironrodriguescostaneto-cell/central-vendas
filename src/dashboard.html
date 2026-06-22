@@ -2177,7 +2177,12 @@ async function atkRmkCheckStatus() {
       prog.style.display = 'block'; btnParar.style.display = 'block'; btnEnviar.disabled = true;
     } else {
       clearInterval(atkRmkStatusTimer);
-      if (d.total > 0) {
+      if (d.erroFatal) {
+        bar.style.width = '100%';
+        bar.style.background = 'var(--danger)';
+        txt.textContent = d.erroFatal;
+        prog.style.display = 'block';
+      } else if (d.total > 0) {
         bar.style.width = '100%';
         const erroFinal = d.erros > 0 ? ` (${d.erros} erro${d.erros > 1 ? 's' : ''})` : '';
         txt.textContent = `✓ ${d.enviados}/${d.total} enviados${erroFinal}`;
@@ -2193,7 +2198,10 @@ async function atkRmkPausar() {
   await fetch('/api/remarketing/pausar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
 }
 async function atkRmkRetomar() {
-  await fetch('/api/remarketing/retomar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
+  const r = await fetch('/api/remarketing/retomar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });
+  const d = await r.json();
+  if (!r.ok) alert(d.error || 'Nao foi possivel retomar a campanha');
+  atkRmkPollStatus();
 }
 async function atkRmkParar() {
   await fetch('/api/remarketing/parar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ agente: atkRmkAgente }) });

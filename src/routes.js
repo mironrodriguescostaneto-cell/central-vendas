@@ -3,6 +3,7 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 const { CONFIG } = require('./config');
 const db = require('./database');
 const baileys = require('./baileys');
@@ -644,12 +645,14 @@ router.post('/api/agents/:agentId/test-message', auth, async (req, res) => {
 
 // ----- Remarketing Logzz / ATK -----
 const _remarkTempImgs = new Map();
+const REMARK_MEDIA_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REMARK_MEDIA_DIR = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(), 'data'), 'remarketing-media');
 const _remarkState = {
-  logzz:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
-  sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
-  pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
-  rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
-  antonio: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '' },
+  logzz:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '', erroFatal: '' },
+  sarah:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '', erroFatal: '' },
+  pedro:   { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '', erroFatal: '' },
+  rodrigo: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '', erroFatal: '' },
+  antonio: { ativo: false, pausado: false, cancelar: false, enviados: 0, total: 0, erros: 0, pulados: 0, campanhaId: null, atual: '', erroFatal: '' },
 };
 const VALID_REMARK_AGENTS = ['logzz', 'sarah', 'pedro', 'rodrigo', 'antonio'];
 const ATK_REMARK_AGENTS   = ['pedro', 'rodrigo'];
@@ -659,13 +662,21 @@ router.post('/api/remarketing/temp-img', auth, (req, res) => {
   if (!base64 || !mimetype) return res.status(400).json({ error: 'base64 e mimetype obrigatorios' });
   const buffer = Buffer.from(base64.replace(/^data:[^;]+;base64,/, ''), 'base64');
   const id = crypto.randomBytes(10).toString('hex');
-  _remarkTempImgs.set(id, { buffer, mimetype, expiresAt: Date.now() + 7200000 });
+  const entry = { buffer, mimetype, expiresAt: Date.now() + REMARK_MEDIA_TTL_MS };
+  _remarkTempImgs.set(id, entry);
+  try {
+    fs.mkdirSync(REMARK_MEDIA_DIR, { recursive: true });
+    fs.writeFileSync(path.join(REMARK_MEDIA_DIR, `${id}.bin`), buffer);
+    fs.writeFileSync(path.join(REMARK_MEDIA_DIR, `${id}.json`), JSON.stringify({ mimetype, expiresAt: entry.expiresAt }));
+  } catch (e) {
+    console.error('[Remarketing] Falha ao persistir midia temporaria:', e.message);
+  }
   const url = `${req.protocol}://${req.get('host')}/api/remarketing/temp-img/${id}`;
   res.json({ ok: true, id, url });
 });
 
 router.get('/api/remarketing/temp-img/:id', (req, res) => {
-  const img = _remarkTempImgs.get(req.params.id);
+  const img = _getRemarketingTempImage(`/api/remarketing/temp-img/${req.params.id}`);
   if (!img || img.expiresAt < Date.now()) return res.status(404).send('Not found');
   res.setHeader('Content-Type', img.mimetype);
   res.send(img.buffer);
@@ -675,8 +686,21 @@ function _getRemarketingTempImage(imagemUrl) {
   if (!imagemUrl) return null;
   const id = String(imagemUrl).split('/api/remarketing/temp-img/')[1]?.split(/[?#]/)[0];
   if (!id) return null;
-  const img = _remarkTempImgs.get(id);
-  if (!img || img.expiresAt < Date.now()) return null;
+  let img = _remarkTempImgs.get(id);
+  if (!img) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(path.join(REMARK_MEDIA_DIR, `${id}.json`), 'utf8'));
+      const buffer = fs.readFileSync(path.join(REMARK_MEDIA_DIR, `${id}.bin`));
+      img = { buffer, mimetype: meta.mimetype, expiresAt: Number(meta.expiresAt || 0) };
+      _remarkTempImgs.set(id, img);
+    } catch { return null; }
+  }
+  if (img.expiresAt < Date.now()) {
+    _remarkTempImgs.delete(id);
+    try { fs.unlinkSync(path.join(REMARK_MEDIA_DIR, `${id}.bin`)); } catch {}
+    try { fs.unlinkSync(path.join(REMARK_MEDIA_DIR, `${id}.json`)); } catch {}
+    return null;
+  }
   return img;
 }
 
@@ -870,10 +894,14 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   const textosValidos = Array.isArray(textos) ? textos.map(t => String(t || '').trim()).filter(Boolean) : [];
   const textoPrincipal = textosValidos.length ? textosValidos[0] : texto;
   const mediaUrl = imagemUrl ? _normalizeMediaUrl(imagemUrl) : '';
+  const isTempMedia = mediaUrl.includes('/api/remarketing/temp-img/');
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
   if (!textoPrincipal && !mediaUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
+  if (isTempMedia && !_getRemarketingTempImage(mediaUrl)) {
+    return res.status(410).json({ error: 'A imagem expirou. Selecione a imagem novamente antes de enviar.' });
+  }
 
   const isAtk = ATK_REMARK_AGENTS.includes(agente);
   const dbAtkForDedup = isAtk ? require('./database-atk') : null;
@@ -907,7 +935,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   }
 
   const state = _remarkState[agente];
-  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.pulados = 0; state.total = numerosParaEnvio.length; state.campanhaId = remarketingCampaign?.id || null; state.atual = '';
+  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.pulados = 0; state.total = numerosParaEnvio.length; state.campanhaId = remarketingCampaign?.id || null; state.atual = ''; state.erroFatal = '';
   res.json({ ok: true, total: numerosParaEnvio.length, campanhaId: remarketingCampaign?.id || null });
 
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
@@ -982,6 +1010,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         const textoAtual = textosValidos.length ? textosValidos[envioIndex % textosValidos.length] : textoPrincipal;
         envioIndex++;
         const tempImage = mediaType === 'image' ? _getRemarketingTempImage(mediaUrl) : null;
+        if (isTempMedia && !tempImage) throw new Error('__media_expired__');
         const sendFn = mediaUrl
           ? () => tempImage
             ? baileys.sendMediaBuffer(sessionId, numero, 'image', tempImage.buffer, textoAtual || '', originalJid, tempImage.mimetype)
@@ -1022,6 +1051,11 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       } catch (e) {
         state.erros++;
         if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignFailed(remarketingCampaign.id, numero, e.message);
+        if (e.message === '__media_expired__') {
+          state.erroFatal = 'A imagem da campanha expirou. Selecione a imagem novamente e inicie um novo envio.';
+          console.error(`[Remarketing] ${agente}: campanha interrompida porque a imagem expirou`);
+          break;
+        }
         if (e.message === '__timeout__') {
           consecutiveTimeouts++;
           console.error(`[Remarketing] Timeout ${numero} (${consecutiveTimeouts} consecutivos)`);
@@ -1039,7 +1073,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     state.ativo = false;
     state.atual = '';
     if (isAtk && remarketingCampaign) {
-      require('./database-atk').finishRemarketingCampaign(remarketingCampaign.id, state.cancelar ? 'stopped' : 'finished');
+      require('./database-atk').finishRemarketingCampaign(remarketingCampaign.id, state.cancelar ? 'stopped' : (state.erroFatal ? 'failed' : 'finished'));
     }
     console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} OK, ${state.erros} erros`);
   })();
@@ -1069,7 +1103,18 @@ router.post('/api/remarketing/pausar', auth, (req, res) => {
 router.post('/api/remarketing/retomar', auth, (req, res) => {
   const { agente } = req.body;
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
-  _remarkState[agente].pausado = false;
+  const state = _remarkState[agente];
+  if (state.ativo && state.campanhaId && ATK_REMARK_AGENTS.includes(agente)) {
+    const dbAtk = require('./database-atk');
+    const campaign = dbAtk.getRemarketingCampaign(state.campanhaId);
+    if (campaign?.imageUrl?.includes('/api/remarketing/temp-img/') && !_getRemarketingTempImage(campaign.imageUrl)) {
+      state.erroFatal = 'A imagem da campanha expirou. Selecione a imagem novamente e inicie um novo envio.';
+      state.cancelar = true;
+      state.pausado = false;
+      return res.status(410).json({ error: state.erroFatal });
+    }
+  }
+  state.pausado = false;
   res.json({ ok: true });
 });
 
