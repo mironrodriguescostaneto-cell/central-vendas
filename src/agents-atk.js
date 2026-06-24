@@ -460,6 +460,7 @@ const AUTHORIZED_CATALOG = {
     nome_oficial: "Uni TV V10",
     nomes_proibidos: [
       /tv\s*box/i,                                                              // "TV Box", "TV Box basico", etc.
+      /\bs\s*1[0]\b/i,                                                         // modelo removido, inclusive mencao abreviada
       /uni\s*tv\s*v(?!10\b)\d+/i,                                              // "Uni TV V9", "Uni TV V11", etc.
       /uni\s*tv\s*s\d+/i,                                                       // toda a linha S foi removida
       /uni\s*tv\s+(basico|basic|premium|plus|pro|lite|standard|ultra|max|master|entry|advanced)/i,
