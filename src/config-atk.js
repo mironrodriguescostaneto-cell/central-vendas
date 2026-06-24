@@ -44,13 +44,13 @@ const CONFIG = {
   AGENTS: {
     pedro: {
       name: 'Pedro',
-      product: 'Uni TV V10 / Uni TV S10',
+      product: 'Uni TV V10',
       price: 360,
       floorPrice: 340,
       get provider() { return env('PEDRO_PROVIDER', 'baileys'); },
       get numero()   { return env('PEDRO_NUMERO'); },
       get zapi()     { return { instance: env('PEDRO_ZAPI_INSTANCE'), token: env('PEDRO_ZAPI_TOKEN'), clientToken: env('PEDRO_ZAPI_CLIENT_TOKEN') }; },
-      get media()    { return { foto1: env('PEDRO_FOTO1', 'https://drive.google.com/uc?export=download&id=1kcy56QgpZOi2jxExFkk8EvAMoAAqmvvP'), video1: env('PEDRO_VIDEO1', 'https://drive.google.com/uc?export=download&id=1LKyr7s9ozYguj7f3elJD7LZhUGeWNWPM'), s10Foto: env('PEDRO_S10_FOTO', ''), s10Video: env('PEDRO_S10_VIDEO', 'https://drive.google.com/uc?export=download&id=17NmKz8GUJ90cXoKMxDKxuI9lAvm2Jbp4'), audio1: env('PEDRO_AUDIO1') }; },
+      get media()    { return { foto1: env('PEDRO_FOTO1', 'https://drive.google.com/uc?export=download&id=1kcy56QgpZOi2jxExFkk8EvAMoAAqmvvP'), video1: env('PEDRO_VIDEO1', 'https://drive.google.com/uc?export=download&id=1LKyr7s9ozYguj7f3elJD7LZhUGeWNWPM'), audio1: env('PEDRO_AUDIO1') }; },
       pauseCmd:  'PEDRO_PARA',
       resumeCmd: 'PEDRO_INICIA',
     },

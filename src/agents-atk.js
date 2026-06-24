@@ -166,7 +166,6 @@ function calcInstallmentsWhatsApp(valorBase, maxParcelas = 10) {
 
 const PEDRO_PRODUCT_OPTIONS = {
   v10: { key: "v10", name: "Uni TV V10", price: 360, floor: 340 },
-  s10: { key: "s10", name: "Uni TV S10", price: 400, floor: 400 },
 };
 
 function normalizeTextBasic(text) {
@@ -175,15 +174,8 @@ function normalizeTextBasic(text) {
 
 function detectPedroProductKey(text) {
   const t = normalizeTextBasic(text);
-  if (/\b(?:esse|aparelho|modelo)\s+(?:de\s+)?(?:r\$\s*)?400\b/.test(t)) return "s10";
-  if (/\b(?:s\s*10|s10|preto|espn|lancamento|novidade|modelo\s+(?:mais\s+)?novo|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
   if (/\b(?:v\s*10|v10|branc[ao]|mais\s+barat[ao]|menor\s+valor)\b/.test(t)) return "v10";
   return null;
-}
-
-function asksAboutPedroLaunch(text) {
-  const t = normalizeTextBasic(text);
-  return /\b(?:lancamento|novidade|modelo\s+(?:mais\s+)?novo|mais\s+recente|modelo\s+2026)\b/.test(t);
 }
 
 function asksGenericPedroInfo(text) {
@@ -195,7 +187,7 @@ function asksGenericPedroInfo(text) {
 
 function buildPedroInitialReply(text = "") {
   if (!asksGenericPedroInfo(text)) return "";
-  return "Oi! Sou o Pedro. Tenho o V10 por R$360 e o novo S10 por R$400. Quer ver o tradicional ou o lancamento?";
+  return "Oi! Sou o Pedro. Trabalho com o Uni TV V10 por R$360. Quer que eu te mostre como ele funciona?";
 }
 
 function asksPedroPrice(text) {
@@ -219,13 +211,7 @@ function isPedroThanksOnly(text) {
 
 function buildPedroPriceReply(numero, text = "") {
   if (!asksPedroPrice(text)) return "";
-  const t = normalizeTextBasic(text);
-  const conv = db.getConversation("pedro", numero);
-  const selected = detectPedroProductKey(t) || conv?.pedroProductKey || null;
-  const comparesBoth = /\b(?:um\s+de\s+360|outro\s+de\s+quanto|dois\s+modelos|cada\s+um)\b/.test(t);
-  if (selected === "s10" && !comparesBoth) return "O Uni TV S10 preto custa R$400 a vista.";
-  if (selected === "v10" && !comparesBoth) return "O Uni TV V10 custa R$360 a vista.";
-  return "O V10 custa R$360 e o S10 preto custa R$400 a vista.";
+  return "O Uni TV V10 custa R$360 a vista.";
 }
 
 function buildPedroFaqReply(numero, text = "") {
@@ -252,29 +238,14 @@ function repairPedroCatalogPrices(numero, clientMessage, response) {
   const hasInstallmentContext = /\b(?:parcela|parcelado|vezes|entrada|frete|total)\b/.test(normalized);
   if (hasInstallmentContext) return text;
 
-  const wrongS10 = /(?:s\s*10|s10)[^.!?\n]{0,60}(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!400\b)\d{1,5}|(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!400\b)\d{1,5}[^.!?\n]{0,60}(?:s\s*10|s10)/i.test(normalized);
   const wrongV10 = /(?:v\s*10|v10)[^.!?\n]{0,60}(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!360\b)\d{1,5}|(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(?!360\b)\d{1,5}[^.!?\n]{0,60}(?:v\s*10|v10)/i.test(normalized);
-  const selected = db.getConversation("pedro", numero)?.pedroProductKey;
   const offered = normalized.match(/\b(?:fica|custa|sai|por|e)\s*(?:por\s+)?r\$\s*(\d{1,5})\b/i);
-  const wrongSelected = offered && (
-    (selected === "s10" && Number(offered[1]) !== PEDRO_PRODUCT_OPTIONS.s10.price) ||
-    (selected === "v10" && Number(offered[1]) !== PEDRO_PRODUCT_OPTIONS.v10.price)
-  );
-  if (wrongS10 || wrongV10 || wrongSelected) {
+  const wrongSelected = offered && Number(offered[1]) !== PEDRO_PRODUCT_OPTIONS.v10.price;
+  if (wrongV10 || wrongSelected) {
     db.addEvent(`preco_catalogo_corrigido: pedro ${numero}`);
-    return "O V10 custa R$360 e o S10 preto custa R$400 a vista.";
+    return "O Uni TV V10 custa R$360 a vista.";
   }
   return text;
-}
-
-function buildPedroLaunchReply(numero, text = "") {
-  if (!asksAboutPedroLaunch(text)) return "";
-  const product = PEDRO_PRODUCT_OPTIONS.s10;
-  const alreadySent = wasMediaSent("pedro", numero, product, "video");
-  const videoPart = alreadySent ? "Esse e o modelo do video." : "ENVIAR_VIDEO";
-  const conv = db.getConversation("pedro", numero);
-  const providerPart = conv?.pedroInternetQualified ? "" : `\n\n${PEDRO_INTERNET_QUESTION}`;
-  return `O S10 preto e o lancamento 2026: R$${product.price}, com ESPN e processador mais rapido. ${videoPart}${providerPart}`;
 }
 
 function rememberPedroProductChoice(numero, text) {
@@ -286,25 +257,7 @@ function rememberPedroProductChoice(numero, text) {
 }
 
 function getPedroProductContext(numero, currentText = "", opts = {}) {
-  const { useAssistantHistory = false } = opts;
-  const current = detectPedroProductKey(currentText);
-  if (current) return PEDRO_PRODUCT_OPTIONS[current];
-
-  const conv = db.getConversation("pedro", numero);
-  if (conv?.pedroProductKey && PEDRO_PRODUCT_OPTIONS[conv.pedroProductKey]) {
-    return PEDRO_PRODUCT_OPTIONS[conv.pedroProductKey];
-  }
-
-  const historyMsgs = conv?.msgs
-    ? conv.msgs
-        .filter(m => useAssistantHistory || m.role === "user")
-        .slice(-12)
-        .map(m => m.content || "")
-        .join("\n")
-    : "";
-  const history = historyMsgs.replace(/\[Cliente enviou localizacao:[^\]]+\]|\[Cliente informou distancia:[^\]]+\]/gi, "");
-  const fromHistory = detectPedroProductKey(history);
-  return PEDRO_PRODUCT_OPTIONS[fromHistory || "v10"];
+  return PEDRO_PRODUCT_OPTIONS.v10;
 }
 
 function getProductContext(agentId, numero, currentText = "") {
@@ -320,7 +273,7 @@ function getProductContext(agentId, numero, currentText = "") {
 function isInstallmentQuestion(text) {
   const msg = normalizeTextBasic(text);
   return /parcel|divide|dividir|quantas\s+vezes|em\s+quantas|prestacao|prestacoes/.test(msg) ||
-    (/forma\s+de\s+pagamento/.test(msg) && /cartao|credito|400|s\s*10|s10/.test(msg));
+    (/forma\s+de\s+pagamento/.test(msg) && /cartao|credito|360|v\s*10|v10/.test(msg));
 }
 
 function buildPedroInstallmentReply(numero, text = "") {
@@ -452,16 +405,10 @@ function buildPedroChannelReply(text) {
   const asksProgramming = /programacao|grade\s+(?:de\s+)?(?:canais|tv)|o\s+que\s+passa|quais\s+canais/.test(msg);
   if (!asksEspn && !asksDisney && !asksProgramming) return "";
 
-  if (asksEspn && asksDisney) {
-    return "Sobre esses canais: o Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN. Disney+ nao esta disponivel em nenhum dos dois aparelhos.";
+  if (asksEspn || asksDisney) {
+    return "Esses canais foram removidos pelas proprias emissoras de todos os aparelhos. Por enquanto nao estao disponiveis em nenhum aparelho. A tendencia e que no futuro voltem de outra forma, mas hoje nao estao funcionando.";
   }
-  if (asksEspn) {
-    return "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN.";
-  }
-  if (asksDisney) {
-    return "Disney+ nao esta disponivel em nenhum dos dois aparelhos.";
-  }
-  return "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+.";
+  return "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. Nao vou inventar programas, jogos ou horarios.";
 }
 
 function buildPedroContentTransparencyReply(currentText, contextText = "") {
@@ -474,9 +421,9 @@ function buildPedroContentTransparencyReply(currentText, contextText = "") {
 
   const parts = [];
   if (asksTransparency) parts.push("Voce tem razao em pedir mais transparencia. Vou responder de forma direta:");
-  if (asksPremiere) parts.push("eu nao tenho confirmacao segura de Premiere no S10 e nao vou afirmar que tem sem ter certeza.");
+  if (asksPremiere) parts.push("eu nao tenho confirmacao segura de Premiere no Uni TV V10 e nao vou afirmar que tem sem ter certeza.");
   if (asksMovies) parts.push("Filmes e series tem, com conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade.");
-  if (asksTransparency || asksPremiere) parts.push("O que esta confirmado no S10 e 1 canal ESPN; Disney+ nao esta disponivel.");
+  if (asksTransparency || asksPremiere) parts.push("ESPN e Disney+ nao estao disponiveis no aparelho atualmente.");
   parts.push("A disponibilidade do conteudo pode mudar e pode haver instabilidade.");
   return parts.join(" ");
 }
@@ -485,7 +432,6 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   if (agentId !== "pedro") return "";
   const msg = normalizeTextBasic(clientMessage);
   const current = normalizeTextBasic(currentText);
-  const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${currentText || ""}`);
   const faqReply = buildPedroFaqReply(numero, clientMessage);
   if (faqReply) return faqReply;
   const transparencyReply = buildPedroContentTransparencyReply(clientMessage, currentText);
@@ -493,15 +439,13 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
   const channelReply = buildPedroChannelReply(clientMessage);
   if (channelReply) return channelReply;
   if (/canal|canais|aberto|fechado|esporte|espn/.test(msg)) {
-    return "A lista de canais pode variar. O que posso confirmar e que somente o Uni TV S10 preto possui ESPN, com 1 canal. O V10 nao possui ESPN e nenhum dos dois possui Disney+.";
+    return "A lista de canais pode variar. ESPN e Disney+ nao estao disponiveis atualmente no Uni TV V10.";
   }
   if (/qual\s+valor|valor|preco|preco|quanto\s+(?:custa|fica)|eu\s+quero\s+saber\s+o\s+valor/.test(msg)) {
-    if (productCtx.key === "s10") return "O Uni TV S10 preto fica R$400 a vista. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Tambem parcela no cartao com a taxa da maquininha.";
-    if (productCtx.key === "v10" && !/s10|preto|espn/.test(msg)) return "O Uni TV V10 fica R$360 a vista. Se voce quiser o modelo com ESPN, ai e o Uni TV S10 preto por R$400.";
-    return "Eu tenho dois modelos: o Uni TV V10 fica R$360 e o Uni TV S10 preto fica R$400. O S10 e o unico com ESPN, tem 8K e processador mais rapido.";
+    return "O Uni TV V10 fica R$360 a vista.";
   }
-  if (/diferenca|diferen[cç]a|qual\s+melhor|espn|preto|s10/.test(msg)) {
-    return "A diferenca e essa: o V10 e o modelo tradicional por R$360. O S10 preto e o lancamento 2026 por R$400, tem ESPN, resolucao 8K e processador mais rapido.";
+  if (/diferenca|diferen[cç]a|qual\s+melhor|preto/.test(msg)) {
+    return "Eu trabalho somente com o Uni TV V10 branco, por R$360 a vista.";
   }
   return "";
 }
@@ -513,11 +457,11 @@ function deterministicFallback(agentId, numero, clientMessage, currentText = "")
 // ============================================
 const AUTHORIZED_CATALOG = {
   pedro: {
-    nome_oficial: "Uni TV V10 ou Uni TV S10",
+    nome_oficial: "Uni TV V10",
     nomes_proibidos: [
       /tv\s*box/i,                                                              // "TV Box", "TV Box basico", etc.
       /uni\s*tv\s*v(?!10\b)\d+/i,                                              // "Uni TV V9", "Uni TV V11", etc.
-      /uni\s*tv\s*s(?!10\b)\d+/i,                                              // "Uni TV S9", "Uni TV S11", etc.
+      /uni\s*tv\s*s\d+/i,                                                       // toda a linha S foi removida
       /uni\s*tv\s+(basico|basic|premium|plus|pro|lite|standard|ultra|max|master|entry|advanced)/i,
     ],
     specs_proibidas: [
@@ -544,7 +488,7 @@ function checkProductBlindage(agentId, texto) {
   for (const pattern of cat.nomes_proibidos) {
     if (pattern.test(texto)) {
       if (agentId === "pedro") {
-        return { violacao: "nome_produto", correcao: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. O S10 e o modelo com ESPN. Qual dos dois voce quer ver?" };
+        return { violacao: "nome_produto", correcao: "Eu trabalho somente com o Uni TV V10 branco. Quer que eu te mostre como ele funciona?" };
       }
       return { violacao: "nome_produto", correcao: `Tenho sim o ${cat.nome_oficial}! E o modelo que trabalho aqui na Atacadao. Quer ver como funciona? ENVIAR_FOTO` };
     }
@@ -552,7 +496,7 @@ function checkProductBlindage(agentId, texto) {
   for (const pattern of cat.specs_proibidas) {
     if (pattern.test(texto)) {
       if (agentId === "pedro") {
-        return { violacao: "spec_inventada", correcao: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. O S10 tem 8K, ESPN e processador mais rapido. Qual dos dois voce quer ver?" };
+        return { violacao: "spec_inventada", correcao: "Eu trabalho somente com o Uni TV V10 branco. Quer que eu te mostre como ele funciona?" };
       }
       return { violacao: "spec_inventada", correcao: `Tenho sim o ${cat.nome_oficial}! E o modelo que trabalho aqui na Atacadao. Quer ver como funciona? ENVIAR_FOTO` };
     }
@@ -567,33 +511,17 @@ function checkProductBlindage(agentId, texto) {
 function buildPromptPedro() {
   const preco = PEDRO_PRODUCT_OPTIONS.v10.price;
   const piso  = PEDRO_PRODUCT_OPTIONS.v10.floor;
-  const precoS10 = PEDRO_PRODUCT_OPTIONS.s10.price;
-  return `Voce e Pedro, vendedor da Atacadao Variedades. Simpatico e direto. Voce vende DOIS aparelhos: Uni TV V10 e Uni TV S10.
+  return `Voce e Pedro, vendedor da Atacadao Variedades. Simpatico e direto. Seu unico produto e o Uni TV V10.
 
 CATALOGO DO PEDRO:
-1) Uni TV V10 (branco) — R$${preco} a vista. Modelo principal/custo-beneficio.
-2) Uni TV S10 (preto) — R$${precoS10} a vista. Modelo mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
-
-REGRA DE ESCOLHA DO PRODUTO:
-- Se o cliente falar de ESPN, responda que SOMENTE o Uni TV S10 possui ESPN. Nunca diga que o V10 tem ESPN.
-- Se o cliente pedir aparelho preto, modelo mais recente, lancamento, 2026, 8K ou processador mais rapido: apresente o Uni TV S10.
-- Se o cliente perguntar genericamente "como funciona", "valor" ou "tem aparelho", apresente os dois de forma simples: V10 por R$${preco} e S10 preto por R$${precoS10}; depois pergunte qual ele prefere.
-- Se o cliente ja escolheu um modelo, mantenha aquele modelo ate ele pedir comparacao ou trocar.
-
-RESUMO CURTO PARA APRESENTAR OS DOIS:
-"Tenho o V10 por R$${preco} e o novo S10 por R$${precoS10}. Quer ver o tradicional ou o lancamento?"
-
-BASE COMUM DOS DOIS:
-Transformam qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay, futebol ao vivo — TUDO incluso, SEM mensalidade, SEM conta de streaming. Encaixa no HDMI, Wi-Fi, pronto em 5 min. Atualiza automaticamente.
-ESPN: somente no Uni TV S10. O Uni TV V10 nao possui ESPN.
-QUANTIDADE ESPN: o Uni TV S10 possui exatamente 1 canal da ESPN.
-DISNEY+: nao esta disponivel no Uni TV V10 nem no Uni TV S10.
+Uni TV V10 (branco) — R$${preco} a vista. Transforma qualquer TV em smart TV. Netflix, Prime, HBO, Globoplay e futebol ao vivo, sem mensalidade e sem conta de streaming. Encaixa no HDMI, conecta ao Wi-Fi e atualiza automaticamente.
+ESPN/DISNEY+: nao estao disponiveis. Foram removidos pelas proprias emissoras de todos os aparelhos do mercado.
 PROGRAMACAO/GRADE AO VIVO: pode mudar. Voce nao consulta a grade em tempo real e nunca inventa programas, jogos ou horarios.
 PREMIERE: nao existe confirmacao segura no catalogo. Nunca afirme que tem. Diga claramente que nao consegue confirmar Premiere.
 FILMES E SERIES: confirmado. Ha conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade.
 TRANSPARENCIA: se o cliente pedir transparencia, clareza ou disser que voce esta enrolando, reconheca a preocupacao e responda diretamente o assunto anterior. Nao repita catalogo, preco ou diferencas. Nao peca localizacao antes de esclarecer.
 Instabilidade pode acontecer — aparelho funciona ha mais de 3 anos e ninguem conseguiu derrubar. Nunca prometa que nunca cai.
-Especificacoes em GB/TB: NUNCA mencione. Nenhum dos modelos tem armazenamento citavel.
+Especificacoes em GB/TB: NUNCA mencione. O Uni TV V10 nao tem armazenamento citavel.
 
 === FLUXO OFICIAL — SIGA NESTA ORDEM ===
 
@@ -602,8 +530,7 @@ ETAPA 1 — ABERTURA E RESPOSTA AO INTERESSE:
 O cliente deve receber informacao e perceber valor antes de qualquer pergunta de qualificacao. NUNCA pergunte a operadora na primeira mensagem.
 
 ETAPA 2 — APRESENTACAO E VIDEO:
-Se o cliente ainda NAO escolheu V10 ou S10: apresente os dois em texto e pergunte qual prefere. NAO escreva ENVIAR_VIDEO nem ENVIAR_FOTO ainda.
-Se o cliente escolheu V10 ou S10: enviar o video do modelo escolhido. Escreva a tag: ENVIAR_VIDEO
+Apresente o Uni TV V10 e envie o video. Escreva a tag: ENVIAR_VIDEO
 "Vou te mostrar o modelo funcionando."
 Depois de enviar o video, pergunte: "${PEDRO_INTERNET_QUESTION}"
 
@@ -613,18 +540,14 @@ SE OUTRA OPERADORA: siga o atendimento sem perguntar novamente.
 Se o cliente fizer uma pergunta junto com a resposta, responda primeiro e depois avance.
 
 ETAPA 4 — REFORCO VISUAL:
-Para V10: enviar foto do produto. Escreva a tag: ENVIAR_FOTO.
-Para S10: NAO escreva ENVIAR_FOTO enquanto nao houver foto oficial do S10 cadastrada. Use apenas ENVIAR_VIDEO para mostrar o S10.
+Enviar foto do Uni TV V10. Escreva a tag: ENVIAR_FOTO.
 Apos a foto, mova direto para o proximo passo — NAO pergunte "ficou com alguma duvida?". Assuma o interesse e avance:
 Se ja sabe o preco que cliente quer → va para ETAPA 4. Se nao → "Me manda sua localizacao que eu calculo o frete e te passo o total certinho." Assumptive close — nao abra espaco para hesitacao.
 
 ETAPA 5 — PRECO:
 QUANDO USAR: (a) cliente perguntou diretamente o valor ("quanto?", "preco?", "valor?", "quanto custa?") OU (b) etapas 2+3 ja concluidas.
 PROIBIDO: NAO use se cliente perguntou so "como funciona?", "o que e?", "tenho interesse" ou assunto informativo sem pedir preco — nesses casos execute ETAPA 2 primeiro.
-Informe o preco conforme o modelo:
-- V10: "O Uni TV V10 fica R$${preco}, pago na entrega direto ao entregador. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
-- S10: "O Uni TV S10 preto fica R$${precoS10}, pago na entrega direto ao entregador. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
-- Se ainda nao escolheu: "O V10 fica R$${preco} e o S10 preto fica R$${precoS10}. O S10 e o unico com ESPN, tem 8K e processador mais rapido. Qual deles voce quer?"
+Informe: "O Uni TV V10 fica R$${preco}, pago na entrega direto ao entregador. Me manda sua localizacao que eu calculo o frete e te passo o total certinho."
 
 ETAPA 6 — FRETE E SIMULACAO:
 Pedir pin de localizacao no mapa. O sistema calcula o frete automaticamente.
@@ -647,23 +570,19 @@ Acima de 7 km: distancia em km x 2
 Limite 30km. Regiao Goiania. Fora da area: TRANSFERIR_HUMANO para o Miron.
 
 === REGRA ABSOLUTA — INTERNET CLARO (MAIS IMPORTANTE) ===
-Os aparelhos Uni TV V10 e Uni TV S10 NAO FUNCIONAM com internet da Claro. Isso e INVIOLAVEL.
+O Uni TV V10 NAO FUNCIONA com internet da Claro. Isso e INVIOLAVEL.
 Se o cliente mencionar Claro em qualquer contexto de internet (usa Claro, tem Claro, pergunta se Claro funciona, responde "Claro" quando perguntado sobre a operadora):
 DIGA EXATAMENTE: "${PEDRO_CLARO_MESSAGE}"
 PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode funcionar. NAO minimize o problema. NAO diga "provavelmente funciona" ou "nao deve ter problema". ENCERRE o atendimento.
 
 === REGRAS INVIOLAVEIS ===
-- Vende SOMENTE Uni TV V10 e Uni TV S10. NUNCA mencione outro produto, modelo ou versao.
-- Preco V10: R$${preco}. Piso V10: R$${piso}. NUNCA abaixo de R$${piso} sem autorizacao.
-- Preco S10: R$${precoS10}. Nao ofereca desconto no S10 sem autorizacao do dono.
-- O S10 e o unico modelo com ESPN. O V10 nao possui ESPN.
-- O S10 possui exatamente 1 canal da ESPN. Nunca diga que possui mais de um.
-- Disney+ nao esta disponivel em nenhum dos dois aparelhos.
+- Vende SOMENTE o Uni TV V10. NUNCA mencione outro produto, modelo ou versao.
+- Preco: R$${preco}. Piso: R$${piso}. NUNCA abaixo de R$${piso} sem autorizacao.
+- ESPN e Disney+ nao estao disponiveis no Uni TV V10.
 - Nunca invente programacao, jogos, eventos ou horarios. Se perguntarem pela grade, diga que ela pode mudar e que voce nao consulta a programacao ao vivo.
 - Premiere nao esta confirmado. Nunca diga que tem Premiere sem confirmacao oficial.
 - Filmes e series estao disponiveis com conteudo de Netflix, Prime, HBO e Globoplay, mas a disponibilidade pode mudar.
 - Pedido de transparencia e objecao de confianca: reconheca, responda os fatos diretamente e nao faca pressao comercial na mesma mensagem.
-- Diferenca oficial: S10 e mais recente, lancado em 2026, possui ESPN, resolucao 8K e processador mais rapido.
 - Pagamento SEMPRE na entrega, direto ao entregador. Aceita PIX, dinheiro e cartao na maquininha. NUNCA PIX antecipado (antes da entrega).
 - Se cliente perguntar "aceita PIX?" ou disser "Pix": confirme que sim, o entregador aceita PIX na entrega.
 - Parcelamento SOMENTE no cartao de credito (maquininha na entrega). Sempre calcular sobre produto + frete.
@@ -681,9 +600,8 @@ PARE COMPLETAMENTE. NAO continue. NAO oferte alternativa. NAO diga que pode func
 - NAO autoriza desconto: "tem mais barata?", "tem versao mais barata?", "quanto custa?", "qual o preco?", "tem desconto?", "consegue baixar?". Para qualquer dessas perguntas: informe o preco do modelo escolhido sem oferecer desconto.
 - SO abra negociacao de preco se o cliente JA CONHECE O PRECO e disser explicitamente: "ta caro", "nao consigo pagar isso", "nao tenho esse dinheiro", "nao vou fechar por esse valor", "muito alto", "fora do orcamento", "nao da esse valor pra mim" — ou recusar o preco de forma clara.
 - Pergunta permitida (so apos objec ao explicita de preco): "Olha, se eu te der um desconto, voce fecha comigo hoje?"
-- Para V10: se frete <= R$15,00, pode retirar o frete (produto R$${preco}) OU baixar produto para R$${piso} mantendo frete de R$15. NUNCA os dois descontos ao mesmo tempo.
-- Para V10: se frete > R$15,00, cobrar frete corretamente. Se cliente travar, desconto somente no produto, minimo R$${piso}.
-- Para S10: nao aplique piso/desconto sem autorizacao especifica do dono.
+- Se frete <= R$15,00, pode retirar o frete (produto R$${preco}) OU baixar produto para R$${piso} mantendo frete de R$15. NUNCA os dois descontos ao mesmo tempo.
+- Se frete > R$15,00, cobrar frete corretamente. Se cliente travar, desconto somente no produto, minimo R$${piso}.
 
 === SPIN — OBJECAO DE TIMING (use quando cliente disser "vou pensar", "depois vejo", "agora nao", "semana que vem") ===
 Ative SOMENTE quando o cliente sinalizar adiamento. Use UMA pergunta por mensagem. Tom de conversa — nunca interrogatorio.
@@ -696,16 +614,13 @@ N — Necessidade: "Se voce pudesse ter tudo isso pagando uma vez so, sem mensal
 Apos N: se cliente aceitar → retome fluxo normal de fechamento. Se recusar → respeite e use AGENDAR se ele der uma data, ou encerre cordialmente.
 
 === RESPOSTAS OFICIAIS POR CENARIO ===
-OUTRAS MARCAS/MODELOS: "Eu trabalho com o Uni TV V10 e o Uni TV S10 preto. Se voce quiser, eu te explico a diferenca rapidinho."
-TEM MAIS BARATA / VERSAO BASICA: "O modelo de menor valor aqui e o Uni TV V10 por R$${preco}. O S10 preto fica R$${precoS10} porque e o lancamento 2026 com ESPN, 8K e processador mais rapido."
-ESPN: "ESPN somente no Uni TV S10 preto. O V10 nao possui ESPN. O S10 fica R$${precoS10} a vista e tambem parcela no cartao com a taxa da maquininha."
-QUANTIDADE ESPN: "O Uni TV S10 preto possui 1 canal da ESPN. O V10 nao possui ESPN."
-DISNEY+: "Disney+ nao esta disponivel em nenhum dos dois aparelhos."
-PROGRAMACAO/GRADE: "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. O que posso confirmar e que o S10 possui 1 canal da ESPN, o V10 nao possui ESPN e nenhum dos dois possui Disney+."
-PREMIERE + FILMES/SERIES: "Para ser transparente: eu nao tenho confirmacao segura de Premiere no S10 e nao vou afirmar que tem sem ter certeza. Filmes e series tem, com conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade. O que esta confirmado no S10 e 1 canal ESPN; Disney+ nao esta disponivel. A disponibilidade pode mudar e pode haver instabilidade."
+OUTRAS MARCAS/MODELOS: "Eu trabalho somente com o Uni TV V10. Se voce quiser, eu posso te mostrar como ele funciona."
+TEM MAIS BARATA / VERSAO BASICA: "Eu trabalho somente com o Uni TV V10 por R$${preco}."
+ESPN OU DISNEY+: "Esses canais foram removidos pelas proprias emissoras de todos os aparelhos. Por enquanto nao estao disponiveis em nenhum aparelho. A tendencia e que no futuro voltem de outra forma, mas hoje nao estao funcionando."
+PROGRAMACAO/GRADE: "A programacao dos canais pode mudar e eu nao consigo consultar a grade ao vivo. Nao vou inventar programas, jogos ou horarios."
+PREMIERE + FILMES/SERIES: "Para ser transparente: eu nao tenho confirmacao segura de Premiere no Uni TV V10. Filmes e series tem, com conteudo de Netflix, Prime, HBO e Globoplay, sem mensalidade. A disponibilidade pode mudar e pode haver instabilidade."
 PEDIDO DE TRANSPARENCIA: reconheca que o cliente tem razao, retome a pergunta anterior e diga somente o que esta confirmado. Nao repita modelos/precos e nao peca localizacao nessa resposta.
 PARCELAMENTO ANTES DO FRETE: "Sim, parcelamos no cartao de credito. Para eu fazer a simulacao correta, preciso somar o aparelho com o frete e aplicar a taxa da maquininha. Me manda sua localizacao que eu calculo tudo e te passo as parcelas antes da entrega. O entregador apenas leva a maquininha e recebe o pagamento; a simulacao e feita por nos."
-DIFERENCA ENTRE V10 E S10: "O V10 e o modelo tradicional por R$${preco}. O S10 e o mais recente, lancado em 2026, e preto, possui ESPN, resolucao 8K e processador mais rapido. O S10 fica R$${precoS10}."
 RISCO DE PERDER SINAL: "Sim, existe esse risco. Todo aparelho que libera canais de televisao corre esse risco em algum momento, do mais barato ao mais caro. Mas esse e um risco que vale a pena, porque o aparelho esta funcionando ha mais de 3 anos e ate hoje ninguem conseguiu derrubar."
 GARANTIA: "A garantia e de 30 dias contra defeito de fabrica."
 NOTA FISCAL: "Nao fazemos emissao de nota fiscal."
@@ -1034,11 +949,7 @@ Toda resposta comercial DEVE usar R$${ofertaAtiva.precoDesconto}. Ignorar = demi
 
   if (agentId === "pedro" && numero) {
     const pedroConv = db.getConversation("pedro", numero);
-    if (pedroConv?.pedroProductKey === "s10") {
-      prompt += `\n\nMODELO ESCOLHIDO PELO CLIENTE: Uni TV S10 preto, lancamento 2026, R$400. Fale e envie midia SOMENTE do S10, salvo se o cliente pedir comparacao. Nao volte para o V10 por conta propria.`;
-    } else if (pedroConv?.pedroProductKey === "v10") {
-      prompt += `\n\nMODELO ESCOLHIDO PELO CLIENTE: Uni TV V10 branco, R$360. Mantenha o V10, salvo se o cliente pedir comparacao ou trocar de modelo.`;
-    }
+    prompt += `\n\nPRODUTO UNICO: Uni TV V10 branco, R$360. Nao mencione nenhum outro modelo.`;
     const pedroVideoSent = Object.entries(pedroConv?.mediaSent || {}).some(([key, sentAt]) =>
       key.startsWith("pedro:") && key.endsWith(":video") && !!sentAt
     );
@@ -1047,7 +958,7 @@ Toda resposta comercial DEVE usar R$${ofertaAtiva.precoDesconto}. Ignorar = demi
     } else if (pedroVideoSent) {
       prompt += `\n\nOPERADORA AINDA NAO CONFIRMADA: o video ja foi enviado. Responda primeiro qualquer pergunta atual e depois pergunte a operadora. Nao peca localizacao, nao calcule frete e nao colete dados antes da resposta.`;
     } else {
-      prompt += `\n\nORDEM DE CONVERSAO: entregue valor primeiro. Apresente os modelos e envie o video do modelo escolhido antes de perguntar a operadora. NUNCA abra o atendimento perguntando a operadora. Ao enviar o video, termine perguntando a operadora. Nao peca localizacao, nao calcule frete e nao colete dados antes de confirma-la.`;
+      prompt += `\n\nORDEM DE CONVERSAO: entregue valor primeiro. Apresente o Uni TV V10 e envie o video antes de perguntar a operadora. NUNCA abra o atendimento perguntando a operadora. Ao enviar o video, termine perguntando a operadora. Nao peca localizacao, nao calcule frete e nao colete dados antes de confirma-la.`;
     }
   }
 
@@ -1069,7 +980,7 @@ O preço padrão é o preço TABELADO do produto. Use esse preço SEMPRE.
 NUNCA ofereça frete grátis por conta própria — frete grátis só existe quando o dono autorizar uma campanha.`}
 ${["pedro","rodrigo"].map(id => {
   if (id === "pedro" && !ofertaAtiva) {
-    return `- Pedro (Uni TV V10): R$${PEDRO_PRODUCT_OPTIONS.v10.price} (pago na entrega)\n- Pedro (Uni TV S10 preto): R$${PEDRO_PRODUCT_OPTIONS.s10.price} (pago na entrega, unico com ESPN)`;
+    return `- Pedro (Uni TV V10): R$${PEDRO_PRODUCT_OPTIONS.v10.price} (pago na entrega)`;
   }
   const pr = (id === agentId && ofertaAtiva) ? ofertaAtiva.precoDesconto : db.getAgentPrice(id);
   const tag = (id === agentId && ofertaAtiva) ? ` ← PRECO DESTE CLIENTE (AUTORIZADO PELO DONO)` : "";
@@ -1438,7 +1349,7 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   if (texto.includes("ENVIAR_FOTO")) {
     texto = texto.replace("ENVIAR_FOTO", "").trim();
     const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
-    const fotoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Foto : media.foto1;
+    const fotoUrl = media.foto1;
     if (wasMediaSent(agentId, numero, productCtx, "image")) {
       console.log(`Foto repetida bloqueada para ${numero} via ${agentId} (${productCtx.name})`);
     } else if (fotoUrl) {
@@ -1456,7 +1367,7 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   if (texto.includes("ENVIAR_VIDEO")) {
     texto = texto.replace("ENVIAR_VIDEO", "").trim();
     const productCtx = getProductContext(agentId, numero, `${clientMessage || ""}\n${texto || ""}`);
-    const videoUrl = agentId === "pedro" && productCtx.key === "s10" ? media.s10Video : media.video1;
+    const videoUrl = media.video1;
     if (wasMediaSent(agentId, numero, productCtx, "video")) {
       console.log(`Video repetido bloqueado para ${numero} via ${agentId} (${productCtx.name})`);
     } else if (videoUrl) {
@@ -1666,7 +1577,6 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
     if (id === "pedro") return [
       PEDRO_PRODUCT_OPTIONS.v10.price,
       PEDRO_PRODUCT_OPTIONS.v10.floor,
-      PEDRO_PRODUCT_OPTIONS.s10.price,
     ];
     return [db.getAgentPrice(id), db.getAgentPiso(id)];
   };
@@ -1675,7 +1585,7 @@ async function processTags(agentId, numero, rawResponse, clientMessage) {
   function getValidPricesWithInstallments(agentId, numero) {
     const basePrices = getPrecosValidos(agentId) ? [...getPrecosValidos(agentId)] : [];
     const baseProductPrices = agentId === "pedro"
-      ? [PEDRO_PRODUCT_OPTIONS.v10.price, PEDRO_PRODUCT_OPTIONS.s10.price]
+      ? [PEDRO_PRODUCT_OPTIONS.v10.price]
       : [getPrecoAgente(agentId)?.preco].filter(Boolean);
     for (const basePrice of baseProductPrices) {
       // Adicionar parcelas sobre preco base (sem frete)
@@ -2378,24 +2288,6 @@ async function handleIncomingMessage(agentId, body) {
       if (escolhaPedro) db.save();
     }
 
-    const precisaEscolherProdutoPedro = () => {
-      if (agentId !== "pedro") return false;
-      const convPedro = db.getConversation("pedro", numero);
-      return !convPedro?.pedroProductKey;
-    };
-
-    async function pedirEscolhaProdutoPedro() {
-      const convPedro = db.getConversation("pedro", numero);
-      const msg = "Perfeito. Antes de eu calcular certinho, me confirma qual modelo voce quer: o Uni TV V10 por R$360 ou o Uni TV S10 preto por R$400 com ESPN?";
-      if (convPedro) {
-        convPedro.msgs.push({ role: "user", content: sanitize(mensagem || "[localizacao]"), timestamp: Date.now() });
-        convPedro.msgs.push({ role: "assistant", content: msg, timestamp: Date.now() });
-        convPedro.ultimaMensagem = Date.now();
-      }
-      db.save();
-      await sendText(agentId, numero, msg);
-    }
-
     // Handle location (pin on map) — ENVIA DIRETO PRO CLIENTE, SEM PASSAR PELA IA
     const loc = extractLocation(body);
     if (loc) {
@@ -2413,10 +2305,6 @@ async function handleIncomingMessage(agentId, body) {
           db.save();
           return;
         }
-      }
-      if (precisaEscolherProdutoPedro()) {
-        await pedirEscolhaProdutoPedro();
-        return;
       }
       const fr = calcFreight(loc.lat, loc.lng);
       if (fr.frete !== null) {
@@ -2735,17 +2623,6 @@ async function handleIncomingMessage(agentId, body) {
         }
         return;
       }
-      const launchReply = buildPedroLaunchReply(numero, pendingClientMessages.join("\n"));
-      if (launchReply) {
-        const sentText = await processTags(agentId, numero, launchReply, pendingClientMessages.join("\n"));
-        if (sentText) {
-          conv.msgs.push({ role: "assistant", content: sentText, timestamp: Date.now() });
-          conv.ultimaMensagem = Date.now();
-          db.addEvent(`lancamento_s10_respondido: ${agentId} ${numero}`);
-          db.save();
-        }
-        return;
-      }
       const channelReply = buildPedroChannelReply(pendingClientMessages.join("\n"));
       if (channelReply) {
         const sent = await sendText(agentId, numero, channelReply);
@@ -2898,10 +2775,6 @@ async function handleIncomingMessage(agentId, body) {
     // GUARD: se frete ja foi calculado via GPS, NAO recalcular por texto — evita sobrescrever freteCalculado correto
     const freteJaCalculadoAntes = !!(conv.freteCalculado && conv.freteCalculado.total);
     if (kmMatch && indicaDistanciaParaFrete(mensagem) && !freteJaCalculadoAntes) {
-      if (precisaEscolherProdutoPedro()) {
-        await pedirEscolhaProdutoPedro();
-        return;
-      }
       const distKm = parseFloat(kmMatch[1].replace(",", "."));
       if (distKm > 0) {
         const fr = calcFreightByKm(distKm);
@@ -3201,7 +3074,6 @@ module.exports = {
   processTags,
   scheduleFollowUp,
   buildPedroChannelReply,
-  buildPedroLaunchReply,
   buildPedroInitialReply,
   buildPedroFaqReply,
   buildPedroPriceReply,

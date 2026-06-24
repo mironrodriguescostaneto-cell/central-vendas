@@ -63,7 +63,7 @@ const state = {
     { id: 'furadeira', nome: 'Furadeira 48V',  precoCusto: 110, precoVenda: 160, lucro:  50, ativo: true },
   ],
   agentCatalog: {
-    pedro:   { precoVenda: 360, piso: 340, product: 'Uni TV V10 / Uni TV S10' },
+    pedro:   { precoVenda: 360, piso: 340, product: 'Uni TV V10' },
     rodrigo: { precoVenda: 160, piso: 140, product: 'Furadeira 48V' },
   },
   sales: [],
@@ -999,9 +999,7 @@ function restoreState(data) {
     for (const id of ['pedro','rodrigo']) {
       if (data.agentCatalog[id]) Object.assign(state.agentCatalog[id], data.agentCatalog[id]);
     }
-    if (state.agentCatalog.pedro?.product === 'Uni TV V10') {
-      state.agentCatalog.pedro.product = 'Uni TV V10 / Uni TV S10';
-    }
+    state.agentCatalog.pedro.product = 'Uni TV V10';
   }
   if (data.sales)   { state.sales.length = 0;   state.sales.push(...data.sales); }
   if (data.pedidos) { state.pedidos.length = 0; state.pedidos.push(...data.pedidos); }

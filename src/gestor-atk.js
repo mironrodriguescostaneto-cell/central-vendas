@@ -62,14 +62,6 @@ CATALOGO DE PRODUTOS — PRECOS ATUAIS (fonte: CONFIG em runtime):
 - Parcelas: calculadas dinamicamente pelo sistema (cartao de credito, maquininha na entrega)
 - Entrega: Goiania e regiao (frete = km x 2, min R$15 ate 7km, max 30km)
 
-== PRODUTO 1B: Uni TV S10 preto (Pedro vende) ==
-- Modelo mais recente, lancado em 2026
-- Possui ESPN; o V10 nao possui ESPN
-- Resolucao 8K e processador mais rapido
-- PRECO: R$400 (pago na entrega ao entregador)
-- Parcelas: calculadas dinamicamente pelo sistema (cartao de credito, maquininha na entrega)
-- Entrega: mesma regra do V10
-
 == PRODUTO 2: ${rodrigo.product} (Rodrigo vende) ==
 - Furadeira profissional sem fio 48V, 2 baterias, maleta, acessorios
 - ATENCAO: "48V" e VOLTAGEM, NAO preco. Preco e R$${rodrigoPreco}.
@@ -134,7 +126,6 @@ function getAgentProductInfo(agentId) {
 
 function detectPedroProductKeyFromText(text) {
   const t = String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/\b(?:s\s*10|s10|preto|espn|mais\s+recente|lancad[oa]\s+em\s+2026|2026|8k|processador)\b/.test(t)) return "s10";
   if (/\b(?:v\s*10|v10|branc[ao]|mais\s+barat[ao]|menor\s+valor)\b/.test(t)) return "v10";
   return null;
 }
@@ -190,9 +181,6 @@ function isBadRemarketingMsg(msg) {
 
 function fallbackRemarketingMsg(agentId, prodInfo) {
   if (agentId === "pedro") {
-    if (/s10/i.test(prodInfo?.product || "")) {
-      return "Oi! Ainda tenho o Uni TV S10 preto por R$400. Ele e o modelo 2026 com ESPN, 8K e processador mais rapido. Quer que eu separe um pra voce?";
-    }
     return "Oi! Ainda tenho o Uni TV V10 por R$360, sem mensalidade e pago so na entrega. Quer que eu veja a entrega pra voce?";
   }
   if (agentId === "rodrigo") {
@@ -203,7 +191,6 @@ function fallbackRemarketingMsg(agentId, prodInfo) {
 
 // Mensagens fixas de remarketing 24h — determinísticas, sem IA
 const PEDRO_RM_24H_V10 = "Opa, tudo bem? passando para te falar que consegui um super desconto no Uni TV V10 para voce fechar comigo hoje. Ontem te passei por R$360, mas para fechar hoje consigo fazer R$330 a vista no PIX ou dinheiro. Esse valor e somente hoje. Posso separar o seu?";
-const PEDRO_RM_24H_S10 = "Opa, tudo bem? passando para te avisar que ainda tenho o Uni TV S10 preto, o modelo 2026 com ESPN, por R$400 a vista. Tambem parcela no cartao com a taxa da maquininha. Posso separar um pra voce?";
 const RODRIGO_RM_24H = "Opa, tudo bem? passando para te falar que consegui um super desconto no aparelho para você fechar comigo hoje. ontem te passei o valor da furadeira por 160,00 mas para fechar comigo hoje, eu te faço a 130,00 a vista no pix ou dinheiro. Mas lembrando que esse valor consigo fazer somente hoje. posso separar o seu?";
 
 // Retorna timestamp UTC correspondente a 23:59:59 de hoje no fuso Brasília
@@ -1808,7 +1795,7 @@ ${descontoAntiRegressao}- Resposta deve ser UMA UNICA mensagem (nunca dividida, 
 - Se o agente calculou frete a partir de endereco escrito (sem pin no mapa ou mensagem do sistema): corrija para pedir o pin no mapa.
 - Se o agente aceitou endereco de OUTRO ESTADO (fora de Goias): corrija para informar que entregamos apenas na regiao de Goiania.
 ${retiradaRule}${infoIntentRule}
-- PRODUTO INVENTADO ABSOLUTAMENTE PROIBIDO: Pedro vende SOMENTE "Uni TV V10" e "Uni TV S10". Rodrigo vende SOMENTE "Furadeira 48V". O S10 e preto, lancamento 2026, possui ESPN, resolucao 8K e processador mais rapido. Se o agente mencionou "TV Box", "TV Box basico", "Uni TV V9", "Uni TV V11", "Uni TV premium", "versao basica", "modelo plus", "512GB", "256GB", ou qualquer nome/variacao/spec nao autorizada: CORRIJA para "Tenho sim o [nome oficial]! Me manda sua localizacao que calculo o frete pra voce!" ${descontoInfo ? "EXCECAO: Se ha DESCONTO ATIVO (ver acima), o preco com desconto e CORRETO — NAO corrija." : `Se Pedro mencionou um preco que NAO seja R$360/R$340 para V10 ou R$400 para S10, corrija para o preco oficial do modelo correto. Se Rodrigo mencionou preco errado, corrija para o preco oficial da furadeira.`}
+- PRODUTO INVENTADO ABSOLUTAMENTE PROIBIDO: Pedro vende SOMENTE "Uni TV V10". Rodrigo vende SOMENTE "Furadeira 48V". Se o agente mencionou "TV Box", "TV Box basico", "Uni TV V9", "Uni TV V11", qualquer "Uni TV S", "Uni TV premium", "versao basica", "modelo plus", "512GB", "256GB", ou qualquer nome/variacao/spec nao autorizada: CORRIJA para "Eu trabalho somente com o Uni TV V10. Me manda sua localizacao que calculo o frete pra voce!" ${descontoInfo ? "EXCECAO: Se ha DESCONTO ATIVO (ver acima), o preco com desconto e CORRETO — NAO corrija." : `Se Pedro mencionou um preco que NAO seja R$360/R$340, corrija para o preco oficial do V10. Se Rodrigo mencionou preco errado, corrija para o preco oficial da furadeira.`}
 - R$48 PROIBIDO PARA RODRIGO: A "Furadeira 48V" tem 48V de VOLTAGEM, nao preco. Se Rodrigo disser "R$48" por qualquer motivo (debito, pix, desconto, pergunta), CORRIJA IMEDIATAMENTE para o preco real: "A Furadeira 48V sai por R$${db.getAgentPrice("rodrigo")}. O 48V é a voltagem da ferramenta, não o preço!"
 ${freteContext}
 
@@ -2302,12 +2289,11 @@ async function runRemarketing() {
             const lastRM = db.state.lastRemarketing[rmKey] || 0;
             if (lastRM > lastMsgTime) continue;
 
-            const pedroProductKey = agentId === "pedro" ? getPedroProductKeyFromConversation(conv) : null;
             const fixedMsg = agentId === "pedro"
-              ? (pedroProductKey === "s10" ? PEDRO_RM_24H_S10 : PEDRO_RM_24H_V10)
+              ? PEDRO_RM_24H_V10
               : RODRIGO_RM_24H;
-            const precoOriginal = agentId === "pedro" ? (pedroProductKey === "s10" ? 400 : 360) : 160;
-            const precoDesconto = agentId === "pedro" ? (pedroProductKey === "s10" ? 400 : 330) : 130;
+            const precoOriginal = agentId === "pedro" ? 360 : 160;
+            const precoDesconto = agentId === "pedro" ? 330 : 130;
 
             await sendText(agentId, numero, fixedMsg);
             db.state.lastRemarketing[rmKey] = now;
