@@ -1921,10 +1921,35 @@ function atkRmkEnsureEnhancedUi() {
   const textarea = document.getElementById('atkRmkTexto');
   if (textarea) {
     textarea.insertAdjacentHTML('beforebegin', `<input id="atkRmkNomeCampanha" placeholder="Nome da campanha" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box">`);
+    textarea.insertAdjacentHTML('beforebegin', `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <button id="atkRmkModoAgora" onclick="atkRmkSetModo('agora')" style="padding:10px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:800;cursor:pointer">Enviar agora</button>
+        <button id="atkRmkModoProgramar" onclick="atkRmkSetModo('programar')" style="padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text-muted);font-size:12px;font-weight:800;cursor:pointer">Programar</button>
+      </div>
+      <div id="atkRmkProgramarBox" style="display:none;margin-bottom:10px">
+        <input id="atkRmkScheduledAt" type="datetime-local" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+    `);
     textarea.insertAdjacentHTML('afterend', `<div id="atkRmkPreflight" style="background:var(--card);border-radius:12px;border:1px dashed var(--border);padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--text-muted);line-height:1.45"></div>`);
     textarea.addEventListener('input', atkRmkUpdatePreflight);
   }
+  const pause = document.getElementById('atkRmkPausarApos');
+  if (pause) { pause.checked = true; pause.disabled = true; }
   atkRmkEnhancedReady = true;
+}
+
+function atkRmkSetModo(modo) {
+  const isProgramar = modo === 'programar';
+  const box = document.getElementById('atkRmkProgramarBox');
+  const btnAgora = document.getElementById('atkRmkModoAgora');
+  const btnProgramar = document.getElementById('atkRmkModoProgramar');
+  const btnEnviar = document.getElementById('atkRmkBtnEnviar');
+  if (box) box.style.display = isProgramar ? 'block' : 'none';
+  if (btnAgora) { btnAgora.style.background = isProgramar ? 'var(--card)' : 'var(--accent)'; btnAgora.style.color = isProgramar ? 'var(--text-muted)' : '#fff'; btnAgora.style.border = isProgramar ? '1px solid var(--border)' : 'none'; }
+  if (btnProgramar) { btnProgramar.style.background = isProgramar ? 'var(--accent)' : 'var(--card)'; btnProgramar.style.color = isProgramar ? '#fff' : 'var(--text-muted)'; btnProgramar.style.border = isProgramar ? 'none' : '1px solid var(--border)'; }
+  if (btnEnviar) btnEnviar.textContent = isProgramar ? '🕒 PROGRAMAR ENVIO' : '📤 ENVIAR';
+  window.atkRmkModo = isProgramar ? 'programar' : 'agora';
+  atkRmkUpdatePreflight();
 }
 
 function atkRmkSwitchAgent(agente, btn) {
@@ -1976,9 +2001,21 @@ function atkRmkRenderCampanhas() {
     el.innerHTML = '';
     return;
   }
+  atkRmkCampanhas.forEach(c => {
+    if (c.scheduledAt && !String(c.status || '').includes('programada')) {
+      c._statusText = `${c.status} - ${new Date(c.scheduledAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`;
+    } else c._statusText = c.status;
+  });
   el.innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px">
       <div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:6px">Ultimas campanhas</div>
+      ${atkRmkCampanhas.filter(c => c.status === 'scheduled').slice(0,3).map(c => `
+        <div style="border-top:1px solid var(--border);padding:7px 0">
+          <div style="font-size:12px;font-weight:800;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Programada: ${esc(c.name || c.id)}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${new Date(c.scheduledAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} - ${c.total || 0} contatos - agente pausa apos envio</div>
+          <button onclick="atkRmkCancelarCampanha('${c.id}')" style="margin-top:6px;padding:6px 8px;border-radius:8px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:11px;font-weight:800;cursor:pointer">Cancelar programada</button>
+        </div>
+      `).join('')}
       ${atkRmkCampanhas.slice(0,3).map(c => `
         <button onclick="atkRmkSelectCampaignPendentes('${c.id}')" style="width:100%;text-align:left;border:0;background:transparent;border-top:1px solid var(--border);padding:7px 0;cursor:pointer">
           <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name || c.id)}</div>
@@ -1986,6 +2023,15 @@ function atkRmkRenderCampanhas() {
         </button>
       `).join('')}
     </div>`;
+}
+
+async function atkRmkCancelarCampanha(id) {
+  if (!confirm('Cancelar esta campanha programada?')) return;
+  const r = await fetch(`/api/remarketing/campanhas/${id}/cancelar`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + TOKEN } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'Nao foi possivel cancelar');
+  toast('Campanha programada cancelada');
+  atkRmkLoadCampanhas();
 }
 
 function atkRmkSelectCampaignPendentes(id) {
@@ -2138,15 +2184,26 @@ async function atkRmkEnviar() {
   if (!numeros.length) return alert('Selecione pelo menos 1 contato');
   if (!texto && !atkRmkImgUrl) return alert('Digite uma mensagem ou selecione uma imagem');
   const nomeCampanha = document.getElementById('atkRmkNomeCampanha')?.value.trim() || `Remarketing ${atkRmkAgente} ${new Date().toLocaleDateString('pt-BR')}`;
-  if (!confirm(`Enviar campanha "${nomeCampanha}" para ${numeros.length} contato(s) do ${atkRmkAgente}?`)) return;
-  const pausarAposEnvio = document.getElementById('atkRmkPausarApos').checked;
+  const modo = window.atkRmkModo === 'programar' ? 'programar' : 'agora';
+  const scheduledInput = document.getElementById('atkRmkScheduledAt')?.value || '';
+  const scheduledAt = scheduledInput ? new Date(scheduledInput).getTime() : 0;
+  if (modo === 'programar' && (!scheduledAt || scheduledAt < Date.now() + 60000)) return alert('Escolha uma data e horario pelo menos 1 minuto no futuro');
+  const acao = modo === 'programar' ? `Programar campanha "${nomeCampanha}" para ${new Date(scheduledAt).toLocaleString('pt-BR')}` : `Enviar campanha "${nomeCampanha}"`;
+  if (!confirm(`${acao} para ${numeros.length} contato(s) do ${atkRmkAgente}?\n\nApos o envio, o agente ficara pausado para esses contatos.`)) return;
+  const pausarAposEnvio = true;
   try {
-    const r = await fetch('/api/remarketing/enviar', {
+    const endpoint = modo === 'programar' ? '/api/remarketing/programar' : '/api/remarketing/enviar';
+    const r = await fetch(endpoint, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
-      body: JSON.stringify({ agente: atkRmkAgente, numeros, texto, imagemUrl: atkRmkImgUrl, pausarAposEnvio, nomeCampanha })
+      body: JSON.stringify({ agente: atkRmkAgente, numeros, texto, imagemUrl: atkRmkImgUrl, pausarAposEnvio, nomeCampanha, scheduledAt })
     });
     const d = await r.json();
     if (!r.ok) return alert(d.error || 'Erro ao iniciar envio');
+    if (modo === 'programar') {
+      toast('Campanha programada');
+      atkRmkLoadCampanhas();
+      return;
+    }
     document.getElementById('atkRmkProgress').style.display = 'block';
     document.getElementById('atkRmkBtnParar').style.display = 'block';
     document.getElementById('atkRmkBtnEnviar').disabled = true;

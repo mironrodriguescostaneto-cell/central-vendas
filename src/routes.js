@@ -887,8 +887,70 @@ router.get('/api/remarketing/campanhas', auth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+function _dedupeRemarketingNumbers(numeros, dbAtkForDedup) {
+  const seenInput = new Set();
+  const numerosParaEnvio = [];
+  for (const numero of numeros || []) {
+    const canon = _canonicalPhone(numero, dbAtkForDedup);
+    const key = canon && canon.length >= 6 ? canon : `raw:${numero}`;
+    if (seenInput.has(key)) continue;
+    seenInput.add(key);
+    numerosParaEnvio.push(numero);
+  }
+  if (dbAtkForDedup) {
+    for (let i = numerosParaEnvio.length - 1; i >= 0; i--) {
+      if (dbAtkForDedup.isAgentNumber(numerosParaEnvio[i])) numerosParaEnvio.splice(i, 1);
+    }
+  }
+  return numerosParaEnvio;
+}
+
+router.post('/api/remarketing/programar', auth, (req, res) => {
+  const { agente, numeros, texto, textos, imagemUrl, nomeCampanha } = req.body;
+  const mediaType = req.body.mediaType === 'video' ? 'video' : 'image';
+  const delayMs = Math.max(3000, Number(req.body.delayMs || 3000));
+  const scheduledAt = Number(req.body.scheduledAt || 0);
+  const textosValidos = Array.isArray(textos) ? textos.map(t => String(t || '').trim()).filter(Boolean) : [];
+  const textoPrincipal = textosValidos.length ? textosValidos[0] : String(texto || '').trim();
+  const mediaUrl = imagemUrl ? _normalizeMediaUrl(imagemUrl) : '';
+  if (!ATK_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente ATK invalido' });
+  if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
+  if (!textoPrincipal && !mediaUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
+  if (!scheduledAt || scheduledAt < Date.now() + 60 * 1000) return res.status(400).json({ error: 'Escolha um horario pelo menos 1 minuto no futuro.' });
+  if (mediaUrl.includes('/api/remarketing/temp-img/') && !_getRemarketingTempImage(mediaUrl)) {
+    return res.status(410).json({ error: 'A imagem expirou. Selecione a imagem novamente antes de programar.' });
+  }
+  const dbAtk = require('./database-atk');
+  const numerosParaEnvio = _dedupeRemarketingNumbers(numeros, dbAtk);
+  if (!numerosParaEnvio.length) return res.status(400).json({ error: 'nenhum numero valido para envio' });
+  const campaign = dbAtk.createRemarketingCampaign({
+    agentId: agente,
+    name: nomeCampanha,
+    text: textoPrincipal,
+    textos: textosValidos,
+    imageUrl: mediaUrl,
+    mediaType,
+    delayMs,
+    pauseAfterSend: true,
+    total: numerosParaEnvio.length,
+    recipients: numerosParaEnvio,
+    scheduledAt,
+    status: 'scheduled',
+  });
+  res.json({ ok: true, campanhaId: campaign.id, scheduledAt, total: numerosParaEnvio.length });
+});
+
+router.post('/api/remarketing/campanhas/:id/cancelar', auth, (req, res) => {
+  try {
+    const dbAtk = require('./database-atk');
+    const c = dbAtk.cancelRemarketingCampaign(req.params.id);
+    if (!c) return res.status(400).json({ error: 'Campanha nao encontrada ou nao pode mais ser cancelada.' });
+    res.json({ ok: true, campanha: c });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/api/remarketing/enviar', auth, async (req, res) => {
-  const { agente, numeros, texto, textos, imagemUrl, pausarAposEnvio, nomeCampanha } = req.body;
+  const { agente, numeros, texto, textos, imagemUrl, pausarAposEnvio, nomeCampanha, campanhaId } = req.body;
   const mediaType = req.body.mediaType === 'video' ? 'video' : 'image';
   const delayMs = Math.max(3000, Number(req.body.delayMs || 3000));
   const textosValidos = Array.isArray(textos) ? textos.map(t => String(t || '').trim()).filter(Boolean) : [];
@@ -905,33 +967,42 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
 
   const isAtk = ATK_REMARK_AGENTS.includes(agente);
   const dbAtkForDedup = isAtk ? require('./database-atk') : null;
-  const seenInput = new Set();
-  const numerosParaEnvio = [];
-  for (const numero of numeros) {
-    const canon = _canonicalPhone(numero, dbAtkForDedup);
-    const key = canon && canon.length >= 6 ? canon : `raw:${numero}`;
-    if (seenInput.has(key)) continue;
-    seenInput.add(key);
-    numerosParaEnvio.push(numero);
-  }
-  if (isAtk) {
-    for (let i = numerosParaEnvio.length - 1; i >= 0; i--) {
-      if (dbAtkForDedup.isAgentNumber(numerosParaEnvio[i])) numerosParaEnvio.splice(i, 1);
-    }
-  }
+  const numerosParaEnvio = _dedupeRemarketingNumbers(numeros, dbAtkForDedup);
   if (!numerosParaEnvio.length) return res.status(400).json({ error: 'nenhum numero valido para envio' });
+  const pauseAfterSendEffective = isAtk ? true : !!pausarAposEnvio;
 
   let remarketingCampaign = null;
   if (isAtk) {
-    remarketingCampaign = dbAtkForDedup.createRemarketingCampaign({
-      agentId: agente,
-      name: nomeCampanha,
-      text: textoPrincipal,
-      imageUrl: mediaUrl,
-      pauseAfterSend: pausarAposEnvio,
-      total: numerosParaEnvio.length,
-      recipients: numerosParaEnvio,
-    });
+    remarketingCampaign = campanhaId ? dbAtkForDedup.getRemarketingCampaign(campanhaId) : null;
+    if (remarketingCampaign && remarketingCampaign.agentId !== agente) return res.status(400).json({ error: 'campanha de outro agente' });
+    if (remarketingCampaign) {
+      Object.assign(remarketingCampaign, {
+        status: 'active',
+        updatedAt: Date.now(),
+        text: textoPrincipal,
+        textos: textosValidos,
+        imageUrl: mediaUrl || remarketingCampaign.imageUrl || null,
+        mediaType,
+        delayMs,
+        pauseAfterSend: true,
+        total: numerosParaEnvio.length,
+        recipients: numerosParaEnvio,
+      });
+      dbAtkForDedup.save();
+    } else {
+      remarketingCampaign = dbAtkForDedup.createRemarketingCampaign({
+        agentId: agente,
+        name: nomeCampanha,
+        text: textoPrincipal,
+        textos: textosValidos,
+        imageUrl: mediaUrl,
+        mediaType,
+        delayMs,
+        pauseAfterSend: pauseAfterSendEffective,
+        total: numerosParaEnvio.length,
+        recipients: numerosParaEnvio,
+      });
+    }
   }
 
   const state = _remarkState[agente];
@@ -1024,7 +1095,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
         const sentAt = Date.now();
         if (isAtk) {
           const dbAtk = require('./database-atk');
-          if (pausarAposEnvio) dbAtk.pauseManual(numero, agente);
+          if (pauseAfterSendEffective) dbAtk.pauseManual(numero, agente);
           const conv = dbAtk.getConversation(agente, numero);
           if (conv) {
             conv.msgs.push({ role: 'assistant', content: textoAtual || (mediaType === 'video' ? '[video]' : '[imagem]'), timestamp: sentAt });
@@ -1037,7 +1108,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           if (remarketingCampaign) dbAtk.markRemarketingCampaignSent(remarketingCampaign.id, numero);
           dbAtk.save();
         } else {
-          if (pausarAposEnvio) db.pausePhone(agente, numero);
+          if (pauseAfterSendEffective) db.pausePhone(agente, numero);
           db.addMsg(agente, numero, 'assistant', textoAtual || (mediaType === 'video' ? '[video]' : '[imagem]'));
           const convCvn = db.state.conversations[agente]?.get(numero);
           if (convCvn) convCvn.remarketingEnviadoEm = sentAt;
@@ -1117,6 +1188,62 @@ router.post('/api/remarketing/retomar', auth, (req, res) => {
   state.pausado = false;
   res.json({ ok: true });
 });
+
+async function _dispatchScheduledRemarketingCampaign(campaign) {
+  if (!campaign || !ATK_REMARK_AGENTS.includes(campaign.agentId)) return;
+  const agente = campaign.agentId;
+  if (_remarkState[agente].ativo) return;
+  const dbAtk = require('./database-atk');
+  campaign.status = 'queued';
+  campaign.updatedAt = Date.now();
+  dbAtk.save();
+  const token = signToken({ user: 'scheduler', ts: Date.now() });
+  const port = process.env.PORT || 3001;
+  const baseUrl = process.env.INTERNAL_BASE_URL || `http://127.0.0.1:${port}`;
+  const payload = {
+    agente,
+    numeros: campaign.recipients || [],
+    texto: campaign.text || '',
+    textos: campaign.textos || [],
+    imagemUrl: campaign.imageUrl || '',
+    mediaType: campaign.mediaType || 'image',
+    delayMs: campaign.delayMs || 3000,
+    nomeCampanha: campaign.name,
+    pausarAposEnvio: true,
+    campanhaId: campaign.id,
+  };
+  try {
+    const r = await fetch(`${baseUrl}/api/remarketing/enviar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      campaign.status = 'scheduled';
+      campaign.updatedAt = Date.now();
+      campaign.lastScheduleError = d.error || `HTTP ${r.status}`;
+      dbAtk.save();
+    }
+  } catch (e) {
+    campaign.status = 'scheduled';
+    campaign.updatedAt = Date.now();
+    campaign.lastScheduleError = e.message;
+    dbAtk.save();
+  }
+}
+
+const remarketingScheduleTimer = setInterval(() => {
+  try {
+    const dbAtk = require('./database-atk');
+    for (const campaign of dbAtk.listDueRemarketingCampaigns(Date.now())) {
+      _dispatchScheduledRemarketingCampaign(campaign).catch(e => console.error('[RemarketingSchedule]', e.message));
+    }
+  } catch (e) {
+    console.error('[RemarketingSchedule] erro:', e.message);
+  }
+}, 30000);
+remarketingScheduleTimer.unref?.();
 
 // Recuperação retroativa: marca contatos que receberam remarketing nos últimos 7 dias
 router.post('/api/remarketing/recuperar/:agente', auth, (req, res) => {

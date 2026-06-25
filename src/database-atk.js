@@ -800,7 +800,7 @@ function cancelCampaign(campaignId) { const c = state.visualCampaigns[campaignId
 function listCampaigns() { return Object.values(state.visualCampaigns).sort((a, b) => b.createdAt - a.createdAt); }
 
 // --- Campanhas de Remarketing Manual (aba MKT) ---
-function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSend, total, recipients }) {
+function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSend, total, recipients, status, scheduledAt, mediaType, delayMs, textos }) {
   const id = `rmk_${Date.now()}_${agentId}`;
   state.remarketingCampaigns[id] = {
     id,
@@ -809,7 +809,11 @@ function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSe
     text: text || '',
     imageUrl: imageUrl || null,
     pauseAfterSend: pauseAfterSend !== false,
-    status: 'active',
+    status: status || 'active',
+    scheduledAt: Number(scheduledAt || 0),
+    mediaType: mediaType || 'image',
+    delayMs: Number(delayMs || 3000),
+    textos: Array.isArray(textos) ? textos : [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
     finishedAt: 0,
@@ -886,6 +890,24 @@ function finishRemarketingCampaign(campaignId, status = 'finished') {
   c.pending = Math.max(0, (c.total || 0) - c.sent - c.failed - c.skipped);
   save();
   return c;
+}
+
+function cancelRemarketingCampaign(campaignId) {
+  const c = getRemarketingCampaign(campaignId);
+  if (!c) return null;
+  if (!['scheduled', 'queued'].includes(c.status)) return null;
+  c.status = 'cancelled';
+  c.finishedAt = Date.now();
+  c.updatedAt = Date.now();
+  addEvent(`remarketing_campanha_cancelada: ${campaignId}`);
+  save();
+  return c;
+}
+
+function listDueRemarketingCampaigns(now = Date.now()) {
+  return Object.values(state.remarketingCampaigns)
+    .filter(c => c.status === 'scheduled' && Number(c.scheduledAt || 0) > 0 && Number(c.scheduledAt || 0) <= now)
+    .sort((a, b) => Number(a.scheduledAt || 0) - Number(b.scheduledAt || 0));
 }
 
 function getActiveRemarketingCampaignForClient(agentId, numero) {
@@ -1124,6 +1146,7 @@ module.exports = {
   createRemarketingCampaign, getRemarketingCampaign, listRemarketingCampaigns,
   markRemarketingCampaignSent, markRemarketingCampaignFailed, markRemarketingCampaignSkipped,
   markRemarketingCampaignResponded, getActiveRemarketingCampaignForClient, finishRemarketingCampaign,
+  cancelRemarketingCampaign, listDueRemarketingCampaigns,
   setPendingOwnerMedia, getPendingOwnerMedia, clearPendingOwnerMedia,
   cleanupOldData,
   getMemoryStats,
