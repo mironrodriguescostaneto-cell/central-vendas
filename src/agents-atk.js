@@ -507,6 +507,10 @@ function detectPedroNonClaroProvider(msg, wasAsked = false) {
   if (/\btim\b/.test(m)) return "TIM";
   if (/\b(?:starlink|brisanet|algar|vero|unifique|desktop)\b/.test(m)) return "Outra";
   if (/\b(?:internet|provedor)\s+(?:de\s+)?bairro\b|\bprovedor\s+local\b/.test(m)) return "Internet de bairro";
+  if (wasAsked && /\bbairro\b/.test(m)) return "Internet de bairro";
+  if (wasAsked && /\b(?:fibra\s+otica|fibra|cidade|local|municipal|regional)\b/.test(m) && /\b(?:nao\s+e\s+de\s+operadora|nao\s+e\s+operadora|internet|provedor|cidade|local)\b/.test(m)) {
+    return "Internet de bairro";
+  }
 
   // "Oi" so conta como operadora quando Pedro acabou de perguntar; fora desse
   // contexto, quase sempre e apenas uma saudacao.
@@ -3250,6 +3254,7 @@ module.exports = {
   isAgentResponseComplete,
   generateValidatedResponse,
   detectPedroProductKey,
+  detectPedroNonClaroProvider,
   rememberPedroProductChoice,
   buildPedroInstallmentReply,
   buildPedroContentTransparencyReply,

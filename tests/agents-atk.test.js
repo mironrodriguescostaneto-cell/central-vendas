@@ -74,3 +74,12 @@ test('respostas seguras satisfazem a intencao', () => {
   assert.equal(agents.isAgentResponseComplete('pedro', 'audit-ok-price', 'Quanto custa?', 'O Uni TV V10 custa R$360 a vista.'), true);
   assert.equal(agents.isAgentResponseComplete('pedro', 'audit-ok-install', 'Voce instala na residencia?', 'Nao fazemos instalacao na residencia. O aparelho vai configurado.'), true);
 });
+
+test('internet local/fibra depois da pergunta qualifica como bairro', () => {
+  assert.equal(
+    agents.detectPedroNonClaroProvider('[Audio]: Nossa internet nao e de operadora nao, e de fibra otica, e da cidade, do local.', true),
+    'Internet de bairro'
+  );
+  assert.equal(agents.detectPedroNonClaroProvider('Bairro', true), 'Internet de bairro');
+  assert.equal(agents.detectPedroNonClaroProvider('Bairro', false), null);
+});
