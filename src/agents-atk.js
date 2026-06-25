@@ -190,6 +190,108 @@ function buildPedroInitialReply(text = "") {
   return "Oi! Sou o Pedro. Trabalho com o Uni TV V10 por R$360. Quer que eu te mostre como ele funciona?";
 }
 
+const PEDRO_INTRO_FLOW_VERSION = 1;
+const PEDRO_INTRO_FLOW_MESSAGES = {
+  greeting: "Olá, meu nome é Pedro, vou te mostrar como o aparelho funciona beleza?",
+  videoCaption: "neste vídeo eu te mostro o aparelho",
+  benefits: "O aparelho já vai pronto para ser usado\n\n📍Não paga mensalidade (Você vai economizar dinheiro)\n📍Funciona na TV mesmo que não seja smart\n📍Só precisa de internet para funcionar\n📍Você só paga o valor do aparelho",
+  imageCaption: "Hoje estamos fazendo uma promoção no aparelho, para você fechar comigo HOJE ele fica R$ 360,00 A VISTA",
+  closingQuestion: "você tem alguma duvida até aqui?",
+};
+
+function shouldStartPedroIntroFlow(conv) {
+  if (!conv || conv.finalizado) return false;
+  if (conv.pedroIntroFlow?.completedAt || conv.pedroIntroFlow?.startedAt) return false;
+  const assistantMsgs = (conv.msgs || []).filter(m => m.role === "assistant");
+  return assistantMsgs.length === 0;
+}
+
+function getPedroIntroPendingText(conv) {
+  const startedAt = conv?.pedroIntroFlow?.startedAt || 0;
+  if (!startedAt) return "";
+  return (conv.msgs || [])
+    .filter(m => m.role === "user" && (m.timestamp || 0) > startedAt)
+    .map(m => m.content || "")
+    .join("\n")
+    .trim();
+}
+
+async function sendPedroIntroText(numero, text, label) {
+  const sent = await sendText("pedro", numero, text, { allowIncomplete: true });
+  if (!sent) return false;
+  const conv = db.getConversation("pedro", numero);
+  if (conv) {
+    conv.msgs.push({ role: "assistant", content: sanitize(text), timestamp: Date.now(), _type: "intro_flow", _step: label });
+    conv.ultimaMensagem = Date.now();
+    db.save();
+  }
+  return true;
+}
+
+async function sendPedroIntroMedia(numero, type, url, caption, label) {
+  if (!url) {
+    console.error(`[PEDRO INTRO] midia ausente: ${type}/${label}`);
+    return false;
+  }
+  const sent = await sendMedia("pedro", numero, type, url, caption);
+  if (!sent) return false;
+  const conv = db.getConversation("pedro", numero);
+  if (conv) {
+    const productCtx = getPedroProductContext(numero, "");
+    markMediaSent("pedro", numero, productCtx, type);
+    conv.msgs.push({ role: "assistant", content: sanitize(caption), timestamp: Date.now(), _type: "intro_flow", _step: label, _media: type });
+    conv.ultimaMensagem = Date.now();
+    db.save();
+  }
+  return true;
+}
+
+async function runPedroIntroFlow(numero) {
+  const conv = db.getConversation("pedro", numero);
+  if (!conv) return;
+  conv.pedroIntroFlow = {
+    version: PEDRO_INTRO_FLOW_VERSION,
+    startedAt: Date.now(),
+    status: "running",
+  };
+  db.addEvent(`pedro_intro_flow_iniciado: ${numero}`);
+  db.save();
+
+  const media = CONFIG.AGENTS.pedro.media;
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  try {
+    if (!await sendPedroIntroText(numero, PEDRO_INTRO_FLOW_MESSAGES.greeting, "greeting")) throw new Error("falha greeting");
+    await wait(10 * 1000);
+    if (!await sendPedroIntroMedia(numero, "video", media.video1, PEDRO_INTRO_FLOW_MESSAGES.videoCaption, "video")) throw new Error("falha video");
+    await wait(10 * 1000);
+    if (!await sendPedroIntroText(numero, PEDRO_INTRO_FLOW_MESSAGES.benefits, "benefits")) throw new Error("falha benefits");
+    await wait(40 * 1000);
+    if (!await sendPedroIntroMedia(numero, "image", media.foto1, PEDRO_INTRO_FLOW_MESSAGES.imageCaption, "image")) throw new Error("falha image");
+    await wait(10 * 1000);
+    if (!await sendPedroIntroText(numero, PEDRO_INTRO_FLOW_MESSAGES.closingQuestion, "closing_question")) throw new Error("falha closing");
+
+    const finalConv = db.getConversation("pedro", numero);
+    if (finalConv) {
+      finalConv.pedroIntroFlow.status = "completed";
+      finalConv.pedroIntroFlow.completedAt = Date.now();
+      finalConv.pedroIntroFlow.pendingTextAtCompletion = getPedroIntroPendingText(finalConv);
+      db.addEvent(`pedro_intro_flow_concluido: ${numero}`);
+      db.save();
+    }
+  } catch (e) {
+    const errorConv = db.getConversation("pedro", numero);
+    if (errorConv) {
+      errorConv.pedroIntroFlow.status = "error";
+      errorConv.pedroIntroFlow.error = e.message;
+      errorConv.pedroIntroFlow.errorAt = Date.now();
+    }
+    db.addEvent(`pedro_intro_flow_erro: ${numero} ${e.message}`);
+    db.save();
+    sendText("pedro", CONFIG.SEU_WHATSAPP, `*PEDRO - ERRO NO FLUXO INICIAL*\nCliente: wa.me/${numero}\nErro: ${e.message}`).catch(() => {});
+  }
+}
+
 function asksPedroPrice(text) {
   const t = normalizeTextBasic(text);
   return /\b(?:quanto\s+(?:(?:esta|ta)\s+)?(?:custa|custando|fica|e)|qual\s+(?:o\s+)?valor|preco|valor|custa\s+quanto|outro\s+de\s+quanto)\b/.test(t);
@@ -637,6 +739,18 @@ Sem a tag, nada e enviado/executado.
 ENVIAR_FOTO | ENVIAR_VIDEO | ENVIAR_AUDIO | NOTIFICAR_ENTREGA | TRANSFERIR_HUMANO | AGENDAR:DD/MM/YYYY:msg
 Follow-up: cliente diz "depois" → pergunte a data → AGENDAR.
 Dia futuro de entrega: incluir CONFIRMAR_DIA:DD/MM/YYYY.
+
+=== POS-FLUXO INICIAL ===
+O primeiro contato do Pedro ja e enviado pelo sistema em mensagens fixas com video, beneficios, foto, promocao de HOJE e pergunta de duvida.
+Quando o historico mostrar mensagens marcadas como intro_flow, NAO reinicie a apresentacao e NAO repita video/foto.
+Depois desse fluxo, responda a pergunta do cliente e avance para a venda com gatilhos mentais reais:
+- Urgencia: reforcar que a condicao e para fechar HOJE.
+- Economia: sem mensalidade, paga uma vez so.
+- Seguranca: pagamento somente na entrega, direto ao entregador.
+- Simplicidade: ja vai pronto para usar.
+- Conveniencia: entrega calculada pela localizacao.
+Seja persuasivo, direto e humano. Entenda a preocupacao do cliente, mas conduza para o proximo passo: localizacao para frete, simulacao ou fechamento.
+Nao invente escassez, estoque, prazo ou promessa que nao esteja no historico/manual.
 
 ESTILO: Responda sempre a pergunta do cliente antes de fazer a sua. Nao repita informacao ja dada. Em respostas comuns, use no maximo 160 caracteres, 2 frases curtas e 1 pergunta. So detalhe quando o cliente pedir comparacao, parcelas ou informacoes especificas. Uma mensagem por vez.`;
 }
@@ -2393,7 +2507,7 @@ async function handleIncomingMessage(agentId, body) {
 
     if (!mensagem) return;
 
-    if (isDeliveryTimingQuestion(mensagem)) {
+    if (isDeliveryTimingQuestion(mensagem) && !(agentId === "pedro" && shouldStartPedroIntroFlow(db.getConversation("pedro", numero)))) {
       const convPrazo = db.getConversation(agentId, numero);
       const prazoMsg = buildDeliveryTimingReply(agentId, numero);
       convPrazo.msgs.push({ role: "user", content: sanitize(mensagem), timestamp: Date.now() });
@@ -2421,6 +2535,28 @@ async function handleIncomingMessage(agentId, body) {
     convDB.ultimaMensagem = Date.now();
 
     // Se já tem um debounce pendente, cancelar (nova msg chegou, esperar mais)
+    if (agentId === "pedro") {
+      if (shouldStartPedroIntroFlow(convDB)) {
+        db.registerContact(numero, agentId);
+        db.state.metrics[agentId].atendimentos++;
+        db.addActivity(`${agentId}: ${numero} - fluxo inicial Pedro iniciado`);
+        await runPedroIntroFlow(numero);
+        const pendingAfterIntro = getPedroIntroPendingText(convDB);
+        if (!pendingAfterIntro) {
+          db.save();
+          return;
+        }
+        mensagem = pendingAfterIntro;
+      }
+
+      if (convDB.pedroIntroFlow?.status === "running") {
+        db.addEvent(`pedro_intro_flow_mensagem_enfileirada: ${numero}`);
+        db.save();
+        console.log(`Pedro [${numero}]: mensagem salva enquanto fluxo inicial roda`);
+        return;
+      }
+    }
+
     if (db.state.debounceTimers && db.state.debounceTimers.has(rateKey)) {
       clearTimeout(db.state.debounceTimers.get(rateKey));
       db.state.debounceTimers.delete(rateKey);
