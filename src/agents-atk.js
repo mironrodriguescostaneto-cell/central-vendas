@@ -306,6 +306,24 @@ function asksPedroGuarantee(text) {
   return /\bgarantia\b/.test(normalizeTextBasic(text));
 }
 
+function asksPedroUnsupportedModel(text) {
+  const t = normalizeTextBasic(text);
+  return /\b(?:v\s*(?!10\b)\d{1,2}|v11|v\s*11|s\s*\d{1,2}|outro\s+modelo|modelo\s+novo|preto)\b/.test(t);
+}
+
+function asksPedroBluetoothAudio(text) {
+  const t = normalizeTextBasic(text).replace(/^\[audio\]:\s*/, "").trim();
+  return /\b(?:bluetooth|blue\s*tooth|audio|som|fone|caixa\s+de\s+som)\b/.test(t);
+}
+
+function buildPedroUnsupportedModelReply(text = "") {
+  if (!asksPedroUnsupportedModel(text) && !asksPedroBluetoothAudio(text)) return "";
+  if (asksPedroBluetoothAudio(text)) {
+    return "Entendi. Eu trabalho somente com o Uni TV V10, entao nao consigo vender ou garantir informacao sobre V11. Sobre audio via Bluetooth, eu prefiro ser transparente: nao vou prometer isso no V10, porque pode variar conforme a TV e o aparelho de som. O que eu consigo garantir e o V10 funcionando pelo HDMI, com internet, sem mensalidade. Se audio Bluetooth for obrigatorio pra voce, talvez esse modelo nao seja o ideal.";
+  }
+  return "Eu trabalho somente com o Uni TV V10. Nao consigo vender ou garantir informacao sobre outro modelo. Se voce quiser, eu posso te mostrar o que o V10 faz com seguranca.";
+}
+
 function isPedroThanksOnly(text) {
   const t = normalizeTextBasic(text).replace(/^\[audio\]:\s*/, "").trim();
   return /^(?:obrigad[ao]|muito\s+obrigad[ao]|valeu|agradeco)(?:[,.!\s]|$)/.test(t) && !asksPedroPrice(t);
@@ -317,6 +335,8 @@ function buildPedroPriceReply(numero, text = "") {
 }
 
 function buildPedroFaqReply(numero, text = "") {
+  const unsupportedModelReply = buildPedroUnsupportedModelReply(text);
+  if (unsupportedModelReply) return unsupportedModelReply;
   if (asksPedroInstallation(text)) {
     return "Nao fazemos instalacao na residencia. O aparelho vai configurado; e so ligar na TV e conectar a internet.";
   }

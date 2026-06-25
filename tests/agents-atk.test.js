@@ -28,6 +28,21 @@ test('pergunta sobre outro modelo volta para V10 unico', () => {
   assert.doesNotMatch(reply, /S10/);
 });
 
+test('pergunta sobre V11 recebe resposta transparente sem fallback incompleto', () => {
+  const reply = agents.buildPedroFaqReply('audit-v11', 'O unitv v11 me manda foto e quanto vc me faz em 10x');
+  assert.match(reply, /somente com o Uni TV V10/);
+  assert.match(reply, /outro modelo/);
+  assert.doesNotMatch(reply, /resposta saiu incompleta/i);
+});
+
+test('objeção de bluetooth responde sem prometer recurso nao confirmado', () => {
+  const reply = agents.buildPedroFaqReply('audit-bluetooth', 'O V10 nao envia audio pelo bluetooth por isso quero e o v11');
+  assert.match(reply, /audio via Bluetooth/);
+  assert.match(reply, /nao vou prometer isso no V10/);
+  assert.match(reply, /talvez esse modelo nao seja o ideal/);
+  assert.doesNotMatch(reply, /resposta saiu incompleta/i);
+});
+
 test('preco inventado e corrigido para V10', () => {
   const repaired = agents.repairPedroCatalogPrices(
     'audit-repair',
