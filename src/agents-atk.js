@@ -276,7 +276,10 @@ async function runPedroIntroFlow(numero) {
       finalConv.pedroIntroFlow.status = "completed";
       finalConv.pedroIntroFlow.completedAt = Date.now();
       finalConv.pedroIntroFlow.pendingTextAtCompletion = getPedroIntroPendingText(finalConv);
+      db.pauseManual(numero, "pedro");
+      finalConv.pedroIntroFlow.pausedAtCompletion = Date.now();
       db.addEvent(`pedro_intro_flow_concluido: ${numero}`);
+      db.addEvent(`pedro_intro_flow_pausado: ${numero}`);
       db.save();
     }
   } catch (e) {
@@ -2436,6 +2439,7 @@ async function handleIncomingMessage(agentId, body) {
         db.state.metrics[agentId].atendimentos++;
         db.addActivity(`${agentId}: ${numero} - fluxo inicial Pedro iniciado por localizacao`);
         await runPedroIntroFlow(numero);
+        return;
       }
     }
     if (loc) {
@@ -2574,12 +2578,7 @@ async function handleIncomingMessage(agentId, body) {
         db.state.metrics[agentId].atendimentos++;
         db.addActivity(`${agentId}: ${numero} - fluxo inicial Pedro iniciado`);
         await runPedroIntroFlow(numero);
-        const pendingAfterIntro = getPedroIntroPendingText(convDB);
-        if (!pendingAfterIntro) {
-          db.save();
-          return;
-        }
-        mensagem = pendingAfterIntro;
+        return;
       }
 
       if (convDB.pedroIntroFlow?.status === "running") {
