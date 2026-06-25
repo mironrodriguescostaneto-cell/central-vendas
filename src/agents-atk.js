@@ -2405,6 +2405,15 @@ async function handleIncomingMessage(agentId, body) {
 
     // Handle location (pin on map) — ENVIA DIRETO PRO CLIENTE, SEM PASSAR PELA IA
     const loc = extractLocation(body);
+    if (loc && agentId === "pedro") {
+      const convIntroLoc = db.getConversation("pedro", numero);
+      if (shouldStartPedroIntroFlow(convIntroLoc)) {
+        db.registerContact(numero, agentId);
+        db.state.metrics[agentId].atendimentos++;
+        db.addActivity(`${agentId}: ${numero} - fluxo inicial Pedro iniciado por localizacao`);
+        await runPedroIntroFlow(numero);
+      }
+    }
     if (loc) {
       if (agentId === "pedro") {
         const convPedro = db.getConversation("pedro", numero);
@@ -2737,6 +2746,9 @@ async function handleIncomingMessage(agentId, body) {
         const item = conv.msgs[i];
         if (item.role === "assistant") break;
         if (item.role === "user") pendingClientMessages.unshift(item.content || "");
+      }
+      if (pendingClientMessages.length === 0 && conv.pedroIntroFlow?.completedAt && mensagem) {
+        pendingClientMessages.push(mensagem);
       }
       const faqReply = buildPedroFaqReply(numero, pendingClientMessages.join("\n"));
       if (faqReply) {
