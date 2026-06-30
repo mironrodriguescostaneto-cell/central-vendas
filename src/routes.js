@@ -960,6 +960,14 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   if (!VALID_REMARK_AGENTS.includes(agente)) return res.status(400).json({ error: 'agente invalido' });
   if (!numeros?.length) return res.status(400).json({ error: 'numeros obrigatorios' });
   if (!textoPrincipal && !mediaUrl) return res.status(400).json({ error: 'texto ou imagem obrigatorio' });
+  const existingState = _remarkState[agente];
+  const staleActive = existingState.ativo && !existingState.pausado && Number(existingState.lastTick || existingState.startedAt || 0) > 0 && (Date.now() - Number(existingState.lastTick || existingState.startedAt || 0)) > 5 * 60 * 1000;
+  if (staleActive) {
+    existingState.ativo = false;
+    existingState.cancelar = true;
+    existingState.erroFatal = existingState.erroFatal || 'Envio anterior travou e foi liberado automaticamente. Inicie novamente.';
+    console.error(`[Remarketing] ${agente}: envio ativo sem progresso liberado automaticamente`);
+  }
   if (_remarkState[agente].ativo) return res.status(409).json({ error: 'Remarketing ja em andamento' });
   if (isTempMedia && !_getRemarketingTempImage(mediaUrl)) {
     return res.status(410).json({ error: 'A imagem expirou. Selecione a imagem novamente antes de enviar.' });
@@ -1006,7 +1014,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
   }
 
   const state = _remarkState[agente];
-  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.pulados = 0; state.total = numerosParaEnvio.length; state.campanhaId = remarketingCampaign?.id || null; state.atual = ''; state.erroFatal = '';
+  state.ativo = true; state.pausado = false; state.cancelar = false; state.enviados = 0; state.erros = 0; state.pulados = 0; state.total = numerosParaEnvio.length; state.campanhaId = remarketingCampaign?.id || null; state.atual = ''; state.erroFatal = ''; state.startedAt = Date.now(); state.lastTick = Date.now();
   res.json({ ok: true, total: numerosParaEnvio.length, campanhaId: remarketingCampaign?.id || null });
 
   const sessionId = isAtk ? agente : CONFIG.sessionIds[agente];
@@ -1054,13 +1062,16 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     let consecutiveTimeouts = 0;
     const _sentCanonical = new Set(); // anti-duplicata por sessão de envio
     let envioIndex = 0;
+    try {
     for (const numero of numerosParaEnvio) {
+      state.lastTick = Date.now();
       // Bloqueia duplicata: mesmo número com chaves diferentes no Map
       const canon = _canonicalPhone(numero, isAtk ? require('./database-atk') : null);
       if (canon && canon.length >= 6) {
         if (_sentCanonical.has(canon)) {
           console.log(`[Remarketing] Duplicata ignorada: ${numero} (canon: ${canon})`);
           state.pulados++;
+          state.lastTick = Date.now();
           if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignSkipped(remarketingCampaign.id, numero, 'duplicata');
           continue;
         }
@@ -1068,16 +1079,18 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       }
 
       while (state.pausado && !state.cancelar) {
+        state.lastTick = Date.now();
         await new Promise(r => setTimeout(r, 1000));
       }
       if (state.cancelar) break;
       state.atual = numero;
       if (baileys.getState(sessionId) !== 'connected') {
+        state.erroFatal = `WhatsApp do agente ${agente} desconectado. Reconecte e tente novamente.`;
         console.log(`[Remarketing] ${sessionId} desconectado — abortando`);
         break;
       }
       try {
-        const originalJid = resolveJid(numero);
+        const originalJid = resolveJid(String(numero || ''));
         const textoAtual = textosValidos.length ? textosValidos[envioIndex % textosValidos.length] : textoPrincipal;
         envioIndex++;
         const tempImage = mediaType === 'image' ? _getRemarketingTempImage(mediaUrl) : null;
@@ -1119,8 +1132,10 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           }
         }
         state.enviados++;
+        state.lastTick = Date.now();
       } catch (e) {
         state.erros++;
+        state.lastTick = Date.now();
         if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignFailed(remarketingCampaign.id, numero, e.message);
         if (e.message === '__media_expired__') {
           state.erroFatal = 'A imagem da campanha expirou. Selecione a imagem novamente e inicie um novo envio.';
@@ -1131,6 +1146,7 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           consecutiveTimeouts++;
           console.error(`[Remarketing] Timeout ${numero} (${consecutiveTimeouts} consecutivos)`);
           if (consecutiveTimeouts >= 3) {
+            state.erroFatal = 'WhatsApp demorou demais em 3 envios seguidos. Campanha interrompida para evitar travar.';
             console.log(`[Remarketing] 3 timeouts consecutivos — WhatsApp throttling, abortando`);
             break;
           }
@@ -1141,18 +1157,31 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       }
       await new Promise(r => setTimeout(r, delayMs));
     }
-    state.ativo = false;
-    state.atual = '';
-    if (isAtk && remarketingCampaign) {
-      require('./database-atk').finishRemarketingCampaign(remarketingCampaign.id, state.cancelar ? 'stopped' : (state.erroFatal ? 'failed' : 'finished'));
+    } catch (e) {
+      state.erros++;
+      state.erroFatal = e.message || 'Erro interno no envio do remarketing.';
+      console.error(`[Remarketing] ${agente}: erro fatal no worker`, e);
+    } finally {
+      state.ativo = false;
+      state.atual = '';
+      state.lastTick = Date.now();
+      if (isAtk && remarketingCampaign) {
+        require('./database-atk').finishRemarketingCampaign(remarketingCampaign.id, state.cancelar ? 'stopped' : (state.erroFatal ? 'failed' : 'finished'));
+      }
+      console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} OK, ${state.erros} erros`);
     }
-    console.log(`[Remarketing] ${agente}: ${state.enviados}/${state.total} OK, ${state.erros} erros`);
   })();
 });
 
 router.get('/api/remarketing/status', auth, (req, res) => {
   const agentId = req.query.agente;
   if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  const state = _remarkState[agentId];
+  if (state.ativo && !state.pausado && Number(state.lastTick || 0) > 0 && (Date.now() - Number(state.lastTick || 0)) > 5 * 60 * 1000) {
+    state.ativo = false;
+    state.erroFatal = state.erroFatal || 'Envio sem progresso por mais de 5 minutos. Inicie novamente.';
+    state.atual = '';
+  }
   res.json(_remarkState[agentId]);
 });
 

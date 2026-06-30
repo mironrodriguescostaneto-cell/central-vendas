@@ -2335,9 +2335,17 @@ async function handleIncomingMessage(agentId, body) {
     const activeRemarketingCampaign = db.getActiveRemarketingCampaignForClient(agentId, numero);
     if (activeRemarketingCampaign) {
       const conv = db.getConversation(agentId, numero);
-      if (conv) conv.remarketingRespondidoEm = Date.now();
+      const textoCliente = extractText(body) || "[mensagem]";
+      if (conv) {
+        conv.msgs.push({ role: "user", content: sanitize(textoCliente), timestamp: Date.now() });
+        conv.ultimaMensagem = Date.now();
+        conv.remarketingRespondidoEm = Date.now();
+      }
       db.markRemarketingCampaignResponded(activeRemarketingCampaign.id, numero);
+      db.pauseManual(numero, agentId);
+      db.save();
       console.log(`[RemarketingMKT] ${agentId} [${numero}]: respondeu campanha ${activeRemarketingCampaign.id}`);
+      return;
     }
 
     // Intercept: cliente respondeu a campanha visual ativa — pausa + notifica Miron

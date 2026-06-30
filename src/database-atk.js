@@ -914,7 +914,7 @@ function getActiveRemarketingCampaignForClient(agentId, numero) {
   const now = Date.now();
   const maxAge = 14 * 24 * 60 * 60 * 1000;
   for (const c of listRemarketingCampaigns(agentId)) {
-    if (!['active', 'finished', 'stopped'].includes(c.status)) continue;
+    if (!['active', 'finished', 'stopped', 'failed'].includes(c.status)) continue;
     if ((now - (c.createdAt || 0)) > maxAge) continue;
     if (!_campaignHasNumber(c.sentTo, numero)) continue;
     if (_campaignHasNumber(c.responded, numero)) continue;
