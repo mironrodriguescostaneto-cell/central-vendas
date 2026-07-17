@@ -1125,16 +1125,21 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
     if (isAtk) {
       const dbAtk = require('./database-atk');
       // 1. Pegar _originalJid salvo na conversa (fonte mais confiável)
-      const conv = dbAtk.state.conversations[agente]?.get(numero);
+      const conv = dbAtk.getConversation(agente, numero);
       if (conv?._originalJid && !isOwnAgentJid(conv._originalJid) && jidLooksCompatible(conv._originalJid, numero)) return conv._originalJid;
       if (conv?._originalJid && isOwnAgentJid(conv._originalJid)) {
         delete conv._originalJid;
         dbAtk.save();
       }
+      const resolvedPhone = dbAtk.resolvePhone(numero);
+      if (resolvedPhone) return `${resolvedPhone}@s.whatsapp.net`;
       // 2. Se o numero já tem @ (é JID completo), usar direto
       if (numero.includes('@') && !isOwnAgentJid(numero)) return numero;
       // 3. Se parece LID (sem prefixo 55 e ≥12 dígitos), usar @lid
-      if (!numero.startsWith('55') && numero.length >= 12) return `${numero}@lid`;
+      if (!numero.startsWith('55') && numero.length >= 12) {
+        if (!conv?._originalJid && !resolvedPhone) throw new Error('__unreliable_lid_destination__');
+        return `${numero}@lid`;
+      }
       return null;
     }
     const lidJid = db.state.phoneLidMap?.get(numero);
@@ -1184,7 +1189,11 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
           ? () => tempImage
             ? baileys.sendMediaBuffer(sessionId, numero, 'image', tempImage.buffer, textoAtual || '', originalJid, tempImage.mimetype)
             : baileys.sendMedia(sessionId, numero, mediaType, mediaUrl, textoAtual || '', originalJid)
-          : () => baileys.sendText(sessionId, numero, textoAtual, originalJid);
+          : () => isAtk
+            ? require('./services-atk').sendText(agente, numero, textoAtual, { bypassPause: true, allowDuplicate: true }).then(ok => {
+                if (!ok) throw new Error('__send_not_confirmed__');
+              })
+            : baileys.sendText(sessionId, numero, textoAtual, originalJid);
         await Promise.race([
           sendFn(),
           new Promise((_, rej) => setTimeout(() => rej(new Error('__timeout__')), TIMEOUT_ENVIO)),
@@ -1221,7 +1230,12 @@ router.post('/api/remarketing/enviar', auth, async (req, res) => {
       } catch (e) {
         state.erros++;
         state.lastTick = Date.now();
-        if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignFailed(remarketingCampaign.id, numero, e.message);
+        const failMessage = e.message === '__unreliable_lid_destination__'
+          ? 'Destino LID antigo sem JID confiavel. Nao foi marcado como enviado.'
+          : e.message === '__send_not_confirmed__'
+            ? 'WhatsApp nao confirmou o envio.'
+            : e.message;
+        if (isAtk && remarketingCampaign) require('./database-atk').markRemarketingCampaignFailed(remarketingCampaign.id, numero, failMessage);
         if (e.message === '__media_expired__') {
           state.erroFatal = 'A imagem da campanha expirou. Selecione a imagem novamente e inicie um novo envio.';
           console.error(`[Remarketing] ${agente}: campanha interrompida porque a imagem expirou`);
