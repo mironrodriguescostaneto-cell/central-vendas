@@ -11,6 +11,27 @@ const path = require("path");
 const { execSync } = require("child_process");
 const obsidianApi = require("./obsidian-api-atk");
 
+function createManagerRemarketingCampaign({ agentId, name, text, recipients, source }) {
+  if (!["pedro", "rodrigo"].includes(agentId)) return null;
+  const validRecipients = Array.isArray(recipients) ? recipients.filter(Boolean) : [];
+  if (!validRecipients.length) return null;
+  return db.createRemarketingCampaign({
+    agentId,
+    name,
+    text: text || "Remarketing personalizado",
+    pauseAfterSend: true,
+    total: validRecipients.length,
+    recipients: validRecipients,
+    status: "active",
+    source: source || "manager",
+  });
+}
+
+function finishManagerRemarketingCampaign(campaign, sent, errors) {
+  if (!campaign) return;
+  db.finishRemarketingCampaign(campaign.id, sent > 0 || errors === 0 ? "finished" : "failed");
+}
+
 // Gera o system prompt do Aslam com precos atuais de db.agentCatalog — fonte única persistida
 function buildAslamSystemPrompt() {
   // Lê preços do banco (fonte única e persistida)
@@ -877,19 +898,35 @@ async function handleAslamChat(message, mediaUrl = null) {
     if (!dateStr) dateStr = "base completa";
 
     let sent = 0, skipped = 0, errors = 0;
+    const managerCampaigns = new Map();
+    const getManagerCampaign = (agentId) => {
+      if (!["pedro", "rodrigo"].includes(agentId)) return null;
+      if (!managerCampaigns.has(agentId)) {
+        const recipients = filtered.filter(c => c.agente === agentId).map(c => c.numero);
+        managerCampaigns.set(agentId, createManagerRemarketingCampaign({
+          agentId,
+          name: `Remarketing ${CONFIG.AGENTS[agentId]?.name || agentId} via Aslam ${new Date().toLocaleDateString("pt-BR")}`,
+          text: mensagemExata || instrucaoMiron || "Remarketing personalizado via Aslam",
+          recipients,
+          source: "manager_manual",
+        }));
+      }
+      return managerCampaigns.get(agentId);
+    };
 
     for (const contact of filtered) {
       try {
+        const managerCampaign = getManagerCampaign(contact.agente);
         // Respeitar pausa MANUAL do Miron — nunca enviar
-        if (db.isManuallyPaused(contact.numero)) { skipped++; continue; }
+        if (db.isManuallyPaused(contact.numero)) { skipped++; if (managerCampaign) db.markRemarketingCampaignSkipped(managerCampaign.id, contact.numero, "pausado"); continue; }
         // Nunca enviar para quem já comprou
-        if (db.hasSaleForNumber(contact.numero)) { skipped++; continue; }
+        if (db.hasSaleForNumber(contact.numero)) { skipped++; if (managerCampaign) db.markRemarketingCampaignSkipped(managerCampaign.id, contact.numero, "comprou"); continue; }
         // Verificar se agente existe
-        if (!CONFIG.AGENTS[contact.agente]) { skipped++; continue; }
+        if (!CONFIG.AGENTS[contact.agente]) { skipped++; if (managerCampaign) db.markRemarketingCampaignSkipped(managerCampaign.id, contact.numero, "agente invalido"); continue; }
 
         const conv = db.getConversation(contact.agente, contact.numero);
         const msgs = conv && conv.msgs ? conv.msgs : [];
-        if (msgs.length === 0) { skipped++; continue; }
+        if (msgs.length === 0) { skipped++; if (managerCampaign) db.markRemarketingCampaignSkipped(managerCampaign.id, contact.numero, "sem historico"); continue; }
 
         // Se Miron mandou mensagem EXATA ("dizendo: ..."), usar direto sem gerar pelo Claude
         if (mensagemExata) {
@@ -898,6 +935,7 @@ async function handleAslamChat(message, mediaUrl = null) {
             conv.msgs.push({ role: "assistant", content: mensagemExata, timestamp: Date.now() });
             conv.ultimaMensagem = Date.now();
           }
+          if (managerCampaign) db.markRemarketingCampaignSent(managerCampaign.id, contact.numero);
           sent++;
           console.log(`Msg exata ${contact.agente} -> ${contact.numero}: ${mensagemExata.substring(0, 50)}...`);
           await new Promise((r) => setTimeout(r, 1500));
@@ -964,6 +1002,7 @@ async function handleAslamChat(message, mediaUrl = null) {
             conv.msgs.push({ role: "assistant", content: cleanMsg, timestamp: Date.now() });
             conv.ultimaMensagem = Date.now();
           }
+          if (managerCampaign) db.markRemarketingCampaignSent(managerCampaign.id, contact.numero);
           // Registrar oferta ativa se remarketing manual contém preço com desconto e/ou frete grátis
           if (instrucaoExtra) {
             const precoDescMatch = instrucaoExtra.match(/PRECO COM DESCONTO: R\$(\d+)/);
@@ -987,14 +1026,18 @@ async function handleAslamChat(message, mediaUrl = null) {
           // Esperar entre mensagens pra não sobrecarregar
           await new Promise((r) => setTimeout(r, 1500));
         } else {
+          if (managerCampaign) db.markRemarketingCampaignFailed(managerCampaign.id, contact.numero, "sem resposta da IA");
           errors++;
         }
       } catch (e) {
         console.error(`Remarketing error ${contact.numero}:`, e.message);
+        const managerCampaign = getManagerCampaign(contact.agente);
+        if (managerCampaign) db.markRemarketingCampaignFailed(managerCampaign.id, contact.numero, e.message);
         errors++;
       }
     }
 
+    for (const campaign of managerCampaigns.values()) finishManagerRemarketingCampaign(campaign, sent, errors);
     db.addEvent(`Remarketing ${agentFilter || "todos"} (${dateStr}): ${sent} enviados, ${skipped} pulados, ${errors} erros${isOverrideHorario && !isDentroHorarioComercial() ? " [OVERRIDE_HORARIO]" : ""}`);
     db.save();
     return `Remarketing concluido (${dateStr})${agentFilter ? " — " + CONFIG.AGENTS[agentFilter].name : ""}:\n- Contatos encontrados: ${filtered.length}\n- Mensagens enviadas: ${sent}\n- Pulados (pausados/compraram): ${skipped}\n- Erros: ${errors}` + _overrideAviso;
@@ -1428,6 +1471,13 @@ Eventos recentes: ${db.state.events.slice(-5).map((e) => e.text).join("; ")}`;
       if (contacts.length > 0) {
         let rmSent = 0, rmErrors = 0;
         const agentConfig = CONFIG.AGENTS[rmAgent];
+        const safetyCampaign = createManagerRemarketingCampaign({
+          agentId: rmAgent,
+          name: `Remarketing ${CONFIG.AGENTS[rmAgent]?.name || rmAgent} safety-net ${new Date().toLocaleDateString("pt-BR")}`,
+          text: rmMensagemExata || rmInstrucao || "Remarketing safety-net",
+          recipients: contacts.map(c => c.numero),
+          source: "manager_safety_net",
+        });
 
         for (const { numero, conv } of contacts) {
           try {
@@ -1438,6 +1488,7 @@ Eventos recentes: ${db.state.events.slice(-5).map((e) => e.text).join("; ")}`;
                 conv.msgs.push({ role: "assistant", content: rmMensagemExata, timestamp: Date.now() });
                 conv.ultimaMensagem = Date.now();
               }
+              if (safetyCampaign) db.markRemarketingCampaignSent(safetyCampaign.id, numero);
               rmSent++;
               console.log(`Safety-net msg exata ${rmAgent} -> ${numero}: ${rmMensagemExata.substring(0, 50)}...`);
               await new Promise(r => setTimeout(r, 1500));
@@ -1480,6 +1531,7 @@ Eventos recentes: ${db.state.events.slice(-5).map((e) => e.text).join("; ")}`;
               await sendText(rmAgent, numero, cleanMsg);
               conv.msgs.push({ role: "assistant", content: sanitize(cleanMsg), timestamp: Date.now() });
               conv.ultimaMensagem = Date.now();
+              if (safetyCampaign) db.markRemarketingCampaignSent(safetyCampaign.id, numero);
               // Registrar oferta ativa no safety-net se há desconto e/ou frete grátis
               if (instrucaoExtra) {
                 const precoDescMatchSN = instrucaoExtra.match(/PRECO COM DESCONTO: R\$(\d+)/);
@@ -1498,14 +1550,17 @@ Eventos recentes: ${db.state.events.slice(-5).map((e) => e.text).join("; ")}`;
               rmSent++;
               await new Promise(r => setTimeout(r, 1500));
             } else {
+              if (safetyCampaign) db.markRemarketingCampaignFailed(safetyCampaign.id, numero, "sem resposta da IA");
               rmErrors++;
             }
           } catch (e) {
             console.error(`Safety-net remarketing error ${numero}:`, e.message);
+            if (safetyCampaign) db.markRemarketingCampaignFailed(safetyCampaign.id, numero, e.message);
             rmErrors++;
           }
         }
 
+        finishManagerRemarketingCampaign(safetyCampaign, rmSent, rmErrors);
         const productLabel = rmProduct === "unitv" ? " [Uni TV]" : rmProduct === "furadeira" ? " [Furadeira]" : "";
         db.addEvent(`Remarketing safety-net ${rmAgent}${productLabel}: ${rmSent} enviados, ${rmErrors} erros`);
         db.save();

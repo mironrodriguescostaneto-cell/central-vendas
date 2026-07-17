@@ -894,6 +894,7 @@ router.get('/api/remarketing/campanhas', auth, (req, res) => {
       scheduledAt: c.scheduledAt,
       mediaType: c.mediaType,
       delayMs: c.delayMs,
+      source: c.source || 'mkt',
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
       finishedAt: c.finishedAt,

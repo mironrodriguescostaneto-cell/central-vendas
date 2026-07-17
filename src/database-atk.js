@@ -800,7 +800,7 @@ function cancelCampaign(campaignId) { const c = state.visualCampaigns[campaignId
 function listCampaigns() { return Object.values(state.visualCampaigns).sort((a, b) => b.createdAt - a.createdAt); }
 
 // --- Campanhas de Remarketing Manual (aba MKT) ---
-function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSend, total, recipients, status, scheduledAt, mediaType, delayMs, textos }) {
+function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSend, total, recipients, status, scheduledAt, mediaType, delayMs, textos, source }) {
   const id = `rmk_${Date.now()}_${agentId}`;
   state.remarketingCampaigns[id] = {
     id,
@@ -814,6 +814,7 @@ function createRemarketingCampaign({ agentId, name, text, imageUrl, pauseAfterSe
     mediaType: mediaType || 'image',
     delayMs: Number(delayMs || 3000),
     textos: Array.isArray(textos) ? textos : [],
+    source: source || 'mkt',
     createdAt: Date.now(),
     updatedAt: Date.now(),
     finishedAt: 0,
