@@ -1894,6 +1894,7 @@ let atkRmkStatusTimer = null;
 let atkRmkCampanhas = [];
 let atkRmkEnhancedReady = false;
 let atkRmkCampanhaSelecionada = null;
+let atkRmkCampanhaPendentes = null;
 
 function atkRmkEnsureEnhancedUi() {
   if (atkRmkEnhancedReady) return;
@@ -1955,6 +1956,8 @@ function atkRmkSetModo(modo) {
 function atkRmkSwitchAgent(agente, btn) {
   atkRmkEnsureEnhancedUi();
   atkRmkAgente = agente;
+  atkRmkCampanhaSelecionada = null;
+  atkRmkCampanhaPendentes = null;
   ['Pedro','Rodrigo'].forEach(n => {
     const b = document.getElementById(`atkRmkBtn${n}`);
     if (b) { b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)'; }
@@ -1966,6 +1969,7 @@ function atkRmkSwitchAgent(agente, btn) {
 function atkRmkSetFilter(f, btn) {
   atkRmkFiltro = f;
   atkRmkCampanhaSelecionada = null;
+  atkRmkCampanhaPendentes = null;
   document.querySelectorAll('.atk-rmk-filter').forEach(b => {
     b.style.background = 'var(--card)'; b.style.color = 'var(--text-muted)'; b.style.border = '1px solid var(--border)';
   });
@@ -2050,16 +2054,14 @@ async function atkRmkCancelarCampanha(id) {
 async function atkRmkSelectCampaignPendentes(id) {
   let c = atkRmkCampanhas.find(x => x.id === id);
   if (!c) return;
-  if (!Array.isArray(c.recipients)) {
-    try {
-      const r = await fetch(`/api/remarketing/campanhas/${id}?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
-      const detalhe = await r.json();
-      if (!r.ok) throw new Error(detalhe.error || 'Nao foi possivel carregar a campanha');
-      c = detalhe;
-      atkRmkCampanhas = atkRmkCampanhas.map(item => item.id === id ? c : item);
-    } catch (e) {
-      return alert(e.message || 'Nao foi possivel carregar a campanha');
-    }
+  try {
+    const r = await fetch(`/api/remarketing/campanhas/${id}/pendentes?agente=${atkRmkAgente}`, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    const detalhe = await r.json();
+    if (!r.ok) throw new Error(detalhe.error || 'Nao foi possivel carregar pendentes');
+    c = detalhe.campanha || c;
+    atkRmkCampanhaPendentes = Array.isArray(detalhe.contatos) ? detalhe.contatos : [];
+  } catch (e) {
+    return alert(e.message || 'Nao foi possivel carregar pendentes');
   }
   atkRmkFiltro = 'campanha_pendente';
   atkRmkCampanhaSelecionada = c;
@@ -2069,7 +2071,7 @@ async function atkRmkSelectCampaignPendentes(id) {
   atkRmkRenderContatos();
   document.querySelectorAll('.atk-rmk-chk').forEach(chk => { chk.checked = true; });
   atkRmkUpdateCounter();
-  toast(`Pendentes da campanha carregados`);
+  toast(`${atkRmkCampanhaPendentes.length} pendentes da campanha carregados`);
 }
 
 function atkRmkRenderContatos() {
@@ -2085,13 +2087,7 @@ function atkRmkRenderContatos() {
   else if (atkRmkFiltro === 'falharam') lista = lista.filter(c => c.falhaRemarketingEm);
   else if (atkRmkFiltro === 'sem_data') lista = lista.filter(c => c.pausado && !c.pausadoEm);
   else if (atkRmkFiltro === 'campanha_pendente' && atkRmkCampanhaSelecionada) {
-    const recipients = new Set((atkRmkCampanhaSelecionada.recipients || []).map(n => String(n).slice(-8)));
-    const sent = new Set((atkRmkCampanhaSelecionada.sentTo || []).map(n => String(n).slice(-8)));
-    const failed = new Set((atkRmkCampanhaSelecionada.failedTo || []).map(item => String(item?.numero || item).slice(-8)));
-    lista = lista.filter(c => {
-      const key = String(c.numero || '').slice(-8);
-      return recipients.has(key) && !sent.has(key) && !failed.has(key);
-    });
+    lista = Array.isArray(atkRmkCampanhaPendentes) ? [...atkRmkCampanhaPendentes] : [];
   }
   const sort = document.getElementById('atkRmkSort')?.value || 'ultima';
   lista.sort((a, b) => {

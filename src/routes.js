@@ -832,9 +832,7 @@ function _markCanonicalRemarketingSent(agente, numero, sentAt, dbAtk) {
   return marked;
 }
 
-router.get('/api/remarketing/contatos', auth, (req, res) => {
-  const agentId = req.query.agente;
-  if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+function _getRemarketingContatos(agentId) {
   const raw = [];
   let dbAtkRef = null;
   if (ATK_REMARK_AGENTS.includes(agentId)) {
@@ -871,8 +869,15 @@ router.get('/api/remarketing/contatos', auth, (req, res) => {
       });
     });
   }
-  let contatos = _deduplicateContatos(raw, dbAtkRef);
+  const contatos = _deduplicateContatos(raw, dbAtkRef);
   contatos.sort((a, b) => b.ultimaMensagem - a.ultimaMensagem);
+  return { contatos, dbAtkRef };
+}
+
+router.get('/api/remarketing/contatos', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!VALID_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente invalido' });
+  let { contatos } = _getRemarketingContatos(agentId);
   if (req.query.pausado === 'true') contatos = contatos.filter(c => c.pausado);
   if (req.query.pausado === 'false') contatos = contatos.filter(c => !c.pausado);
   res.json(contatos);
@@ -918,6 +923,52 @@ router.get('/api/remarketing/campanhas/:id', auth, (req, res) => {
     const campaign = dbAtk.getRemarketingCampaign(req.params.id);
     if (!campaign || campaign.agentId !== agentId) return res.status(404).json({ error: 'campanha nao encontrada' });
     res.json(campaign);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/api/remarketing/campanhas/:id/pendentes', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!ATK_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente ATK invalido' });
+  try {
+    const dbAtk = require('./database-atk');
+    const campaign = dbAtk.getRemarketingCampaign(req.params.id);
+    if (!campaign || campaign.agentId !== agentId) return res.status(404).json({ error: 'campanha nao encontrada' });
+
+    const done = new Set([
+      ...(campaign.sentTo || []),
+      ...(campaign.failedTo || []).map(item => item?.numero || item),
+      ...(campaign.skippedTo || []).map(item => item?.numero || item),
+    ].map(n => _canonicalPhone(n, dbAtk)).filter(Boolean));
+
+    const pendingCanon = new Set((campaign.recipients || [])
+      .map(n => _canonicalPhone(n, dbAtk))
+      .filter(canon => canon && !done.has(canon)));
+
+    const { contatos } = _getRemarketingContatos(agentId);
+    const pendentes = contatos
+      .filter(c => pendingCanon.has(_canonicalPhone(c.numero, dbAtk)))
+      .map(c => ({
+        ...c,
+        campanhaPendenteId: campaign.id,
+        campanhaPendenteNome: campaign.name,
+      }));
+
+    res.json({
+      campanha: {
+        id: campaign.id,
+        agentId: campaign.agentId,
+        name: campaign.name,
+        status: campaign.status,
+        total: campaign.total || 0,
+        sent: campaign.sent || 0,
+        failed: campaign.failed || 0,
+        skipped: campaign.skipped || 0,
+        pending: campaign.pending || pendingCanon.size,
+      },
+      contatos: pendentes,
+      pendingRaw: pendingCanon.size,
+      matched: pendentes.length,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
