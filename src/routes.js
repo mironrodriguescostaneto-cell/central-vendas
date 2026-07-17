@@ -883,7 +883,40 @@ router.get('/api/remarketing/campanhas', auth, (req, res) => {
   if (!ATK_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente ATK invalido' });
   try {
     const dbAtk = require('./database-atk');
-    res.json(dbAtk.listRemarketingCampaigns(agentId).slice(0, 20));
+    res.json(dbAtk.listRemarketingCampaigns(agentId).slice(0, 20).map(c => ({
+      id: c.id,
+      agentId: c.agentId,
+      name: c.name,
+      text: c.text,
+      imageUrl: c.imageUrl,
+      pauseAfterSend: c.pauseAfterSend,
+      status: c.status,
+      scheduledAt: c.scheduledAt,
+      mediaType: c.mediaType,
+      delayMs: c.delayMs,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      finishedAt: c.finishedAt,
+      total: c.total || 0,
+      sent: c.sent || 0,
+      failed: c.failed || 0,
+      skipped: c.skipped || 0,
+      pending: c.pending || 0,
+      responded: Array(c.responded?.length || 0).fill(''),
+      respondedCount: c.responded?.length || 0,
+      summary: true,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/api/remarketing/campanhas/:id', auth, (req, res) => {
+  const agentId = req.query.agente;
+  if (!ATK_REMARK_AGENTS.includes(agentId)) return res.status(400).json({ error: 'agente ATK invalido' });
+  try {
+    const dbAtk = require('./database-atk');
+    const campaign = dbAtk.getRemarketingCampaign(req.params.id);
+    if (!campaign || campaign.agentId !== agentId) return res.status(404).json({ error: 'campanha nao encontrada' });
+    res.json(campaign);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
