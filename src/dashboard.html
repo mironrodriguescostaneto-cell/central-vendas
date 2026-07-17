@@ -1578,6 +1578,7 @@ function rmkRenderContatos() {
       <input type="checkbox" class="rmk-chk" data-numero="${c.numero}" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0" onchange="rmkUpdateCounter()">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome || c.numero}</div>
+        ${c.campanhaPendenteNome ? `<div style="font-size:11px;color:var(--danger);font-weight:700">Pendente em ${esc(c.campanhaPendenteNome)}</div>` : ''}
         <div style="font-size:11px;color:var(--text-muted)">${c.nome ? c.numero : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
@@ -2099,8 +2100,11 @@ function atkRmkRenderContatos() {
   atkRmkRenderResumo(lista);
   if (!lista.length) { el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:14px">Nenhum contato</div>'; atkRmkUpdateCounter(); return; }
   el.innerHTML = lista.map(c => {
-    const recebeu = c.remarketingEnviadoEm || c.respondeuRemarketingEm;
-    const rmkBadge = recebeu
+    const isCampaignPendingMode = atkRmkFiltro === 'campanha_pendente' && c.campanhaPendenteId;
+    const recebeu = !isCampaignPendingMode && (c.remarketingEnviadoEm || c.respondeuRemarketingEm);
+    const rmkBadge = isCampaignPendingMode
+      ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626">Nao recebeu esta campanha</span>`
+      : recebeu
       ? `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#dcfce7;color:#15803d">Recebeu ${c.remarketingEnviadoEm ? new Date(c.remarketingEnviadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : ''}</span>`
       : `<span style="font-size:9px;padding:2px 5px;border-radius:99px;font-weight:700;background:#fee2e2;color:#dc2626">Nao enviado</span>`;
     return `
