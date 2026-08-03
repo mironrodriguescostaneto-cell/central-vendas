@@ -112,6 +112,8 @@ const CONFIG = {
     rafael: 'rafael-session',
     sarah: 'sarah-session',
     antonio: 'antonio-session',
+    pedro: 'pedro',
+    rodrigo: 'rodrigo',
   },
 };
 

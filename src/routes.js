@@ -36,6 +36,12 @@ function auth(req, res, next) {
   next();
 }
 
+function getBaileysSessionId(agentId) {
+  if (CONFIG.sessionIds[agentId]) return CONFIG.sessionIds[agentId];
+  if (['pedro', 'rodrigo'].includes(agentId)) return agentId;
+  return null;
+}
+
 // ----- Login -----
 router.post('/api/login', (req, res) => {
   const { password } = req.body;
@@ -129,7 +135,7 @@ router.get('/api/agents/:agentId/qr', auth, (req, res) => {
 // ----- Página de scan local (sem auth, só localhost) -----
 router.get('/scan/:agentId', (req, res) => {
   const { agentId } = req.params;
-  if (!['info', 'logzz', 'rafael', 'sarah', 'antonio'].includes(agentId)) return res.status(404).end();
+  if (!['info', 'logzz', 'rafael', 'sarah', 'antonio', 'pedro', 'rodrigo'].includes(agentId)) return res.status(404).end();
   res.setHeader('Content-Type', 'text/html');
   res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conectar - ${agentId}</title>
@@ -172,7 +178,8 @@ button:hover{background:#1da34e}
 let t=0;
 async function refresh(){
   const r=await fetch('/api/health'); const d=await r.json();
-  const s=d.agents['${agentId}-session']||{};
+  const sessionId={info:'info-session',logzz:'logzz-session',rafael:'rafael-session',sarah:'sarah-session',antonio:'antonio-session',pedro:'pedro',rodrigo:'rodrigo'}['${agentId}'];
+  const s=d.agents[sessionId]||{};
   const st=document.getElementById('st');
   st.textContent=s.state==='connected'?'✅ Conectado!':s.hasQR?'📱 QR disponível':'⏳ Aguardando...';
   st.className='status '+(s.state||'disconnected');
