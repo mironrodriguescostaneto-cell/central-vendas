@@ -51,6 +51,7 @@ function getSession(sessionId) {
       connectionState: 'disconnected',
       messageHandler: null,
       retryCount: 0,
+      lastError: null,
       _reconnectGen: 0,
       lidMap: {},
     };
@@ -215,6 +216,7 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
         session.connectionState = 'disconnected';
         notifyStatus(sessionId, 'disconnected');
         const statusCode = lastDisconnect?.error?.output?.statusCode;
+        session.lastError = lastDisconnect?.error?.message || (statusCode ? `connection.close ${statusCode}` : 'connection.close');
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
         console.log(`[BAILEYS:${sessionId}] Desconectado. StatusCode: ${statusCode}. Reconectar: ${shouldReconnect}`);
@@ -472,10 +474,33 @@ async function connect(sessionId, onMessage, isInternalReconnect = false, opts =
   } catch (error) {
     console.error(`[BAILEYS:${sessionId}] Erro ao conectar:`, error.message);
     session.connectionState = 'disconnected';
+    session.lastError = error.message;
     notifyStatus(sessionId, 'disconnected');
     return null;
   }
 }
+
+function waitForQR(sessionId, timeoutMs = 30000) {
+  const session = getSession(sessionId);
+  if (session.qrCode) return Promise.resolve(session.qrCode);
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      session._qrWaiters = (session._qrWaiters || []).filter(fn => fn !== onQR);
+      reject(new Error(`Timeout ${Math.round(timeoutMs / 1000)}s aguardando QR`));
+    }, timeoutMs);
+
+    function onQR(qr) {
+      clearTimeout(timeout);
+      resolve(qr);
+    }
+
+    session._qrWaiters = session._qrWaiters || [];
+    session._qrWaiters.push(onQR);
+  });
+}
+
+function getLastError(sessionId) { return getSession(sessionId).lastError || null; }
 
 function _syncContactsFromLidMap(sessionId) {
   try {
@@ -663,7 +688,9 @@ module.exports = {
   sendMediaBuffer,
   getQRCode,
   getState,
+  getLastError,
   getAllStatus,
+  waitForQR,
   forceLogout,
   reconnect,
   restartConnection,

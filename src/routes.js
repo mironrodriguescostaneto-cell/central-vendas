@@ -2108,6 +2108,10 @@ router.post('/api/atk/agents/:agentId/reconnect', auth, async (req, res) => {
     const baileys = require('./baileys');
     const agentsAtkInit = require('./agents-atk-init');
     await baileys.forceLogout(agentId);
+    const qrPromise = baileys.waitForQR(agentId, 30000).catch(e => {
+      console.error(`[ATK:${agentId}] QR timeout:`, e.message);
+      return null;
+    });
     // Re-inicializa a sessão para gerar novo QR
     const dbAtk = require('./database-atk');
     const agentsAtk = require('./agents-atk');
@@ -2119,15 +2123,10 @@ router.post('/api/atk/agents/:agentId/reconnect', auth, async (req, res) => {
         else if (type === 'sent') agentsAtk.handleSentMessage(agentId, data);
       } catch (e) { console.error(`[ATK:${agentId}] Handler error:`, e.message); }
     };
-    await baileys.connect(agentId, handler);
-    // Aguardar QR até 8s
-    let qr = null;
-    for (let i = 0; i < 16; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      qr = baileys.getQRCode(agentId);
-      if (qr) break;
-      if (baileys.getState(agentId) === 'connected') break;
-    }
+    const sock = await baileys.connect(agentId, handler);
+    // Aguardar QR por evento; se nao chegar, devolve o erro mais recente.
+    let qr = sock ? await qrPromise : null;
+    if (!qr) qr = baileys.getQRCode(agentId);
     const state = baileys.getState(agentId);
     if (state === 'connected') return res.json({ agentId, state, qr: null, connected: true });
     if (qr) {
@@ -2138,7 +2137,7 @@ router.post('/api/atk/agents/:agentId/reconnect', auth, async (req, res) => {
       } catch {}
       return res.json({ agentId, state, qr: `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}` });
     }
-    res.json({ agentId, state, qr: null });
+    res.json({ agentId, state, qr: null, error: baileys.getLastError(agentId) || 'QR nao gerado no tempo esperado' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
